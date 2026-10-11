@@ -39,6 +39,8 @@ class MatchScene extends Phaser.Scene {
         this.isSkip = false;
 
         this.score = { player: 0, opponent: 0 };
+        this.matchState = 'playing';
+        this.kickoffTimer = 0;
         this.ball = { x: 400, y: 300, owner: null }; // owner is a sprite or null
 
         // Sprites / Teams
@@ -46,6 +48,7 @@ class MatchScene extends Phaser.Scene {
         this.opponentSprites = [];
 
         this.spawnTeams();
+        this.resetPositions();
 
         // Physics/Update timer (Run every 100ms logically)
         this.logicTimer = this.time.addEvent({
@@ -191,6 +194,8 @@ class MatchScene extends Phaser.Scene {
             }
 
             let sprite = this.createPlayerSprite(pos.x, pos.y, 0x3498db, i + 1, true, player);
+            sprite.baseX = pos.x;
+            sprite.baseY = pos.y;
             this.playerSprites.push(sprite);
         });
 
@@ -205,6 +210,8 @@ class MatchScene extends Phaser.Scene {
             }
 
             let sprite = this.createPlayerSprite(pos.x, pos.y, 0xe74c3c, i + 1, false, player);
+            sprite.baseX = pos.x;
+            sprite.baseY = pos.y;
             this.opponentSprites.push(sprite);
         });
 
@@ -851,6 +858,13 @@ class MatchScene extends Phaser.Scene {
         }
 
         // Update ball sprite visually
+        // Update visual drawing order (Z-index) based on Y position
+        this.playerSprites.forEach(p => { p.container.setDepth(p.y); });
+        this.opponentSprites.forEach(p => { p.container.setDepth(p.y); });
+        if (this.ballContainer) {
+            this.ballContainer.setDepth(this.ball.y);
+        }
+
         if (this.ballContainer) {
             this.ballContainer.x = this.ball.x;
             this.ballContainer.y = this.ball.y;
@@ -873,8 +887,31 @@ class MatchScene extends Phaser.Scene {
     }
 
     resetPositions() {
-        this.playerSprites.forEach(p => { p.x = Phaser.Math.Between(50, 350); p.y = Phaser.Math.Between(50, 550); });
-        this.opponentSprites.forEach(p => { p.x = Phaser.Math.Between(450, 750); p.y = Phaser.Math.Between(50, 550); });
+        this.playerSprites.forEach(p => {
+            if (p.baseX) { p.x = p.baseX; p.y = p.baseY; }
+            else { p.x = Phaser.Math.Between(50, 350); p.y = Phaser.Math.Between(50, 550); }
+        });
+        this.opponentSprites.forEach(p => {
+            if (p.baseX) { p.x = p.baseX; p.y = p.baseY; }
+            else { p.x = Phaser.Math.Between(450, 750); p.y = Phaser.Math.Between(50, 550); }
+        });
+
+        this.ball.x = 400;
+        this.ball.y = 300;
+
+        // Determine kicking team (alternates or based on goal)
+        // For simplicity, team that conceded kicks off. If score is tied or start of match, random or player team.
+        const isPlayerKickoff = (this.score.player + this.score.opponent) % 2 === 0;
+
+        let kickOffTeam = isPlayerKickoff ? this.playerSprites : this.opponentSprites;
+        let striker = kickOffTeam.find(p => p.playerData.position === 'ST') || kickOffTeam[kickOffTeam.length - 1];
+
+        striker.x = 400 - (isPlayerKickoff ? 10 : -10);
+        striker.y = 300;
+
+        this.ball.owner = striker;
+        this.matchState = 'kickoff';
+        this.kickoffTimer = 20; // 20 ticks delay
     }
 
     triggerGoal(isPlayerTeam) {
