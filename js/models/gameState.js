@@ -60,10 +60,36 @@ class GameState {
         } else if (homeScore === awayScore) {
             matchFunds += 20000; // Draw bonus
         }
+
+        // Apply Post-Match Relics
+        let conditionRecoveryBonus = 0;
+        this.playerTeam.relics.forEach(relicId => {
+            const relic = window.MasterData.Relics.find(r => r.id === relicId);
+            if (relic) {
+                if (relic.effectType === "FUNDS_UP") {
+                    matchFunds += relic.value;
+                }
+                if (relic.effectType === "CONDITION_RECOVERY") {
+                    conditionRecoveryBonus += relic.value;
+                }
+            }
+        });
+
+        // Apply condition recovery
+        this.playerTeam.players.forEach(p => {
+             // base match stamina recovery (e.g., 20) + relic bonus
+             p.condition = Math.min(100, p.condition + 20 + conditionRecoveryBonus);
+             p.currentStamina = p.stats.stamina; // Reset match stamina
+        });
+
         this.funds += matchFunds;
 
         // Advance Matchday
         this.league.currentMatchday++;
+
+        // Clear events so they regenerate next turn
+        this.currentEvents = [];
+        this.eventsGeneratedForTurn = false;
 
         this.checkDismissal();
     }
