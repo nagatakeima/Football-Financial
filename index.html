@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Football Tactics: Unseated</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Phaser 3 CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+</head>
+<body>
+    <div id="game-container">
+        <!-- UI Overlay for Management Phase / Match UI -->
+        <div id="ui-layer">
+            <header class="top-bar">
+                <div class="team-info">チーム: 未設定 <span class="funds">資金: ¥1,000,000</span> <span class="ap">AP: 5/5</span></div>
+                <div class="schedule">第3部 第1節</div>
+            </header>
+            <main class="ui-content" id="ui-content">
+                <!-- Management events, menus will be injected here -->
+                <div class="menu-box">
+                    <h2>監督室</h2>
+                    <button onclick="startGame()">試合開始</button>
+                    <button>編成</button>
+                    <button>イベント</button>
+                </div>
+            </main>
+        </div>
+
+        <!-- Phaser Canvas Container -->
+        <div id="phaser-game"></div>
+    </div>
+
+    <!-- Main Game Logic -->
+    <script src="js/main.js"></script>
+</body>
+</html>
