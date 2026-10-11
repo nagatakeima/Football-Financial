@@ -869,8 +869,8 @@ class MatchScene extends Phaser.Scene {
 
         // Update ball sprite visually
         // Update visual drawing order (Z-index) based on Y position
-        this.playerSprites.forEach(p => { p.container.setDepth(p.y); });
-        this.opponentSprites.forEach(p => { p.container.setDepth(p.y); });
+        this.playerSprites.forEach(p => { p.setDepth(p.y); });
+        this.opponentSprites.forEach(p => { p.setDepth(p.y); });
         if (this.ballContainer) {
             this.ballContainer.setDepth(this.ball.y);
         }
