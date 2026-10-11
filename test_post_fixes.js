@@ -1,6 +1,7 @@
 const fs = require('fs');
 
 global.window = {};
+window.addEventListener = function() {};
 
 window.MasterData = {
     Managers: [], PlayerSkills: [], Relics: [], MicroCommands: [], Positions: []
