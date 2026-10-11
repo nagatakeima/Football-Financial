@@ -13,7 +13,7 @@
         <!-- UI Overlay for Management Phase / Match UI -->
         <div id="ui-layer">
             <header class="top-bar">
-                <div class="team-info">チーム: 未設定 <span class="funds">資金: ¥1,000,000</span> <span class="ap">AP: 5/5</span></div>
+                <div class="team-info">チーム: 未設定 <span class="funds">資金: ¥1,000,000</span> <span class="ap">AP: 5/10</span></div>
                 <div class="schedule">第3部 第1節</div>
             </header>
             <main class="ui-content" id="ui-content">
@@ -31,7 +31,14 @@
         <div id="phaser-game"></div>
     </div>
 
-    <!-- Main Game Logic -->
+    <!-- Data Models & Logic -->
+    <script src="js/models/masterData.js"></script>
+    <script src="js/models/player.js"></script>
+    <script src="js/models/team.js"></script>
+    <script src="js/models/league.js"></script>
+    <script src="js/models/gameState.js"></script>
+    <script src="js/models/chemistry.js"></script>
+    <script src="js/managementUI.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>
