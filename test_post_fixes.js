@@ -6,7 +6,6 @@ global.document = {
     querySelector: () => ({ style: {}, innerHTML: '', addEventListener: () => {} }),
     createElement: () => ({ style: {}, innerHTML: '', appendChild: () => {} })
 };
-
 window.MasterData = {
     Managers: [], PlayerSkills: [], Relics: [], MicroCommands: [], Positions: []
 };
