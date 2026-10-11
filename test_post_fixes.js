@@ -1,17 +1,12 @@
 const fs = require('fs');
 
-<<<<<<< Updated upstream
 global.window = { addEventListener: () => {} };
 global.document = {
     getElementById: () => ({ style: {}, innerHTML: '', addEventListener: () => {} }),
     querySelector: () => ({ style: {}, innerHTML: '', addEventListener: () => {} }),
     createElement: () => ({ style: {}, innerHTML: '', appendChild: () => {} })
 };
-=======
-global.window = {};
-window.addEventListener = function() {};
 
->>>>>>> Stashed changes
 window.MasterData = {
     Managers: [], PlayerSkills: [], Relics: [], MicroCommands: [], Positions: []
 };
