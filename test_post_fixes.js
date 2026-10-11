@@ -1,28 +1,42 @@
 const fs = require('fs');
 
-global.window = {};
-
+global.window = { addEventListener: () => {} };
+global.document = {
+    getElementById: () => ({ style: {}, innerHTML: '', addEventListener: () => {} }),
+    querySelector: () => ({ style: {}, innerHTML: '', addEventListener: () => {} }),
+    createElement: () => ({ style: {}, innerHTML: '', appendChild: () => {} })
+};
 window.MasterData = {
     Managers: [], PlayerSkills: [], Relics: [], MicroCommands: [], Positions: []
 };
 
-// Test UI events loop fix
-eval(fs.readFileSync('js/managementUI.js', 'utf8'));
-
 window.gameState = {
-    currentEvents: []
+    currentEvents: [],
+    ap: 10,
+    funds: 100000
 };
-const ui = new ManagementUI();
-// mock generate events to push a fixed event and a scout
-ui.generateEvents = function() {
-    window.gameState.currentEvents.push({type: 'scout'});
+
+// We will use vm to load it correctly
+const vm = require('vm');
+const context = {
+    window: global.window,
+    document: global.document,
+    console: console,
+    MasterData: window.MasterData
 };
-ui.uiContent = { innerHTML: "" };
+vm.createContext(context);
+const code = fs.readFileSync('js/managementUI.js', 'utf8');
+vm.runInContext(code, context);
 
-ui.showEvents(); // Should call generateEvents
-console.log("After first showEvents:", window.gameState.currentEvents.length); // 1
+vm.runInContext(`
+    const ui = new ManagementUI();
+    ui.generateEvents = function() {
+        window.gameState.currentEvents.push({type: 'scout', player: {name: 'Test', position: 'FW'}, apCost: 10, fundCost: 1000});
+    };
+    ui.uiContent = { innerHTML: "" };
 
-// Simulate buying the scout
-window.gameState.currentEvents = []; // Now it's empty, but maybe we have a 'training' event if we refactored
-// The fix was to check `some(e => e.type === 'scout' || e.type === 'shop')`. So if empty, it'll generate again (which is correct behavior for a new turn, but within a turn we shouldn't wipe everything if it means restocking infinitely).
-// Wait, the reviewer said: "The condition `if (!window.gameState.currentEvents || window.gameState.currentEvents.length === 0)` in `showEvents()` means that if a user has enough resources to buy all available items, the array becomes empty, and the shop will instantly restock itself with new items in the same turn."
+    ui.showEvents();
+    console.log("After first showEvents:", window.gameState.currentEvents.length);
+
+    window.gameState.currentEvents = [];
+`, context);
