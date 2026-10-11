@@ -487,8 +487,18 @@ class MatchScene extends Phaser.Scene {
             });
         }
 
-        // Simulate Action
-        this.simulateAction();
+        // Handle match state and simulate action
+        if (this.matchState === 'kickoff') {
+            if (this.kickoffTimer > 0) {
+                this.kickoffTimer -= 1;
+            } else {
+                this.matchState = 'playing';
+            }
+        }
+
+        if (this.matchState === 'playing') {
+            this.simulateAction();
+        }
 
         // End Game
         if (this.matchTime >= 90) {
