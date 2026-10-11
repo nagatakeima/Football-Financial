@@ -47,9 +47,6 @@ class MatchScene extends Phaser.Scene {
 
         this.spawnTeams();
 
-        // UI Layer in Phaser
-        this.createMatchUI();
-
         // Physics/Update timer (Run every 100ms logically)
         this.logicTimer = this.time.addEvent({
             delay: 100,
@@ -57,50 +54,132 @@ class MatchScene extends Phaser.Scene {
             callbackScope: this,
             loop: true
         });
+
+        // UI Layer in Phaser
+        this.createMatchUI();
     }
 
     drawPitch() {
-        this.add.rectangle(400, 300, 800, 600, 0x2E8B57);
+        // Striped grass pattern
+        for (let i = 0; i < 8; i++) {
+            this.add.rectangle(400, i * 75 + 37.5, 800, 75, i % 2 === 0 ? 0x2E8B57 : 0x277A4D);
+        }
+
         const graphics = this.add.graphics();
-        graphics.lineStyle(4, 0xffffff, 0.8);
+        graphics.lineStyle(2, 0xffffff, 0.8);
+
+        // Center line & circle
         graphics.strokeCircle(400, 300, 70);
         graphics.beginPath();
-        graphics.moveTo(400, 0);
-        graphics.lineTo(400, 600);
+        graphics.moveTo(400, 10);
+        graphics.lineTo(400, 590);
         graphics.strokePath();
-        graphics.strokeRect(0, 150, 150, 300); // Left Penalty
-        graphics.strokeRect(650, 150, 150, 300); // Right Penalty
+
+        // Outer bounds
+        graphics.strokeRect(10, 10, 780, 580);
+
+        // Left Penalty Area
+        graphics.strokeRect(10, 150, 150, 300);
+        graphics.strokeRect(10, 225, 50, 150); // Goal Area
+        graphics.fillCircle(110, 300, 3); // Penalty Spot
+        graphics.beginPath();
+        graphics.arc(110, 300, 70, -Math.PI / 3, Math.PI / 3); // Penalty Arc
+        graphics.strokePath();
+
+        // Right Penalty Area
+        graphics.strokeRect(640, 150, 150, 300);
+        graphics.strokeRect(740, 225, 50, 150); // Goal Area
+        graphics.fillCircle(690, 300, 3); // Penalty Spot
+        graphics.beginPath();
+        graphics.arc(690, 300, 70, Math.PI - Math.PI / 3, Math.PI + Math.PI / 3); // Penalty Arc
+        graphics.strokePath();
+
+        // Goals
+        graphics.lineStyle(3, 0xaaaaaa, 1);
+        graphics.strokeRect(0, 260, 10, 80);
+        graphics.strokeRect(790, 260, 10, 80);
+    }
+
+    getBasePosition(pos, isPlayerTeam) {
+        let x = 400;
+        let y = 300;
+        const dir = isPlayerTeam ? -1 : 1;
+        const half = 200;
+
+        switch (pos) {
+            case 'GK': x = 400 + dir * 350; y = 300; break;
+            case 'CB': x = 400 + dir * 250; y = 300; break;
+            case 'SB': x = 400 + dir * 250; y = 100; break;
+            case 'CDM': x = 400 + dir * 150; y = 300; break;
+            case 'CM': x = 400 + dir * 100; y = 300; break;
+            case 'CAM': x = 400 + dir * 50; y = 300; break;
+            case 'WG': x = 400 + dir * 100; y = 100; break;
+            case 'ST': x = 400 - dir * 50; y = 300; break;
+            default: x = 400 + dir * 100; y = 300; break;
+        }
+        return { x, y };
+    }
+
+    createPlayerSprite(x, y, color, number, isPlayerTeam, player) {
+        let container = this.add.container(x, y);
+        let body = this.add.circle(0, 0, 12, color);
+        body.setStrokeStyle(2, 0xffffff);
+
+        // Head
+        let head = this.add.circle(0, -15, 8, 0xffccaa); // skin tone
+
+        // Number text
+        let numText = this.add.text(0, 0, number, { fontSize: '12px', fontStyle: 'bold', color: '#fff' }).setOrigin(0.5);
+
+        container.add([body, head, numText]);
+
+        // Reference to properties
+        container.playerData = player;
+        container.isPlayerTeam = isPlayerTeam;
+        container.animTick = Math.random() * 10;
+        container.baseColor = color;
+
+        return container;
     }
 
     spawnTeams() {
-        // Very basic positional mapping logic based on standard formations
-        // For MVP, randomly scatter players in their half
-
         this.playerTeamData.starting11.forEach((player, i) => {
-            const x = Phaser.Math.Between(50, 350);
-            const y = Phaser.Math.Between(50, 550);
-            let sprite = this.add.circle(x, y, 10, 0x3498db);
-            sprite.setStrokeStyle(2, 0xffffff);
-            sprite.playerData = player;
-            sprite.isPlayerTeam = true;
-            this.playerSprites.push(sprite);
+            let pos = this.getBasePosition(player.position, true);
+            let yOffset = (i % 2 === 0 ? -1 : 1) * ((i % 3) * 30); // Spread them out
+            if (player.position === 'SB' || player.position === 'WG') {
+                pos.y = i % 2 === 0 ? 100 : 500; // Left / Right flanks
+            }
+            if (player.position === 'CB' || player.position === 'CM' || player.position === 'CDM') {
+                pos.y = 300 + yOffset;
+            }
 
-            // Number label
-            this.add.text(x, y, i+1, { fontSize: '10px', color: '#fff' }).setOrigin(0.5);
+            let sprite = this.createPlayerSprite(pos.x, pos.y, 0x3498db, i + 1, true, player);
+            this.playerSprites.push(sprite);
         });
 
         this.opponentTeamData.starting11.forEach((player, i) => {
-            const x = Phaser.Math.Between(450, 750);
-            const y = Phaser.Math.Between(50, 550);
-            let sprite = this.add.circle(x, y, 10, 0xe74c3c);
-            sprite.setStrokeStyle(2, 0xffffff);
-            sprite.playerData = player;
-            sprite.isPlayerTeam = false;
+            let pos = this.getBasePosition(player.position, false);
+            let yOffset = (i % 2 === 0 ? -1 : 1) * ((i % 3) * 30);
+            if (player.position === 'SB' || player.position === 'WG') {
+                pos.y = i % 2 === 0 ? 100 : 500;
+            }
+            if (player.position === 'CB' || player.position === 'CM' || player.position === 'CDM') {
+                pos.y = 300 + yOffset;
+            }
+
+            let sprite = this.createPlayerSprite(pos.x, pos.y, 0xe74c3c, i + 1, false, player);
             this.opponentSprites.push(sprite);
         });
 
         // Ball Sprite
-        this.ballSprite = this.add.circle(400, 300, 6, 0xffffff);
+        this.ballSprite = this.add.circle(0, 0, 6, 0xffffff);
+        this.ballSprite.setStrokeStyle(1, 0x000000); // shadow
+        this.ballContainer = this.add.container(400, 300);
+        let shadow = this.add.ellipse(0, 8, 12, 6, 0x000000, 0.3);
+        this.ballContainer.add([shadow, this.ballSprite]);
+
+        this.ballTarget = null;
+        this.ballSpeed = 0;
     }
 
     createMatchUI() {
@@ -375,26 +454,120 @@ class MatchScene extends Phaser.Scene {
     }
 
     simulateAction() {
-        // Extremely simplified simulation loop for visual MVP
-        // Move players slightly towards ball
-        const speed = 2;
+        // Modern Football Positional AI
+        const speed = 2.5;
 
         [...this.playerSprites, ...this.opponentSprites].forEach(p => {
-            // Jitter
-            p.x += (Math.random() - 0.5) * 2;
-            p.y += (Math.random() - 0.5) * 2;
+            let targetX = p.x;
+            let targetY = p.y;
+            let moved = false;
 
-            // Very slowly move towards ball if near
-            if (Phaser.Math.Distance.Between(p.x, p.y, this.ball.x, this.ball.y) < 100) {
-                const angle = Phaser.Math.Angle.Between(p.x, p.y, this.ball.x, this.ball.y);
-                p.x += Math.cos(angle) * speed;
-                p.y += Math.sin(angle) * speed;
+            // Determine Roles and Phase
+            const hasBall = this.ball.owner === p;
+
+            // Fix: Team in possession is determined by owner, OR last team to touch ball if loose
+            // We use the ball target direction to guess if it's player team attacking or not,
+            // but for simplicity, if owner is null, we can just say players move to their base positions or chase the ball.
+            let isAttacking = false;
+            let isDefending = false;
+
+            if (this.ball.owner) {
+                isAttacking = this.ball.owner.isPlayerTeam === p.isPlayerTeam;
+                isDefending = this.ball.owner.isPlayerTeam !== p.isPlayerTeam;
+            } else {
+                 // Loose ball - both teams try to move to base position but nearest players will chase (handled below)
+                 isAttacking = false;
+                 isDefending = false;
+            }
+
+            if (hasBall) {
+                // Dribble towards opponent goal
+                const targetGoalX = p.isPlayerTeam ? 800 : 0;
+                targetX = p.x + (p.isPlayerTeam ? 20 : -20);
+                targetY = 300 + (Math.random() * 40 - 20); // slightly aim for center
+
+                // Avoid defenders
+                const enemies = p.isPlayerTeam ? this.opponentSprites : this.playerSprites;
+                enemies.forEach(e => {
+                    if (Phaser.Math.Distance.Between(p.x, p.y, e.x, e.y) < 30) {
+                        targetY += (p.y > e.y ? 20 : -20); // dodge y
+                    }
+                });
+            } else if (isAttacking) {
+                // Move forward to support
+                let base = this.getBasePosition(p.playerData.position, p.isPlayerTeam);
+                // Push up relative to ball
+                targetX = base.x + (p.isPlayerTeam ? 100 : -100);
+                if (p.playerData.position === 'WG' || p.playerData.position === 'SB') {
+                    targetY = base.y; // stay wide
+                } else {
+                    targetY = base.y + (this.ball.y - 300) * 0.3; // slightly shift towards ball side
+                }
+            } else if (isDefending) {
+                // Drop back and compress
+                let base = this.getBasePosition(p.playerData.position, p.isPlayerTeam);
+                targetX = base.x + (p.isPlayerTeam ? -50 : 50);
+                targetY = base.y + (this.ball.y - 300) * 0.5; // shift block towards ball
+            } else {
+                // Ball is loose, return to base
+                let base = this.getBasePosition(p.playerData.position, p.isPlayerTeam);
+                targetX = base.x;
+                targetY = base.y;
+            }
+
+            // Always have the nearest player to the ball chase it, regardless of attacking/defending state
+            const allPlayers = p.isPlayerTeam ? this.playerSprites : this.opponentSprites;
+            const closest = allPlayers.sort((a,b) =>
+                Phaser.Math.Distance.Between(a.x, a.y, this.ball.x, this.ball.y) -
+                Phaser.Math.Distance.Between(b.x, b.y, this.ball.x, this.ball.y)
+            )[0];
+
+            if (closest === p && !hasBall) {
+                targetX = this.ball.x;
+                targetY = this.ball.y;
+            }
+
+
+            // Move towards calculated target
+            if (Phaser.Math.Distance.Between(p.x, p.y, targetX, targetY) > 10) {
+                const angle = Phaser.Math.Angle.Between(p.x, p.y, targetX, targetY);
+                p.x += Math.cos(angle) * (speed + (Math.random()*0.5)); // slight variation
+                p.y += Math.sin(angle) * (speed + (Math.random()*0.5));
+                moved = true;
+            }
+
+            // Animate
+            if (moved) {
+                p.animTick += 0.5;
+                p.y += Math.sin(p.animTick) * 1.5;
+                let numText = p.list[2];
+                if (p.x < targetX) {
+                    p.scaleX = 1;
+                    if (numText) numText.scaleX = 1;
+                } else {
+                    p.scaleX = -1;
+                    if (numText) numText.scaleX = -1;
+                }
             }
         });
 
-        // Ball movement logic
-        if (!this.ball.owner) {
-            // Pick a random player nearby to get ball
+        // --- Ball Interaction ---
+        if (this.ballTarget) {
+            // Ball is moving towards a target (pass/shoot)
+            const dist = Phaser.Math.Distance.Between(this.ball.x, this.ball.y, this.ballTarget.x, this.ballTarget.y);
+            if (dist < 10 || this.ballSpeed < 0.5) { // FIX: if speed gets too low, stop
+                this.ballTarget = null;
+                this.ballSpeed = 0;
+            } else {
+                const angle = Phaser.Math.Angle.Between(this.ball.x, this.ball.y, this.ballTarget.x, this.ballTarget.y);
+                this.ball.x += Math.cos(angle) * this.ballSpeed;
+                this.ball.y += Math.sin(angle) * this.ballSpeed;
+                this.ballSpeed *= 0.98; // friction (reduced so ball goes further)
+            }
+        }
+
+        if (!this.ball.owner && !this.ballTarget) {
+            // Pick up loose ball
             const allPlayers = [...this.playerSprites, ...this.opponentSprites];
             const nearest = allPlayers.sort((a, b) => {
                 let distA = Phaser.Math.Distance.Between(a.x, a.y, this.ball.x, this.ball.y);
@@ -410,17 +583,14 @@ class MatchScene extends Phaser.Scene {
 
             if (Phaser.Math.Distance.Between(nearest.x, nearest.y, this.ball.x, this.ball.y) < 20 + (this.activeBuff && this.activeBuff.target === 'intercept' && nearest.isPlayerTeam ? 20 : 0)) {
                 this.ball.owner = nearest;
-            } else {
-                // Ball rolls randomly
-                this.ball.x += (Math.random() - 0.5) * 5;
-                this.ball.y += (Math.random() - 0.5) * 5;
             }
-        } else {
-            // Owner has ball
-            this.ball.x = this.ball.owner.x;
-            this.ball.y = this.ball.owner.y;
+        } else if (this.ball.owner) {
+            // Ball follows owner
+            this.ball.x = this.ball.owner.x + (this.ball.owner.scaleX > 0 ? 10 : -10);
+            this.ball.y = this.ball.owner.y + 10;
 
-            // Decide action (Pass, Shoot, Dribble)
+            // Decision making (Pass, Shoot, Dribble)
+
             // Forced Actions by Active Buff
             let forceShoot = false;
             let forceLongBall = false;
@@ -430,13 +600,13 @@ class MatchScene extends Phaser.Scene {
                 if (['longBall', 'throughBall', 'switchPlay', 'earlyCross'].includes(this.activeBuff.actionType)) forceLongBall = true;
             }
 
-            if (forceShoot || forceLongBall || Math.random() < 0.05) {
+            if (forceShoot || forceLongBall || Math.random() < 0.05) { // Evaluate action every few ticks
                 const isPlayer = this.ball.owner.isPlayerTeam;
                 const targetGoalX = isPlayer ? 800 : 0;
+                const distToGoal = Phaser.Math.Distance.Between(this.ball.x, this.ball.y, targetGoalX, 300);
 
-                // Shoot?
-                if (forceShoot || Phaser.Math.Distance.Between(this.ball.x, this.ball.y, targetGoalX, 300) < 250) {
-                    // Apply buffs
+                // Shoot Logic
+                if (forceShoot || distToGoal < 250) {
                     let shootStat = this.ball.owner.playerData.dynamicStats.shoot;
                     if (isPlayer && this.activeBuff && (this.activeBuff.target === 'shoot' || this.activeBuff.target === 'header')) {
                         shootStat += this.activeBuff.value;
@@ -458,26 +628,39 @@ class MatchScene extends Phaser.Scene {
                          shootStat += 15;
                     }
 
-                    // Opponent GK save calculation
                     const oppTeamStats = isPlayer ? this.opponentTeamData.getOverallStrength() : this.playerTeamData.getOverallStrength();
 
-                    if (Math.random() * 100 < shootStat - (oppTeamStats / 2) + 20) {
-                        // GOAL
-                        this.triggerGoal(isPlayer);
-                    }
-                    // Reset ball
+                    // Shoot physics
+                    this.ballTarget = {x: targetGoalX, y: 300 + (Math.random()*100 - 50)};
+                    this.ballSpeed = 15;
                     this.ball.owner = null;
-                    this.ball.x = 400;
-                    this.ball.y = 300;
 
-                    // Reposition players
-                    this.resetPositions();
-                } else {
-                    // Pass / Lose ball
-                    let passStat = this.ball.owner.playerData.dynamicStats.pass;
-                    if (isPlayer && this.activeBuff && this.activeBuff.target === 'pass') {
-                        passStat += this.activeBuff.value;
+                    if (Math.random() * 100 < shootStat - (oppTeamStats / 2) + 20) {
+                        // Wait for ball to visually reach goal before triggering, or trigger immediately
+                        this.time.delayedCall(500, () => {
+                            this.triggerGoal(isPlayer);
+                            this.resetPositions();
+                        });
+                    } else {
+                        // Miss / Save - give ball to GK
+                        this.time.delayedCall(500, () => {
+                            this.ballTarget = null;
+                            this.ball.x = isPlayer ? 750 : 50;
+                            this.ball.y = 300;
+                            this.resetPositions();
+                        });
                     }
+                }
+                // Pass Logic
+                else {
+                    const teammates = (isPlayer ? this.playerSprites : this.opponentSprites).filter(p => p !== this.ball.owner);
+
+                    // Find teammate further up the pitch
+                    const forwardMates = teammates.filter(p => isPlayer ? p.x > this.ball.owner.x : p.x < this.ball.owner.x);
+                    const targetMate = forwardMates.length > 0 ? forwardMates[Math.floor(Math.random() * forwardMates.length)] : teammates[0];
+
+                    let passStat = this.ball.owner.playerData.dynamicStats.pass;
+                    if (isPlayer && this.activeBuff && this.activeBuff.target === 'pass') passStat += this.activeBuff.value;
 
                     // Gimmick: Bad Weather reduces pass success globally
                     if (this.currentGimmick === 'badWeather') {
@@ -485,27 +668,34 @@ class MatchScene extends Phaser.Scene {
                         if (forceLongBall) passStat += 30; // long balls become more viable
                     }
 
-                    if (Math.random() * 100 < passStat) {
-                        // Pass success - ball detaches and moves fast
-                        this.ball.owner = null;
-                        if (forceLongBall) {
-                            this.ball.x += (isPlayer ? 200 : -200); // long pass
-                        } else {
-                            this.ball.x += (isPlayer ? 50 : -50);
-                        }
+                    if (forceLongBall) {
+                         this.ballTarget = {x: targetMate.x + (isPlayer ? 150 : -150), y: targetMate.y};
+                         this.ballSpeed = 20; // FIX: Increase speed
                     } else {
-                        // Intercepted
-                        this.ball.owner = null;
+                         this.ballTarget = {x: targetMate.x, y: targetMate.y};
+                         this.ballSpeed = 15; // FIX: Increase speed
                     }
 
+                    if (Math.random() * 100 > passStat) {
+                        // Intercepted (bad pass)
+                        this.ballTarget.x += (Math.random()*100 - 50);
+                        this.ballTarget.y += (Math.random()*100 - 50);
+                    }
+
+                    this.ball.owner = null;
                     if (forceLongBall) this.activeBuff = null; // consume
                 }
             }
         }
 
-        // Update ball sprite
-        this.ballSprite.x = this.ball.x;
-        this.ballSprite.y = this.ball.y;
+        // Update ball sprite visually
+        if (this.ballContainer) {
+            this.ballContainer.x = this.ball.x;
+            this.ballContainer.y = this.ball.y;
+            if (this.ballSpeed > 0) {
+                this.ballSprite.rotation += 0.2;
+            }
+        }
     }
 
     resetPositions() {
