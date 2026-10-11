@@ -20,6 +20,16 @@ class MatchScene extends Phaser.Scene {
             return;
         }
 
+        // Generate Match Gimmick
+        this.gimmicks = ["none", "fever", "fortress", "badWeather"];
+        this.currentGimmick = this.gimmicks[Math.floor(Math.random() * this.gimmicks.length)];
+        console.log("Match Gimmick: ", this.currentGimmick);
+
+        // Apply pre-match gimmick effects
+        if (this.currentGimmick === "badWeather") {
+             // Pass success drops globally implicitly handled in pass logic
+        }
+
         // Draw Pitch
         this.drawPitch();
 
@@ -105,6 +115,15 @@ class MatchScene extends Phaser.Scene {
             fontSize: '18px', fill: '#f1c40f'
         }).setOrigin(0.5);
 
+        // Gimmick Text
+        let gimmickStr = "通常環境";
+        if (this.currentGimmick === "fever") gimmickStr = "熱狂 (前半プレッシャー増)";
+        if (this.currentGimmick === "fortress") gimmickStr = "要塞 (スタミナ消費増/ファウル減)";
+        if (this.currentGimmick === "badWeather") gimmickStr = "悪天候 (パス成功率低下/ロング有利)";
+        this.add.text(400, 75, `環境: ${gimmickStr}`, {
+            fontSize: '14px', fill: '#e74c3c'
+        }).setOrigin(0.5);
+
         // Speed Controls
         const speed1x = this.add.text(700, 25, '1x', { fontSize: '20px', fill: '#fff', backgroundColor: '#333' }).setOrigin(0.5).setInteractive();
         const speed2x = this.add.text(740, 25, '2x', { fontSize: '20px', fill: '#fff' }).setOrigin(0.5).setInteractive();
@@ -166,7 +185,8 @@ class MatchScene extends Phaser.Scene {
                 data: cmdData,
                 bg: bg,
                 cdOverlay: cdOverlay,
-                currentCd: 0 // remaining CD time
+                currentCd: 0, // remaining CD time
+                usesLeft: cmdData.maxUses !== undefined ? cmdData.maxUses : Infinity
             });
 
             // Trigger on click
@@ -177,6 +197,30 @@ class MatchScene extends Phaser.Scene {
     triggerCommand(slotIndex) {
         const slot = this.commandSlots[slotIndex];
         if (slot.currentCd > 0) return; // on cooldown
+        if (slot.usesLeft <= 0) {
+            console.log("No uses left for", slot.data.name);
+            return;
+        }
+
+        // Conditional checks
+        if (slot.data.condition) {
+            const isBehind = this.score.player < this.score.opponent;
+            const isLead = this.score.player > this.score.opponent;
+            if (slot.data.condition === "behind" && !isBehind) {
+                console.log("Condition not met: Requires behind");
+                return;
+            }
+            if (slot.data.condition === "lead" && !isLead) {
+                console.log("Condition not met: Requires lead");
+                return;
+            }
+        }
+
+        // Decrement Uses
+        slot.usesLeft -= 1;
+        if (slot.usesLeft <= 0) {
+            slot.bg.setAlpha(0.5);
+        }
 
         // Trigger logic
         console.log("Triggered command:", slot.data.name);
@@ -186,7 +230,62 @@ class MatchScene extends Phaser.Scene {
         this.tweens.add({ targets: flash, alpha: 0, duration: 500, onComplete: () => flash.destroy() });
 
         // Execute Command Logic (Simplified stat buff for next calculation)
-        this.activeBuff = { target: slot.data.target, value: slot.data.value, duration: 5 }; // lasts 5 in-game minutes
+        this.activeBuff = { target: slot.data.target, value: slot.data.value, actionType: slot.data.actionType, duration: 5 }; // lasts 5 in-game minutes
+
+        // Check Super Sub Skill (ID: 10) on substitute
+        if (slot.data.actionType === 'substitute') {
+            // For MVP: Boost random bench player and swap
+            const benchPlayer = this.playerTeamData.bench.find(p => p.skills.includes(10)) || this.playerTeamData.bench[0];
+            if (benchPlayer) {
+                // Ensure dynamic stats exist if not yet calculated
+                if (!benchPlayer.dynamicStats) {
+                    benchPlayer.dynamicStats = { ...benchPlayer.stats };
+                }
+
+                if (benchPlayer.skills.includes(10)) {
+                    // Super Sub effect (temporary match stats)
+                    Object.keys(benchPlayer.dynamicStats).forEach(k => benchPlayer.dynamicStats[k] = Math.min(100, benchPlayer.dynamicStats[k] + 15));
+                    console.log("Super Sub activated for " + benchPlayer.name);
+                }
+                // Simple swap with worst performer on pitch
+                const worstPitch = this.playerSprites.sort((a,b) => a.playerData.condition - b.playerData.condition)[0];
+                if (worstPitch) {
+                    worstPitch.playerData = benchPlayer;
+                    worstPitch.setStrokeStyle(2, 0xf1c40f); // highlight sub
+                }
+            }
+        }
+
+        // Implement special action types immediately
+        if (slot.data.actionType === 'powerPlay') {
+            const cb = this.playerSprites.find(p => p.playerData.position === 'CB');
+            if (cb) {
+                // Goals are at x=0 and x=800. Center forward is roughly near opponent's half (x=600 if playing L to R).
+                // Assuming player team goes L to R for simplicity, or we can just push x forward.
+                cb.x = 600;
+                console.log("Power play triggered.");
+            }
+        }
+        if (slot.data.actionType === 'comeback') {
+            // Apply massive buff to all stats
+            this.playerSprites.forEach(p => {
+                Object.keys(p.playerData.dynamicStats).forEach(k => p.playerData.dynamicStats[k] += 20);
+            });
+        }
+        if (slot.data.actionType === 'parkBus') {
+            this.playerSprites.forEach(p => {
+                if (p.playerData.position === 'SB' || p.playerData.position === 'CDM') {
+                     // Pull back towards own goal at x=0
+                     p.x = Math.max(50, p.x - 150);
+                }
+            });
+        }
+        if (slot.data.actionType === 'offsideTrap') {
+             this.opponentSprites.forEach(p => {
+                 // Push opponent attackers back towards center
+                 if (p.x < 300) p.x = 400;
+             });
+        }
 
         // Reset CD
         slot.currentCd = slot.data.cooldown;
@@ -227,6 +326,44 @@ class MatchScene extends Phaser.Scene {
             if (this.activeBuff.duration <= 0) this.activeBuff = null;
         }
 
+        // Apply global temporary buffs every tick if active
+        if (this.activeBuff && this.activeBuff.target === 'defenseLine') {
+             // Middle block logic: keep players near center
+             this.playerSprites.forEach(p => {
+                 if (p.x < 300) p.x += 1;
+                 if (p.x > 500) p.x -= 1;
+             });
+        }
+        if (this.activeBuff && this.activeBuff.target === 'press') {
+             // High press: players move towards ball much faster
+             this.playerSprites.forEach(p => {
+                  if (Phaser.Math.Distance.Between(p.x, p.y, this.ball.x, this.ball.y) < 250) {
+                      const angle = Phaser.Math.Angle.Between(p.x, p.y, this.ball.x, this.ball.y);
+                      p.x += Math.cos(angle) * 1.5;
+                      p.y += Math.sin(angle) * 1.5;
+                  }
+             });
+        }
+
+        // Apply global environmental gimmicks
+        if (this.currentGimmick === 'fever' && this.matchTime < 45) {
+             // Opponents press hard in first half
+             this.opponentSprites.forEach(p => {
+                  if (Phaser.Math.Distance.Between(p.x, p.y, this.ball.x, this.ball.y) < 200) {
+                      const angle = Phaser.Math.Angle.Between(p.x, p.y, this.ball.x, this.ball.y);
+                      p.x += Math.cos(angle) * 1.2;
+                      p.y += Math.sin(angle) * 1.2;
+                  }
+             });
+        }
+
+        if (this.currentGimmick === 'fortress') {
+            // Fortress drains stamina faster (stamina affects stats implicitly, MVP simulate by jitter)
+            this.playerSprites.forEach(p => {
+                p.playerData.currentStamina -= p.playerData.staminaConsumptionRate * 0.1;
+            });
+        }
+
         // Simulate Action
         this.simulateAction();
 
@@ -259,12 +396,19 @@ class MatchScene extends Phaser.Scene {
         if (!this.ball.owner) {
             // Pick a random player nearby to get ball
             const allPlayers = [...this.playerSprites, ...this.opponentSprites];
-            const nearest = allPlayers.sort((a, b) =>
-                Phaser.Math.Distance.Between(a.x, a.y, this.ball.x, this.ball.y) -
-                Phaser.Math.Distance.Between(b.x, b.y, this.ball.x, this.ball.y)
-            )[0];
+            const nearest = allPlayers.sort((a, b) => {
+                let distA = Phaser.Math.Distance.Between(a.x, a.y, this.ball.x, this.ball.y);
+                let distB = Phaser.Math.Distance.Between(b.x, b.y, this.ball.x, this.ball.y);
 
-            if (Phaser.Math.Distance.Between(nearest.x, nearest.y, this.ball.x, this.ball.y) < 20) {
+                // Active buff intercept bonus
+                if (this.activeBuff && this.activeBuff.target === 'intercept') {
+                    if (a.isPlayerTeam) distA -= 30;
+                    if (b.isPlayerTeam) distB -= 30;
+                }
+                return distA - distB;
+            })[0];
+
+            if (Phaser.Math.Distance.Between(nearest.x, nearest.y, this.ball.x, this.ball.y) < 20 + (this.activeBuff && this.activeBuff.target === 'intercept' && nearest.isPlayerTeam ? 20 : 0)) {
                 this.ball.owner = nearest;
             } else {
                 // Ball rolls randomly
@@ -277,16 +421,41 @@ class MatchScene extends Phaser.Scene {
             this.ball.y = this.ball.owner.y;
 
             // Decide action (Pass, Shoot, Dribble)
-            if (Math.random() < 0.05) {
+            // Forced Actions by Active Buff
+            let forceShoot = false;
+            let forceLongBall = false;
+
+            if (this.activeBuff && this.ball.owner.isPlayerTeam) {
+                if (['shoot', 'cutInShoot'].includes(this.activeBuff.actionType)) forceShoot = true;
+                if (['longBall', 'throughBall', 'switchPlay', 'earlyCross'].includes(this.activeBuff.actionType)) forceLongBall = true;
+            }
+
+            if (forceShoot || forceLongBall || Math.random() < 0.05) {
                 const isPlayer = this.ball.owner.isPlayerTeam;
                 const targetGoalX = isPlayer ? 800 : 0;
 
                 // Shoot?
-                if (Phaser.Math.Distance.Between(this.ball.x, this.ball.y, targetGoalX, 300) < 250) {
+                if (forceShoot || Phaser.Math.Distance.Between(this.ball.x, this.ball.y, targetGoalX, 300) < 250) {
                     // Apply buffs
                     let shootStat = this.ball.owner.playerData.dynamicStats.shoot;
                     if (isPlayer && this.activeBuff && (this.activeBuff.target === 'shoot' || this.activeBuff.target === 'header')) {
                         shootStat += this.activeBuff.value;
+                    }
+
+                    // Apply Line Breaker Skill (ID: 1) if action is runBehind
+                    if (this.activeBuff && this.activeBuff.actionType === 'runBehind' && this.ball.owner.playerData.skills.includes(1)) {
+                        shootStat += 20;
+                    }
+
+                    // Apply Clutch Shooter Skill (ID: 9) if behind
+                    const isBehind = isPlayer ? this.score.player < this.score.opponent : this.score.opponent < this.score.player;
+                    if (isBehind && this.ball.owner.playerData.skills.includes(9)) {
+                        shootStat += 20;
+                    }
+
+                    // Apply Air Battler Skill (ID: 3) if header buff is active
+                    if (this.activeBuff && this.activeBuff.target === 'header' && this.ball.owner.playerData.skills.includes(3)) {
+                         shootStat += 15;
                     }
 
                     // Opponent GK save calculation
@@ -310,14 +479,26 @@ class MatchScene extends Phaser.Scene {
                         passStat += this.activeBuff.value;
                     }
 
+                    // Gimmick: Bad Weather reduces pass success globally
+                    if (this.currentGimmick === 'badWeather') {
+                        passStat -= 20; // significant drop
+                        if (forceLongBall) passStat += 30; // long balls become more viable
+                    }
+
                     if (Math.random() * 100 < passStat) {
                         // Pass success - ball detaches and moves fast
                         this.ball.owner = null;
-                        this.ball.x += (isPlayer ? 50 : -50);
+                        if (forceLongBall) {
+                            this.ball.x += (isPlayer ? 200 : -200); // long pass
+                        } else {
+                            this.ball.x += (isPlayer ? 50 : -50);
+                        }
                     } else {
                         // Intercepted
                         this.ball.owner = null;
                     }
+
+                    if (forceLongBall) this.activeBuff = null; // consume
                 }
             }
         }

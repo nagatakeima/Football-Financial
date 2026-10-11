@@ -195,23 +195,52 @@ class ManagementUI {
     }
 
     showEvents() {
-        // Simplified event generation
+        // Generate random scout and shop offerings if not already generated for this turn
+        if (!window.gameState.eventsGeneratedForTurn) {
+            this.generateEvents();
+            window.gameState.eventsGeneratedForTurn = true;
+        }
+
+        const events = window.gameState.currentEvents || [];
+        const scoutHtml = events.filter(e => e.type === 'scout').map(e => `
+            <div style="background: #333; padding: 15px; border-radius: 5px; border: 1px solid #27ae60;">
+                <h3 style="color: #27ae60;">スカウト: ${e.player.name} (${e.player.position})</h3>
+                <p>志向: ${e.player.preference}</p>
+                <p>コスト: AP ${e.apCost} / ¥${e.fundCost.toLocaleString()}</p>
+                <button onclick="managementUI.executeEvent('${e.id}')" ${window.gameState.ap < e.apCost || window.gameState.funds < e.fundCost ? 'disabled' : ''}>獲得</button>
+            </div>
+        `).join('');
+
+        const shopHtml = events.filter(e => e.type === 'shop').map(e => `
+            <div style="background: #333; padding: 15px; border-radius: 5px; border: 1px solid #f39c12;">
+                <h3 style="color: #f39c12;">ショップ: ${e.item.name}</h3>
+                <p>${e.itemType === 'relic' ? '宝物 (パッシブ効果)' : 'ミクロ (戦術コマンド)'}</p>
+                <p>コスト: AP ${e.apCost} / ¥${e.fundCost.toLocaleString()}</p>
+                <button onclick="managementUI.executeEvent('${e.id}')" ${window.gameState.ap < e.apCost || window.gameState.funds < e.fundCost ? 'disabled' : ''}>購入</button>
+            </div>
+        `).join('');
+
         let html = `
-            <div class="menu-box" style="width: 600px;">
+            <div class="menu-box" style="width: 800px; max-height: 80vh; overflow-y: auto;">
                 <h2>イベント・ショップ</h2>
                 <p>現在のAP: ${window.gameState.ap} / 資金: ¥${window.gameState.funds.toLocaleString()}</p>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px;">
+                    <!-- Fixed Events -->
                     <div style="background: #333; padding: 15px; border-radius: 5px;">
                         <h3>臨時練習</h3>
                         <p>APを3消費して、チーム全体のコンディションを回復する。</p>
-                        <button onclick="managementUI.executeEvent('training')" ${window.gameState.ap < 3 ? 'disabled' : ''}>実行 (AP:3)</button>
+                        <button onclick="managementUI.executeFixedEvent('training')" ${window.gameState.ap < 3 ? 'disabled' : ''}>実行 (AP:3)</button>
                     </div>
                     <div style="background: #333; padding: 15px; border-radius: 5px;">
                         <h3>スポンサー営業</h3>
                         <p>APを2消費して、資金を¥200,000獲得する。</p>
-                        <button onclick="managementUI.executeEvent('sponsor')" ${window.gameState.ap < 2 ? 'disabled' : ''}>実行 (AP:2)</button>
+                        <button onclick="managementUI.executeFixedEvent('sponsor')" ${window.gameState.ap < 2 ? 'disabled' : ''}>実行 (AP:2)</button>
                     </div>
+
+                    <!-- Dynamic Events (Scout & Shop) -->
+                    ${scoutHtml}
+                    ${shopHtml}
                 </div>
 
                 <button style="margin-top: 20px; width: 100%;" onclick="managementUI.showDashboard()">戻る</button>
@@ -220,7 +249,52 @@ class ManagementUI {
         this.uiContent.innerHTML = html;
     }
 
-    executeEvent(type) {
+    generateEvents() {
+        const events = [];
+
+        // Generate 2 Scout events
+        for(let i=0; i<2; i++) {
+            const newPlayer = window.Player.generateRandom(`scout_${Date.now()}_${i}`);
+            events.push({
+                id: `evt_scout_${i}`,
+                type: 'scout',
+                player: newPlayer,
+                apCost: 2,
+                fundCost: 300000
+            });
+        }
+
+        // Generate 2 Shop events (1 Relic, 1 Command)
+        const unownedRelics = window.MasterData.Relics.filter(r => !window.gameState.playerTeam.relics.includes(r.id));
+        if (unownedRelics.length > 0) {
+            const randomRelic = unownedRelics[Math.floor(Math.random() * unownedRelics.length)];
+            events.push({
+                id: `evt_shop_relic`,
+                type: 'shop',
+                itemType: 'relic',
+                item: randomRelic,
+                apCost: 1,
+                fundCost: 500000
+            });
+        }
+
+        const unownedCmds = window.MasterData.MicroCommands.filter(c => !window.gameState.playerTeam.microCommands.includes(c.id));
+        if (unownedCmds.length > 0) {
+            const randomCmd = unownedCmds[Math.floor(Math.random() * unownedCmds.length)];
+            events.push({
+                id: `evt_shop_cmd`,
+                type: 'shop',
+                itemType: 'microCommand',
+                item: randomCmd,
+                apCost: 1,
+                fundCost: 200000
+            });
+        }
+
+        window.gameState.currentEvents = events;
+    }
+
+    executeFixedEvent(type) {
         if (type === 'training' && window.gameState.ap >= 3) {
             window.gameState.ap -= 3;
             window.gameState.playerTeam.players.forEach(p => p.condition = Math.min(100, p.condition + 20));
@@ -232,6 +306,49 @@ class ManagementUI {
         }
 
         this.showEvents(); // refresh
+        this.updateTopBar();
+    }
+
+    executeEvent(eventId) {
+        const eventIndex = window.gameState.currentEvents.findIndex(e => e.id === eventId);
+        if (eventIndex === -1) return;
+
+        const evt = window.gameState.currentEvents[eventIndex];
+
+        if (window.gameState.ap < evt.apCost || window.gameState.funds < evt.fundCost) {
+            alert("リソースが不足しています。");
+            return;
+        }
+
+        // Pay cost
+        window.gameState.ap -= evt.apCost;
+        window.gameState.funds -= evt.fundCost;
+
+        if (evt.type === 'scout') {
+            window.gameState.playerTeam.players.push(evt.player);
+            window.gameState.playerTeam.bench.push(evt.player); // Add to bench by default
+            alert(`${evt.player.name} を獲得しました！`);
+        } else if (evt.type === 'shop') {
+            if (evt.itemType === 'relic') {
+                window.gameState.playerTeam.relics.push(evt.item.id);
+                alert(`宝物「${evt.item.name}」を獲得しました！`);
+            } else if (evt.itemType === 'microCommand') {
+                if (window.gameState.playerTeam.microCommands.length < 4) {
+                     window.gameState.playerTeam.microCommands.push(evt.item.id);
+                } else {
+                     // MVP logic: just add it, UI only shows first 4 or allows swapping (if implemented)
+                     // To keep it simple, replace the last one
+                     window.gameState.playerTeam.microCommands[3] = evt.item.id;
+                     alert(`コマンドスロットが一杯のため、一番右のコマンドと入れ替えました。`);
+                }
+                alert(`戦術コマンド「${evt.item.name}」を獲得しました！`);
+            }
+        }
+
+        // Remove event so it can't be bought again
+        window.gameState.currentEvents.splice(eventIndex, 1);
+
+        this.showEvents();
         this.updateTopBar();
     }
 
