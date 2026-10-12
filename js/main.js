@@ -117,7 +117,7 @@ class MatchScene extends Phaser.Scene {
             case 'CM': x = 400 + dir * 100; y = 300; break;
             case 'CAM': x = 400 + dir * 50; y = 300; break;
             case 'WG': x = 400 + dir * 100; y = 100; break;
-            case 'ST': x = 400 - dir * 50; y = 300; break;
+            case 'CF': x = 400 - dir * 50; y = 300; break;
             default: x = 400 + dir * 100; y = 300; break;
         }
         return { x, y };
@@ -125,6 +125,11 @@ class MatchScene extends Phaser.Scene {
 
     createPlayerSprite(x, y, color, number, isPlayerTeam, player) {
         let container = this.add.container(x, y);
+
+        // Adjust color for GK
+        if (player.position === 'GK') {
+            color = isPlayerTeam ? 0x2ecc71 : 0xf1c40f; // Green for player GK, Yellow for opponent GK
+        }
 
         // Shadow
         let shadow = this.add.ellipse(0, 15, 20, 8, 0x000000, 0.4);
@@ -196,6 +201,7 @@ class MatchScene extends Phaser.Scene {
             let sprite = this.createPlayerSprite(pos.x, pos.y, 0x3498db, i + 1, true, player);
             sprite.baseX = pos.x;
             sprite.baseY = pos.y;
+            sprite.baseOffsetY = (player.position === 'CB' || player.position === 'CM' || player.position === 'CDM' || player.position === 'CAM' || player.position === 'CF') ? yOffset : 0;
             this.playerSprites.push(sprite);
         });
 
@@ -212,6 +218,7 @@ class MatchScene extends Phaser.Scene {
             let sprite = this.createPlayerSprite(pos.x, pos.y, 0xe74c3c, i + 1, false, player);
             sprite.baseX = pos.x;
             sprite.baseY = pos.y;
+            sprite.baseOffsetY = (player.position === 'CB' || player.position === 'CM' || player.position === 'CDM' || player.position === 'CAM' || player.position === 'CF') ? yOffset : 0;
             this.opponentSprites.push(sprite);
         });
 
@@ -591,6 +598,11 @@ class MatchScene extends Phaser.Scene {
             // 1. Base Position Attraction Force
             let base = this.getBasePosition(p.playerData.position, p.isPlayerTeam);
 
+            // Re-apply vertical offset for central players so they don't clump
+            if (p.baseOffsetY) {
+                base.y += p.baseOffsetY;
+            }
+
             // Adjust base based on tactic and phase
             if (isAttacking) {
                 if (tactic === 'Counter') {
@@ -666,8 +678,8 @@ class MatchScene extends Phaser.Scene {
                 if (isDefending) {
                     // Defending logic
                     if (closestToBall === p) {
-                        // 1st defender: Press the ball
-                        let pressMultiplier = tactic === 'HighPress' ? 1.5 : 1.0;
+                        // 1st defender: Press the ball (Aggressively)
+                        let pressMultiplier = tactic === 'HighPress' ? 2.5 : 1.8;
                         if (urgency > 1) pressMultiplier *= 1.2;
 
                         ballForceX = (this.ball.x - p.x);
@@ -695,10 +707,41 @@ class MatchScene extends Phaser.Scene {
                             ballForceY = (ballForceY / bDist) * 1.5;
                         }
                     } else {
-                        // Other defenders: Retreat / Mark
-                        const targetGoalX = p.isPlayerTeam ? 10 : 790;
-                        // Pull back slightly towards own goal
-                        ballForceX = (targetGoalX - p.x) * 0.05;
+                        // Other defenders: Line Control & Marking
+                        // Find nearest opponent to mark
+                        const enemies = p.isPlayerTeam ? this.opponentSprites : this.playerSprites;
+                        let markTarget = enemies.reduce((nearest, e) => {
+                            let dist = Phaser.Math.Distance.Between(p.x, p.y, e.x, e.y);
+                            return dist < nearest.dist ? {sprite: e, dist: dist} : nearest;
+                        }, {sprite: null, dist: Infinity});
+
+                        // If an enemy is close, mark them (man-to-man)
+                        if (markTarget.sprite && markTarget.dist < 100) {
+                            // Position between marked player and goal
+                            let angleToGoal = p.isPlayerTeam ?
+                                Phaser.Math.Angle.Between(markTarget.sprite.x, markTarget.sprite.y, 10, 300) :
+                                Phaser.Math.Angle.Between(markTarget.sprite.x, markTarget.sprite.y, 790, 300);
+
+                            let markX = markTarget.sprite.x + Math.cos(angleToGoal) * 20;
+                            let markY = markTarget.sprite.y + Math.sin(angleToGoal) * 20;
+
+                            ballForceX = (markX - p.x);
+                            ballForceY = (markY - p.y);
+                        } else {
+                            // Otherwise maintain defensive line (retreat to base slightly based on ball depth)
+                            let lineShift = p.isPlayerTeam ?
+                                Math.max(-50, Math.min(50, this.ball.x - 400) * 0.3) :
+                                Math.min(50, Math.max(-50, this.ball.x - 400) * 0.3);
+
+                            ballForceX = ((base.x + lineShift) - p.x);
+                            ballForceY = (base.y - p.y);
+                        }
+
+                        let bDist = Math.sqrt(ballForceX*ballForceX + ballForceY*ballForceY);
+                        if (bDist > 0) {
+                            ballForceX = (ballForceX / bDist) * 1.0;
+                            ballForceY = (ballForceY / bDist) * 1.0;
+                        }
                     }
                 } else if (isAttacking) {
                     // Attacking support logic
@@ -721,6 +764,18 @@ class MatchScene extends Phaser.Scene {
                             // Move towards sidelines slightly to create width
                             if (p.y < 300) ballForceY = -0.5;
                             else ballForceY = 0.5;
+                        }
+
+                        // Evade nearest defender to open passing lane
+                        const enemies = p.isPlayerTeam ? this.opponentSprites : this.playerSprites;
+                        let nearestEnemy = enemies.reduce((nearest, current) => {
+                            let dist = Phaser.Math.Distance.Between(p.x, p.y, current.x, current.y);
+                            return dist < nearest.dist ? {sprite: current, dist: dist} : nearest;
+                        }, {sprite: null, dist: Infinity});
+
+                        if (nearestEnemy.sprite && nearestEnemy.dist < 80) {
+                            ballForceX += (p.x - nearestEnemy.sprite.x) * 0.5;
+                            ballForceY += (p.y - nearestEnemy.sprite.y) * 0.5;
                         }
 
                         let bDist = Math.sqrt(ballForceX*ballForceX + ballForceY*ballForceY);
@@ -925,7 +980,23 @@ class MatchScene extends Phaser.Scene {
                 if (['longBall', 'throughBall', 'switchPlay', 'earlyCross'].includes(this.activeBuff.actionType)) forceLongBall = true;
             }
 
-            if (forceShoot || forceLongBall || Math.random() < 0.05) {
+
+            // Check pressure for dribble vs pass decision
+            let underPressure = false;
+            const enemies = this.ball.owner.isPlayerTeam ? this.opponentSprites : this.playerSprites;
+            enemies.forEach(e => {
+                // If enemy is ahead and close
+                if (Phaser.Math.Distance.Between(this.ball.x, this.ball.y, e.x, e.y) < 80) {
+                    if ((this.ball.owner.isPlayerTeam && e.x > this.ball.x) || (!this.ball.owner.isPlayerTeam && e.x < this.ball.x)) {
+                        underPressure = true;
+                    }
+                }
+            });
+
+            // Adjust base chance to act (pass/shoot). If open space, hold ball (dribble).
+            const actionChance = underPressure ? 0.15 : 0.01;
+
+            if (forceShoot || forceLongBall || Math.random() < actionChance) {
                 const isPlayer = this.ball.owner.isPlayerTeam;
                 const targetGoalX = isPlayer ? 800 : 0;
                 const distToGoal = Phaser.Math.Distance.Between(this.ball.x, this.ball.y, targetGoalX, 300);
@@ -1006,9 +1077,17 @@ class MatchScene extends Phaser.Scene {
                         targetMate = backMates[Math.floor(Math.random() * backMates.length)];
                         isLongBall = false;
                     } else if (forwardMates.length > 0) {
-                        targetMate = forwardMates[Math.floor(Math.random() * forwardMates.length)];
+                        // Pass to the nearest forward teammate for better short passing play
+                        targetMate = forwardMates.reduce((nearest, p) => {
+                            let dist = Phaser.Math.Distance.Between(this.ball.owner.x, this.ball.owner.y, p.x, p.y);
+                            return dist < nearest.dist ? {sprite: p, dist: dist} : nearest;
+                        }, {sprite: null, dist: Infinity}).sprite;
                     } else if (sideMates.length > 0) {
-                        targetMate = sideMates[Math.floor(Math.random() * sideMates.length)];
+                        // Pass to the nearest side teammate
+                        targetMate = sideMates.reduce((nearest, p) => {
+                            let dist = Phaser.Math.Distance.Between(this.ball.owner.x, this.ball.owner.y, p.x, p.y);
+                            return dist < nearest.dist ? {sprite: p, dist: dist} : nearest;
+                        }, {sprite: null, dist: Infinity}).sprite;
                     } else {
                         targetMate = teammates[0];
                     }
@@ -1107,7 +1186,7 @@ class MatchScene extends Phaser.Scene {
         const isPlayerKickoff = (this.score.player + this.score.opponent) % 2 === 0;
 
         let kickOffTeam = isPlayerKickoff ? this.playerSprites : this.opponentSprites;
-        let striker = kickOffTeam.find(p => p.playerData.position === 'ST') || kickOffTeam[kickOffTeam.length - 1];
+        let striker = kickOffTeam.find(p => p.playerData.position === 'CF') || kickOffTeam[kickOffTeam.length - 1];
 
         striker.x = 400 - (isPlayerKickoff ? 10 : -10);
         striker.y = 300;
