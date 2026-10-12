@@ -414,6 +414,7 @@ class ManagementUI {
         // Draw players on pitch
         // Basic mapping for visual representation (normalized 0-1 coords)
         const posMap = this.getFormationPositions(team.formation);
+        const expectedPositions = window.MasterData.Formations[team.formation] || [];
         container.innerHTML = '';
 
         team.starting11.forEach((p, idx) => {
@@ -422,21 +423,32 @@ class ManagementUI {
             const top = pos.y * 100;
             const isSelected = this.selectedPlayerIndex === idx;
 
+            const expectedPos = expectedPositions[idx];
+            const isMob = p.position !== expectedPos;
+
             const pDiv = document.createElement('div');
             pDiv.className = 'pitch-player';
             pDiv.style = `
                 position: absolute; left: ${left}%; top: ${top}%;
                 transform: translate(-50%, -50%);
                 width: 45px; height: 50px;
-                background: ${isSelected ? '#f39c12' : '#34495e'};
+                background: ${isMob ? '#7f8c8d' : (isSelected ? '#f39c12' : '#34495e')};
                 border: 2px solid ${p.preference === 'ポゼッション' ? '#3498db' : (p.preference === 'カウンター' ? '#e74c3c' : '#2ecc71')};
                 border-radius: 5px; color: white;
                 display: flex; flex-direction: column; align-items: center; justify-content: center;
                 font-size: 10px; cursor: pointer; user-select: none;
                 z-index: 2; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+                ${isMob ? 'opacity: 0.8;' : ''}
             `;
+
+            let roleText = p.role || '';
+            if (isMob) {
+                roleText = '汎用(モブ)';
+            }
+
             pDiv.innerHTML = `
-                <span style="font-weight: bold;">${p.position}</span>
+                <span style="font-weight: bold;">${isMob ? '⚠️ ' : ''}${p.position}</span>
+                <span style="font-size: 7px; color: #f1c40f;">${roleText}</span>
                 <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40px;">${p.name.substring(0,4)}</span>
                 <span style="font-size: 8px;">疲${100 - p.condition}</span>
             `;
@@ -457,7 +469,7 @@ class ManagementUI {
                 cursor: pointer; display: flex; justify-content: space-between;
                 border-left: 4px solid ${p.preference === 'ポゼッション' ? '#3498db' : (p.preference === 'カウンター' ? '#e74c3c' : '#2ecc71')};
             `;
-            bDiv.innerHTML = `<span>[${p.position}] ${p.name}</span> <span>志向: ${p.preference.substring(0,1)} 疲: ${100-p.condition}</span>`;
+            bDiv.innerHTML = `<span>[${p.position}] ${p.role ? p.role : ''} ${p.name}</span> <span>志向: ${p.preference.substring(0,1)} 疲: ${100-p.condition}</span>`;
             bDiv.onclick = () => this.handlePlayerClick(bIdx, false);
             benchContainer.appendChild(bDiv);
         });
@@ -500,6 +512,47 @@ class ManagementUI {
         canvas.height = canvas.parentElement.clientHeight;
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw Pitch Matrix (5 lanes x 3 thirds)
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.lineWidth = 1;
+
+        // 5 Lanes (vertical lines)
+        for (let i = 1; i < 5; i++) {
+            ctx.beginPath();
+            ctx.moveTo(canvas.width * (i / 5), 0);
+            ctx.lineTo(canvas.width * (i / 5), canvas.height);
+            ctx.stroke();
+        }
+
+        // 3 Thirds (horizontal lines)
+        for (let i = 1; i < 3; i++) {
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height * (i / 3));
+            ctx.lineTo(canvas.width, canvas.height * (i / 3));
+            ctx.stroke();
+        }
+
+        // Highlight areas based on tactics
+        const tactic = team.manager ? team.manager.preference : null;
+        if (tactic === 'Possession') {
+            // Highlight center lanes (lane 2, 3, 4)
+            ctx.fillStyle = 'rgba(52, 152, 219, 0.1)';
+            ctx.fillRect(canvas.width * 0.2, 0, canvas.width * 0.6, canvas.height);
+        } else if (tactic === 'HighPress') {
+            // Highlight attacking third
+            ctx.fillStyle = 'rgba(231, 76, 60, 0.1)';
+            ctx.fillRect(0, canvas.height * 0.66, canvas.width, canvas.height * 0.34);
+        } else if (tactic === 'Retreat') {
+            // Highlight defensive third
+            ctx.fillStyle = 'rgba(46, 204, 113, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height * 0.33);
+        } else if (tactic === 'Counter') {
+             // Highlight outside lanes in attacking half
+             ctx.fillStyle = 'rgba(241, 196, 15, 0.1)';
+             ctx.fillRect(0, canvas.height * 0.5, canvas.width * 0.2, canvas.height * 0.5);
+             ctx.fillRect(canvas.width * 0.8, canvas.height * 0.5, canvas.width * 0.2, canvas.height * 0.5);
+        }
 
         const links = window.ChemistrySystem.getFormationLinks(team.formation);
 

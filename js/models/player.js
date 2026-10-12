@@ -1,8 +1,9 @@
 class Player {
-    constructor(id, name, position, stats, preference, skills = []) {
+    constructor(id, name, position, stats, preference, skills = [], role = null) {
         this.id = id;
         this.name = name;
         this.position = position; // e.g., 'GK', 'CB', 'CF'
+        this.role = role; // e.g., 'Classic', 'Inverted', 'Poacher'
 
         // Base Stats (1-100)
         this.stats = {
@@ -57,7 +58,13 @@ class Player {
             }
         }
 
-        return new Player(id, name, position, stats, preference, skills);
+        let role = null;
+        if (window.MasterData.Roles && window.MasterData.Roles[position]) {
+            const rolesForPos = window.MasterData.Roles[position];
+            role = rolesForPos[Math.floor(Math.random() * rolesForPos.length)];
+        }
+
+        return new Player(id, name, position, stats, preference, skills, role);
     }
 
     static randomStat(bonus = 0) {

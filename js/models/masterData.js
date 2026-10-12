@@ -84,7 +84,29 @@ const MasterData = {
         { id: 30, name: "【条件】ゲームクローズ", cooldown: 60, type: "special", actionType: "closeGame", condition: "lead" }
     ],
 
-    Positions: ["GK", "CB", "SB", "CDM", "CM", "CAM", "WG", "CF"]
+    Positions: ["GK", "CB", "SB", "CDM", "CM", "CAM", "WG", "CF"],
+
+    Roles: {
+        "GK": ["Classic", "Sweeper"],
+        "CB": ["Stopper", "Covering", "Ball-Playing"],
+        "SB": ["Defensive", "Attacking", "Inverted", "Wing-Back"],
+        "CDM": ["Anchor", "Destroyer", "Deep-Lying"],
+        "CM": ["Box-to-Box", "Advanced-Playmaker", "Ball-Winning"],
+        "CAM": ["Shadow-Striker", "Enganche", "Dynamo"],
+        "WG": ["Classic-Winger", "Inside-Forward", "Wide-Target-Man", "Crosser", "Wide-Playmaker", "Hard-Worker"], // Combining WB/SH roles here as well
+        "CF": ["Poacher", "Target-Man", "False-9", "Complete"]
+    },
+
+    Formations: {
+        "4-4-2": ["GK", "CB", "CB", "SB", "SB", "CM", "CM", "WG", "WG", "CF", "CF"],
+        "4-3-3": ["GK", "CB", "CB", "SB", "SB", "CDM", "CM", "CM", "WG", "WG", "CF"],
+        "3-2-4-1": ["GK", "CB", "CB", "CB", "CDM", "CDM", "CAM", "CAM", "WG", "WG", "CF"],
+        "4-1-4-1": ["GK", "CB", "CB", "SB", "SB", "CDM", "CM", "CM", "WG", "WG", "CF"],
+        "4-2-3-1": ["GK", "CB", "CB", "SB", "SB", "CDM", "CDM", "CAM", "WG", "WG", "CF"],
+        "5-3-2": ["GK", "CB", "CB", "CB", "SB", "SB", "CM", "CM", "CM", "CF", "CF"],
+        "4-3-1-2": ["GK", "CB", "CB", "SB", "SB", "CM", "CM", "CM", "CAM", "CF", "CF"],
+        "3-5-2": ["GK", "CB", "CB", "CB", "CDM", "CM", "CM", "WG", "WG", "CF", "CF"]
+    }
 };
 
 // Expose globally or export if using modules

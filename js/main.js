@@ -188,37 +188,75 @@ class MatchScene extends Phaser.Scene {
     }
 
     spawnTeams() {
+        const playerFormationPositions = window.MasterData.Formations[this.playerTeamData.formation] || [];
         this.playerTeamData.starting11.forEach((player, i) => {
-            let pos = this.getBasePosition(player.position, true);
+            const expectedPosStr = playerFormationPositions[i] || player.position;
+            let pos = this.getBasePosition(expectedPosStr, true);
             let yOffset = (i % 2 === 0 ? -1 : 1) * ((i % 3) * 30); // Spread them out
-            if (player.position === 'SB' || player.position === 'WG') {
+            if (expectedPosStr === 'SB' || expectedPosStr === 'WG') {
                 pos.y = i % 2 === 0 ? 100 : 500; // Left / Right flanks
             }
-            if (player.position === 'CB' || player.position === 'CM' || player.position === 'CDM') {
+            if (expectedPosStr === 'CB' || expectedPosStr === 'CM' || expectedPosStr === 'CDM') {
                 pos.y = 300 + yOffset;
+            }
+
+            // Apply Mob Penalty if placed in wrong position
+            if (player.position !== expectedPosStr) {
+                player.isMob = true;
+                player.dynamicStats = {
+                    pass: player.stats.pass / 2,
+                    shoot: player.stats.shoot / 2,
+                    defense: player.stats.defense / 2,
+                    physical: player.stats.physical / 2,
+                    speed: player.stats.speed / 2,
+                    mental: player.stats.mental / 2,
+                    stamina: player.stats.stamina / 2
+                };
+            } else {
+                player.isMob = false;
             }
 
             let sprite = this.createPlayerSprite(pos.x, pos.y, 0x3498db, i + 1, true, player);
             sprite.baseX = pos.x;
             sprite.baseY = pos.y;
-            sprite.baseOffsetY = (player.position === 'CB' || player.position === 'CM' || player.position === 'CDM' || player.position === 'CAM' || player.position === 'CF') ? yOffset : 0;
+            sprite.baseOffsetY = (expectedPosStr === 'CB' || expectedPosStr === 'CM' || expectedPosStr === 'CDM' || expectedPosStr === 'CAM' || expectedPosStr === 'CF') ? yOffset : 0;
+            sprite.expectedPosStr = expectedPosStr; // Save for logic
             this.playerSprites.push(sprite);
         });
 
+        const oppFormationPositions = window.MasterData.Formations[this.opponentTeamData.formation] || [];
         this.opponentTeamData.starting11.forEach((player, i) => {
-            let pos = this.getBasePosition(player.position, false);
+            const expectedPosStr = oppFormationPositions[i] || player.position;
+            let pos = this.getBasePosition(expectedPosStr, false);
             let yOffset = (i % 2 === 0 ? -1 : 1) * ((i % 3) * 30);
-            if (player.position === 'SB' || player.position === 'WG') {
+            if (expectedPosStr === 'SB' || expectedPosStr === 'WG') {
                 pos.y = i % 2 === 0 ? 100 : 500;
             }
-            if (player.position === 'CB' || player.position === 'CM' || player.position === 'CDM') {
+            if (expectedPosStr === 'CB' || expectedPosStr === 'CM' || expectedPosStr === 'CDM') {
                 pos.y = 300 + yOffset;
+            }
+
+            // Apply Mob Penalty if placed in wrong position
+            if (player.position !== expectedPosStr) {
+                player.isMob = true;
+                player.dynamicStats = {
+                    pass: player.stats.pass / 2,
+                    shoot: player.stats.shoot / 2,
+                    defense: player.stats.defense / 2,
+                    physical: player.stats.physical / 2,
+                    speed: player.stats.speed / 2,
+                    mental: player.stats.mental / 2,
+                    stamina: player.stats.stamina / 2
+                };
+            } else {
+                player.isMob = false;
             }
 
             let sprite = this.createPlayerSprite(pos.x, pos.y, 0xe74c3c, i + 1, false, player);
             sprite.baseX = pos.x;
             sprite.baseY = pos.y;
-            sprite.baseOffsetY = (player.position === 'CB' || player.position === 'CM' || player.position === 'CDM' || player.position === 'CAM' || player.position === 'CF') ? yOffset : 0;
+            sprite.baseOffsetY = (expectedPosStr === 'CB' || expectedPosStr === 'CM' || expectedPosStr === 'CDM' || expectedPosStr === 'CAM' || expectedPosStr === 'CF') ? yOffset : 0;
+            sprite.expectedPosStr = expectedPosStr; // Save for logic
             this.opponentSprites.push(sprite);
         });
 
@@ -596,37 +634,120 @@ class MatchScene extends Phaser.Scene {
             }
 
             // 1. Base Position Attraction Force
-            let base = this.getBasePosition(p.playerData.position, p.isPlayerTeam);
+            // Use expected position from formation if available
+            let base = this.getBasePosition(p.expectedPosStr || p.playerData.position, p.isPlayerTeam);
 
             // Re-apply vertical offset for central players so they don't clump
             if (p.baseOffsetY) {
                 base.y += p.baseOffsetY;
             }
 
-            // Adjust base based on tactic and phase
+            // Pitch Matrix Constants
+            const laneCenter = 300;
+            const laneHalfSpaceY = 150; // offset from center
+            const dir = p.isPlayerTeam ? 1 : -1;
+
+            // Role and Tactic Overrides
+            const role = p.playerData.role;
+            const isMob = p.playerData.isMob;
+
+            // Adjust base based on tactic, phase, and ROLE
             if (isAttacking) {
+                let attackPush = 100;
+
                 if (tactic === 'Counter') {
-                    base.x += (p.isPlayerTeam ? 150 : -150) * urgency; // Push hard
+                    attackPush = 150 * urgency;
                 } else if (tactic === 'Possession') {
-                    base.x += (p.isPlayerTeam ? 80 : -80); // Push moderately
-                } else {
-                    base.x += (p.isPlayerTeam ? 100 : -100);
+                    attackPush = 80;
                 }
 
-                // Shift y slightly towards ball to support, but keep width if winger
-                if (p.playerData.position !== 'WG' && p.playerData.position !== 'SB') {
-                    base.y = Phaser.Math.Linear(base.y, this.ball.y, 0.3);
+                if (!isMob) {
+                    // Role Overrides - Attack
+                    if (role === 'Inverted' && p.playerData.position === 'SB') {
+                        // Move to half-space or center
+                        base.y = Phaser.Math.Linear(base.y, laneCenter, 0.6);
+                        attackPush += 20; // Support build-up
+                    } else if (role === 'Defensive' && p.playerData.position === 'SB') {
+                        // Stay back
+                        attackPush = 0;
+                    } else if (role === 'Attacking' && p.playerData.position === 'SB') {
+                        // Overlap deep
+                        attackPush += 80;
+                    } else if (role === 'False-9' && p.playerData.position === 'CF') {
+                        // Drop deep to midfield
+                        attackPush = -50;
+                    } else if (role === 'Target-Man' && p.playerData.position === 'CF') {
+                        // Hold center
+                        base.y = laneCenter;
+                    } else if (role === 'Inside-Forward' && p.playerData.position === 'WG') {
+                        // Cut inside
+                        base.y = Phaser.Math.Linear(base.y, laneCenter, 0.4);
+                        attackPush += 40;
+                    } else if (role === 'Box-to-Box' && p.playerData.position === 'CM') {
+                        // Run deep into box
+                        attackPush += 60;
+                    } else if (role === 'Shadow-Striker' && p.playerData.position === 'CAM') {
+                        // Push up like a CF
+                        attackPush += 60;
+                    }
                 }
+
+                base.x += dir * attackPush;
+
+                // Shift y slightly towards ball to support, but keep width if wide player (unless inverted)
+                const isWide = p.playerData.position === 'WG' || p.playerData.position === 'SB';
+                if (!isWide || (role === 'Inverted' || role === 'Inside-Forward')) {
+                    // Central players and inverted wide players move towards ball
+                    base.y = Phaser.Math.Linear(base.y, this.ball.y, tactic === 'Possession' ? 0.5 : 0.3);
+                } else if (isWide && tactic === 'Possession') {
+                    // In possession, true wide players stay VERY wide (Hug touchline)
+                    base.y = base.y > 300 ? 550 : 50;
+                }
+
             } else if (isDefending) {
+                let defendDrop = -50;
+
                 if (tactic === 'Retreat') {
-                    base.x -= (p.isPlayerTeam ? 100 : -100); // Drop deep
+                    defendDrop = -120; // Drop deep
                 } else if (tactic === 'HighPress') {
-                    base.x += (p.isPlayerTeam ? 50 : -50); // Keep line high
-                } else {
-                    base.x -= (p.isPlayerTeam ? 50 : -50);
+                    defendDrop = 50; // Keep line high
                 }
-                // Shift block towards ball
+
+                if (!isMob) {
+                    // Role Overrides - Defense
+                    if (role === 'Stopper' && p.playerData.position === 'CB') {
+                        // Step up to press
+                        defendDrop += 40;
+                    } else if (role === 'Covering' && p.playerData.position === 'CB') {
+                        // Drop deeper to cover
+                        defendDrop -= 30;
+                    } else if ((role === 'Attacking' || role === 'Wing-Back') && p.playerData.position === 'SB') {
+                        // Might be caught high if exhausted
+                        if (p.playerData.condition < 40) {
+                            defendDrop += 50; // Late returning
+                        }
+                    } else if (role === 'Enganche' && p.playerData.position === 'CAM') {
+                        // Exempt from deep defense
+                        defendDrop += 80;
+                    } else if (role === 'Dynamo' && p.playerData.position === 'CAM') {
+                        // High press engine
+                        defendDrop += 60;
+                    } else if (role === 'Hard-Worker' && p.playerData.position === 'WG') {
+                        // Track back deep
+                        defendDrop -= 60;
+                    }
+                }
+
+                base.x += dir * defendDrop;
+
+                // Shift block towards ball (Tuck in)
                 base.y = Phaser.Math.Linear(base.y, this.ball.y, 0.5);
+
+                // If ball is on opposite side, wide defenders tuck in heavily
+                const ballLaneDist = Math.abs(this.ball.y - base.y);
+                if (ballLaneDist > 200 && (p.playerData.position === 'SB' || p.playerData.position === 'WG')) {
+                    base.y = Phaser.Math.Linear(base.y, laneCenter, 0.4);
+                }
             }
 
             let forceX = base.x - p.x;
