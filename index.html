@@ -12,23 +12,17 @@
     <div id="game-container">
         <!-- UI Overlay for Management Phase / Match UI -->
         <div id="ui-layer">
-            <header class="top-bar">
-                <div class="team-info">チーム: 未設定 <span class="funds">資金: ¥1,000,000</span> <span class="ap">AP: 5/10</span></div>
-                <div class="schedule">第3部 第1節</div>
+            <header class="top-bar" id="top-bar" style="display: none;">
+                <div class="team-info" id="team-info">チーム: 未設定 <span class="funds">資金: ¥0</span> <span class="ap">AP: 0/10</span></div>
+                <div class="schedule" id="schedule-info"></div>
             </header>
             <main class="ui-content" id="ui-content">
-                <!-- Management events, menus will be injected here -->
-                <div class="menu-box">
-                    <h2>監督室</h2>
-                    <button onclick="startGame()">試合開始</button>
-                    <button>編成</button>
-                    <button>イベント</button>
-                </div>
+                <!-- UI injected here by managementUI.js -->
             </main>
         </div>
 
-        <!-- Phaser Canvas Container -->
-        <div id="phaser-game"></div>
+        <!-- Phaser Canvas Container (only visible during match) -->
+        <div id="phaser-game" style="display: none;"></div>
     </div>
 
     <!-- Data Models & Logic -->
