@@ -2,7 +2,7 @@ const fs = require('fs');
 
 global.window = { addEventListener: () => {} };
 global.document = {
-    getElementById: () => ({ style: {}, innerHTML: '', addEventListener: () => {} }),
+    getElementById: () => ({ style: {}, innerHTML: '', addEventListener: () => {}, classList: { remove: () => {}, add: () => {} } }),
     querySelector: () => ({ style: {}, innerHTML: '', addEventListener: () => {} }),
     createElement: () => ({ style: {}, innerHTML: '', appendChild: () => {} })
 };
@@ -31,7 +31,7 @@ vm.runInContext(code, context);
 vm.runInContext(`
     const ui = new ManagementUI();
     ui.generateEvents = function() {
-        window.gameState.currentEvents.push({type: 'scout', player: {name: 'Test', position: 'FW'}, apCost: 10, fundCost: 1000});
+        window.gameState.currentEvents.push({id: 'test_1', type: 'scout', player: {name: 'Test', position: 'FW'}, apCost: 10, fundCost: 1000});
     };
     ui.uiContent = { innerHTML: "" };
 

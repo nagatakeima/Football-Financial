@@ -24,7 +24,7 @@ const context = {
         }
     },
     document: {
-        getElementById: () => ({ style: {}, innerHTML: '', addEventListener: () => {} }),
+        getElementById: () => ({ style: {}, innerHTML: '', addEventListener: () => {}, classList: { remove: () => {}, add: () => {} } }),
         querySelector: () => ({ style: {}, innerHTML: '', addEventListener: () => {} }),
         createElement: () => ({ style: {}, innerHTML: '', appendChild: () => {} })
     },
