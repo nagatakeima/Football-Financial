@@ -11,6 +11,11 @@ class GameState {
 
         // References to current events, etc.
         this.currentEvents = [];
+
+        // Hidden parameters for event generation
+        this.morale = 50;
+        this.losingStreak = 0;
+        this.managerInfluence = 0; // Increases when spending high AP
     }
 
     startNewDive(managerId) {
@@ -90,6 +95,12 @@ class GameState {
         // Clear events so they regenerate next turn
         this.currentEvents = [];
         this.eventsGeneratedForTurn = false;
+        this.hasRestedThisTurn = false; // Reset rest limit
+
+        // Update hidden params
+        this.morale = Math.max(0, Math.min(100, this.morale + (homeScore > awayScore ? 10 : (homeScore === awayScore ? 0 : -10))));
+        if (homeScore < awayScore) this.losingStreak++;
+        else this.losingStreak = 0;
 
         this.checkDismissal();
     }
@@ -128,13 +139,12 @@ class GameState {
                 alert("優勝おめでとうございます！ゲームクリア！");
                 this.isGameOver = true;
             } else {
-                alert(`第${this.currentTier}部リーグを突破しました！昇格します。`);
+                this.seasonJustEnded = true;
                 this.currentTier--;
                 this.initializeLeague(this.currentTier);
             }
         } else {
             this.isGameOver = true;
-            alert("シーズン終了時、目標順位に届きませんでした。解任されました。");
         }
     }
 }
