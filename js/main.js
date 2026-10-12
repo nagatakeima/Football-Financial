@@ -982,6 +982,9 @@ class MatchScene extends Phaser.Scene {
                     const sideMates = teammates.filter(p => Math.abs(p.x - this.ball.owner.x) <= 20);
                     const backMates = teammates.filter(p => isPlayer ? p.x < this.ball.owner.x : p.x > this.ball.owner.x);
 
+                    const teamManager = isPlayer ? window.MasterData.Managers.find(m => m.id === window.gameState.playerTeam.managerId) : window.MasterData.Managers.find(m => m.id === managementUI.getNextOpponent().managerId);
+                    const tactic = teamManager ? teamManager.preference : (isPlayer ? window.gameState.playerTeam.tactics : managementUI.getNextOpponent().tactics);
+
                     // Decide pass type based on tactics and situation
                     let isLongBall = forceLongBall || (Math.random() < (tactic === 'Counter' ? 0.3 : 0.05));
                     let isSwitchPlay = Math.random() < 0.1;
