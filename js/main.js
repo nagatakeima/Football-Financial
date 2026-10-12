@@ -983,8 +983,8 @@ class MatchScene extends Phaser.Scene {
 
             // Check pressure for dribble vs pass decision
             let underPressure = false;
-            const enemies = this.ball.owner.isPlayerTeam ? this.opponentSprites : this.playerSprites;
-            enemies.forEach(e => {
+            const pressureEnemies = this.ball.owner.isPlayerTeam ? this.opponentSprites : this.playerSprites;
+            pressureEnemies.forEach(e => {
                 // If enemy is ahead and close
                 if (Phaser.Math.Distance.Between(this.ball.x, this.ball.y, e.x, e.y) < 80) {
                     if ((this.ball.owner.isPlayerTeam && e.x > this.ball.x) || (!this.ball.owner.isPlayerTeam && e.x < this.ball.x)) {
@@ -1282,3 +1282,4 @@ function startGame() {
         game.scene.start('MatchScene');
     }
 }
+window.startGame = startGame;
