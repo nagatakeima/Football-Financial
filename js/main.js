@@ -606,6 +606,7 @@ class MatchScene extends Phaser.Scene {
                 this.kickoffTimer -= 1;
             } else {
                 this.matchState = 'playing';
+                this.currentSetPieceType = null;
                 // Remove visual feedback if any
                 if (this.setpieceText) {
                     this.setpieceText.destroy();
@@ -690,6 +691,7 @@ class MatchScene extends Phaser.Scene {
 
     handleSetPiece(type, x, y, isPlayerTeam) {
         this.matchState = 'setpiece';
+        this.currentSetPieceType = type; // Store for action restrictions
         this.kickoffTimer = 30; // 3 seconds wait
 
         this.ball.x = x;
@@ -1147,6 +1149,7 @@ class MatchScene extends Phaser.Scene {
 
         // --- Ball Interaction ---
         if (this.ballTarget || this.ballSpeed > 0) {
+            this.currentSetPieceType = null; // Clear set piece state once ball is in play
             // Ball is moving towards a target or rolling loose
             let targetX = this.ballTarget ? this.ballTarget.x : this.ball.x + Math.cos(this.ball.angle || 0) * 100;
             let targetY = this.ballTarget ? this.ballTarget.y : this.ball.y + Math.sin(this.ball.angle || 0) * 100;
@@ -1265,6 +1268,10 @@ class MatchScene extends Phaser.Scene {
             this.ball.x = this.ball.owner.x + (this.ball.owner.dirX > 0 ? 10 : -10);
             this.ball.y = this.ball.owner.y + 10;
 
+            // Fix Set Piece Loop: Prevent the ball from being drawn out of bounds while held
+            this.ball.x = Phaser.Math.Clamp(this.ball.x, 15, 785);
+            this.ball.y = Phaser.Math.Clamp(this.ball.y, 15, 585);
+
             // Ground Duel (Tackle)
             const enemies = this.ball.owner.isPlayerTeam ? this.opponentSprites : this.playerSprites;
             const tacklers = enemies.filter(p => Phaser.Math.Distance.Between(p.x, p.y, this.ball.x, this.ball.y) < 20);
@@ -1309,7 +1316,15 @@ class MatchScene extends Phaser.Scene {
                 if (['longBall', 'throughBall', 'switchPlay', 'earlyCross'].includes(this.activeBuff.actionType)) forceLongBall = true;
             }
 
-            const currentAction = this.ball.owner.currentAction;
+            let currentAction = this.ball.owner.currentAction;
+
+            // Fix: Restrict Throw-ins and Indirect Free kicks from direct shooting
+            if (this.currentSetPieceType === 'Throw In' || this.currentSetPieceType === 'Offside') {
+                if (currentAction === 'Shoot' || forceShoot) {
+                    currentAction = 'Pass'; // Force pass instead
+                    forceShoot = false;
+                }
+            }
 
             // Execute action if dictated by AI or Forced by Command
             if (forceShoot || forceLongBall || ['Pass', 'Shoot', 'Clear'].includes(currentAction)) {
@@ -1348,6 +1363,14 @@ class MatchScene extends Phaser.Scene {
                         if (Math.random() > 0.5) {
                             // Saved (catch) - simplifed by giving to GK or resetting near goal
                             this.showActionText(this.ball.owner, "シュート:失敗", "#e74c3c");
+
+                            // Find defending GK and show Save UI
+                            const defendingTeam = isPlayer ? this.opponentSprites : this.playerSprites;
+                            const defendingGK = defendingTeam.find(p => p.playerData.position === 'GK');
+                            if (defendingGK) {
+                                this.showActionText(defendingGK, "セーブ:成功", "#f1c40f");
+                            }
+
                             this.ballTarget = {x: isPlayer ? 780 : 20, y: 300};
                             this.ballSpeed = 10;
                         } else {
