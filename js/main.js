@@ -1329,7 +1329,7 @@ class MatchScene extends Phaser.Scene {
                     }
                 }
                 // Clear Logic
-                } else if (currentAction === 'Clear') {
+                else if (currentAction === 'Clear') {
                     this.createKickEffect(this.ball.x, this.ball.y);
                     this.ballTarget = {x: isPlayer ? 800 : 0, y: Math.random() * 600};
                     this.ballSpeed = 25;
