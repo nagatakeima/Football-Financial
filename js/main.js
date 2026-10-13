@@ -3,220 +3,7 @@
 // ==========================================
 
 class MatchScene extends Phaser.Scene {
-  // Utility methods for Threat & Risk calculation
-    calculateThreat(x, y, isPlayerTeam) {
-        // Goal position
-        const goalX = isPlayerTeam ? 800 : 0;
-        const goalY = 300;
-
-        // Distance to goal
-        const dist = Phaser.Math.Distance.Between(x, y, goalX, goalY);
-
-        // Base threat is inversely proportional to distance to goal
-        let threat = Math.max(0, 100 - (dist / 8));
-
-        // Central areas are more dangerous (higher threat)
-        const centralBonus = Math.max(0, 30 - Math.abs(y - 300) / 10);
-        threat += centralBonus;
-
-        return threat;
-    }
-
-    calculatePassRisk(startX, startY, targetX, targetY, isPlayerTeam) {
-        const enemies = isPlayerTeam ? this.opponentSprites : this.playerSprites;
-        let risk = 0;
-
-        const dist = Phaser.Math.Distance.Between(startX, startY, targetX, targetY);
-
-        // Pass distance adds baseline risk
-        risk += dist / 10;
-
-        // Check if enemies are in the passing lane
-        enemies.forEach(enemy => {
-            const lineLen = dist;
-            if (lineLen === 0) return;
-
-            const t = ((enemy.x - startX) * (targetX - startX) + (enemy.y - startY) * (targetY - startY)) / (lineLen * lineLen);
-
-            if (t >= 0 && t <= 1) {
-                // Enemy is within the segment bounds
-                const projX = startX + t * (targetX - startX);
-                const projY = startY + t * (targetY - startY);
-                const distToLine = Phaser.Math.Distance.Between(enemy.x, enemy.y, projX, projY);
-
-                // If enemy is close to the passing lane, increase risk dramatically
-                if (distToLine < 40) {
-                    risk += 50 * (1 - distToLine / 40); // Max 50 risk per enemy near line
-                }
-            }
-        });
-
-        return Math.min(100, risk); // Cap risk at 100
-    }
-
-    evaluateActions(p, context) {
-        // AI Evaluator calculating Score(A_i) based on Threat & Risk
-        let actionScores = {
-            Keep: 0, Dribble: 0, Pass: 0, Shoot: 0, Clear: 0,
-            Support: 0, RunIntoSpace: 0, HoldPosition: 0,
-            Press: 0, Mark: 0, Cover: 0, Delay: 0, Retreat: 0
-        };
-
-        const pos = p.playerData.position;
-        const role = p.playerData.role;
-        const tactic = context.tactic;
-        const isAttacking = context.isAttacking;
-        const hasBall = context.hasBall;
-        const pitchZone = this.getPitchZone(p.x, p.y, p.isPlayerTeam);
-
-        const currentThreat = this.calculateThreat(p.x, p.y, p.isPlayerTeam);
-        const staminaFactor = Math.max(0.3, p.playerData.currentStamina / 100);
-
-        if (hasBall) {
-            // 1. Shoot evaluation
-            const goalX = p.isPlayerTeam ? 800 : 0;
-            const distToGoal = Phaser.Math.Distance.Between(p.x, p.y, goalX, 300);
-
-            if (distToGoal < 250) {
-                actionScores.Shoot = currentThreat * 1.5;
-                const shootRisk = this.calculatePassRisk(p.x, p.y, goalX, 300, p.isPlayerTeam);
-                actionScores.Shoot -= shootRisk * 0.8;
-            }
-
-            // 2. Pass evaluation
-            const teammates = (p.isPlayerTeam ? this.playerSprites : this.opponentSprites).filter(mate => mate !== p);
-            let bestPassScore = -Infinity;
-            let bestPassTarget = null;
-
-            teammates.forEach(mate => {
-                const mateThreat = this.calculateThreat(mate.x, mate.y, p.isPlayerTeam);
-                const passRisk = this.calculatePassRisk(p.x, p.y, mate.x, mate.y, p.isPlayerTeam);
-
-                let passScore = mateThreat * 1.2 - passRisk * 1.5;
-
-                if (tactic === 'Possession' && passRisk < 30) passScore += 20;
-                if (tactic === 'Counter' && mateThreat > currentThreat) passScore += 30;
-
-                if (passScore > bestPassScore) {
-                    bestPassScore = passScore;
-                    bestPassTarget = mate;
-                }
-            });
-
-            actionScores.Pass = bestPassScore;
-            context.bestPassTarget = bestPassTarget;
-
-            // 3. Dribble evaluation
-            const dir = p.isPlayerTeam ? 1 : -1;
-            const dribbleTargetX = p.x + dir * 50;
-            const dribbleThreat = this.calculateThreat(dribbleTargetX, p.y, p.isPlayerTeam);
-            const dribbleRisk = this.calculatePassRisk(p.x, p.y, dribbleTargetX, p.y, p.isPlayerTeam);
-
-            actionScores.Dribble = dribbleThreat - dribbleRisk;
-            if (pos === 'WG' || role === 'Ball-Playing') actionScores.Dribble += 20;
-
-            // 4. Clear evaluation (Emergency)
-            if (pitchZone.third === 'Defensive') {
-                const localRisk = this.calculatePassRisk(p.x, p.y, p.x + 10, p.y, p.isPlayerTeam);
-                if (localRisk > 50) {
-                    actionScores.Clear = localRisk * 1.5;
-                }
-            }
-
-            actionScores.Keep = 10;
-
-        } else if (isAttacking) {
-            const dir = p.isPlayerTeam ? 1 : -1;
-            const forwardX = p.x + dir * 80;
-            const spaceThreat = this.calculateThreat(forwardX, p.y, p.isPlayerTeam);
-
-            let laneRisk = 100;
-            if (this.ball.owner && this.ball.owner.isPlayerTeam === p.isPlayerTeam) {
-                laneRisk = this.calculatePassRisk(this.ball.owner.x, this.ball.owner.y, forwardX, p.y, p.isPlayerTeam);
-            }
-            actionScores.RunIntoSpace = spaceThreat - (laneRisk * 0.5);
-            if (pos === 'WG' || pos === 'CF' || role === 'Attacking') actionScores.RunIntoSpace += 30;
-
-            if (this.ball.owner && this.ball.owner.isPlayerTeam === p.isPlayerTeam) {
-                const distToBall = Phaser.Math.Distance.Between(p.x, p.y, this.ball.owner.x, this.ball.owner.y);
-                if (distToBall > 100 && distToBall < 250) {
-                    const currentLaneRisk = this.calculatePassRisk(this.ball.owner.x, this.ball.owner.y, p.x, p.y, p.isPlayerTeam);
-                    actionScores.Support = 80 - currentLaneRisk;
-                }
-            }
-
-            actionScores.HoldPosition = 40;
-
-        } else {
-            const ballThreat = this.calculateThreat(this.ball.x, this.ball.y, !p.isPlayerTeam);
-            const distToBall = Phaser.Math.Distance.Between(p.x, p.y, this.ball.x, this.ball.y);
-
-            actionScores.Press = ballThreat * 1.2 - (distToBall / 5);
-            if (tactic === 'HighPress') actionScores.Press += 40;
-
-            actionScores.Mark = 50;
-
-            const goalX = p.isPlayerTeam ? 0 : 800;
-            const distToOwnGoal = Phaser.Math.Distance.Between(p.x, p.y, goalX, 300);
-            const ballDistToOwnGoal = Phaser.Math.Distance.Between(this.ball.x, this.ball.y, goalX, 300);
-
-            if (ballDistToOwnGoal < distToOwnGoal) {
-                actionScores.Retreat = 100;
-            } else {
-                actionScores.Retreat = 50 - (distToOwnGoal / 10);
-            }
-
-            if (pos === 'CB' || pos === 'SB') {
-                actionScores.Retreat += 30;
-                actionScores.Delay += 20;
-            }
-        }
-
-        for (let key in actionScores) {
-            actionScores[key] *= staminaFactor;
-            actionScores[key] += Math.random() * (10 + (1 - staminaFactor) * 20);
-        }
-
-        let targetLineX = null;
-        if (!isAttacking && !hasBall && (pos === 'CB' || pos === 'SB')) {
-            const myTeam = p.isPlayerTeam ? this.playerSprites : this.opponentSprites;
-            const cbs = myTeam.filter(mate => mate.playerData.position === 'CB');
-            if (cbs.length > 0) {
-                let deepestCB = cbs.sort((a,b) => p.isPlayerTeam ? a.x - b.x : b.x - a.x)[0];
-                targetLineX = deepestCB.x;
-            }
-        }
-
-        let bestAction = 'HoldPosition';
-        let maxScore = -Infinity;
-
-        const validActions = hasBall
-            ? ['Keep', 'Dribble', 'Pass', 'Shoot', 'Clear']
-            : (isAttacking ? ['Support', 'RunIntoSpace', 'HoldPosition'] : ['Press', 'Mark', 'Cover', 'Delay', 'Retreat']);
-
-        validActions.forEach(action => {
-            let score = actionScores[action];
-
-            if (targetLineX !== null) {
-                let distToLine = Math.abs(p.x - targetLineX);
-                if (distToLine > 30) {
-                    if (action === 'HoldPosition' || action === 'Retreat' || action === 'Delay') {
-                        score += (distToLine * 0.8);
-                    }
-                    if (action === 'Press' || action === 'Mark') {
-                        score -= (distToLine * 0.8);
-                    }
-                }
-            }
-
-            if (score > maxScore) {
-                maxScore = score;
-                bestAction = action;
-            }
-        });
-
-        return { action: bestAction, score: maxScore, targetLineX: targetLineX };
-    }  constructor() {
+    constructor() {
         super('MatchScene');
     }
 
@@ -254,7 +41,7 @@ class MatchScene extends Phaser.Scene {
         this.score = { player: 0, opponent: 0 };
         this.matchState = 'playing';
         this.kickoffTimer = 0;
-        this.ball = { x: 400, y: 300, z: 0, owner: null }; // owner is a sprite or null
+        this.ball = { x: 400, y: 300, z: 0, owner: null }; this.lastTouchedByPlayerTeam = true; // owner is a sprite or null
 
         // Sprites / Teams
         this.playerSprites = [];
@@ -802,6 +589,16 @@ class MatchScene extends Phaser.Scene {
                 this.kickoffTimer -= 1;
             } else {
                 this.matchState = 'playing';
+                if (this.ball.owner) {
+                    const isPlayer = this.ball.owner.isPlayerTeam;
+                    const teammates = (isPlayer ? this.playerSprites : this.opponentSprites).filter(p => p !== this.ball.owner);
+                    const backMates = teammates.filter(p => isPlayer ? p.x < this.ball.owner.x - 10 : p.x > this.ball.owner.x + 10);
+                    let targetMate = backMates.length > 0 ? backMates[Math.floor(Math.random() * backMates.length)] : teammates[0];
+                    this.ballTarget = {x: targetMate.x, y: targetMate.y};
+                    this.ballSpeed = 15;
+                    this.isHighBall = false;
+                    this.ball.owner = null;
+                }
             }
         } else if (this.matchState === 'setpiece') {
             if (this.kickoffTimer > 0) {
@@ -829,55 +626,33 @@ class MatchScene extends Phaser.Scene {
     }
 
     checkBallOut() {
-        // Bounds for pitch (roughly matching visual lines)
-        const leftBound = 10;
-        const rightBound = 790;
-        const topBound = 10;
-        const bottomBound = 590;
+        const leftBound = 10; const rightBound = 790; const topBound = 10; const bottomBound = 590;
+        let isOut = false; let type = ''; let restartX = this.ball.x; let restartY = this.ball.y;
+        let isPlayerTeamBall = !this.lastTouchedByPlayerTeam;
 
-        let isOut = false;
-        let type = '';
-        let restartX = this.ball.x;
-        let restartY = this.ball.y;
-        let isPlayerTeamBall = true; // For MVP, assume random or based on rough direction
-
-        // Check Touchlines (Y-axis) -> Throw-in
         if (this.ball.y < topBound) {
-            isOut = true; type = 'Throw In';
-            restartY = topBound + 5;
-            isPlayerTeamBall = Math.random() > 0.5;
+            isOut = true; type = 'Throw In'; restartY = topBound + 5;
         } else if (this.ball.y > bottomBound) {
-            isOut = true; type = 'Throw In';
-            restartY = bottomBound - 5;
-            isPlayerTeamBall = Math.random() > 0.5;
+            isOut = true; type = 'Throw In'; restartY = bottomBound - 5;
         }
 
-        // Check Goal lines (X-axis) -> Goal Kick or Corner Kick
         if (!isOut && this.ball.x < leftBound) {
-            // Out on Player team's defensive side (x < 10)
             isOut = true;
-            if (this.ball.y >= 260 && this.ball.y <= 340) {
-                 // Opponent scores
-                 this.triggerGoal(false);
-                 this.resetPositions();
-                 return;
+            if (this.ball.y >= 260 && this.ball.y <= 340 && this.ball.z <= 30) {
+                 this.triggerGoal(false); this.resetPositions(); return;
             } else {
-                if (Math.random() > 0.5) {
+                if (!this.lastTouchedByPlayerTeam) {
                     type = 'Goal Kick'; restartX = 50; restartY = 300; isPlayerTeamBall = true;
                 } else {
                     type = 'Corner Kick'; restartX = leftBound; restartY = this.ball.y < 300 ? topBound : bottomBound; isPlayerTeamBall = false;
                 }
             }
         } else if (!isOut && this.ball.x > rightBound) {
-            // Out on Opponent team's defensive side (x > 790)
             isOut = true;
-            if (this.ball.y >= 260 && this.ball.y <= 340) {
-                 // Player team scores
-                 this.triggerGoal(true);
-                 this.resetPositions();
-                 return;
+            if (this.ball.y >= 260 && this.ball.y <= 340 && this.ball.z <= 30) {
+                 this.triggerGoal(true); this.resetPositions(); return;
             } else {
-                if (Math.random() > 0.5) {
+                if (this.lastTouchedByPlayerTeam) {
                     type = 'Goal Kick'; restartX = 750; restartY = 300; isPlayerTeamBall = false;
                 } else {
                     type = 'Corner Kick'; restartX = rightBound; restartY = this.ball.y < 300 ? topBound : bottomBound; isPlayerTeamBall = true;
@@ -925,149 +700,133 @@ class MatchScene extends Phaser.Scene {
         });
     }
 
-  evaluateActions(p, context) {
-        // AI Evaluator calculating Score(A_i) = BaseWeight * ContextModifier * TacticalDirective
-        let actionScores = {
-            Keep: 0, Dribble: 0, Pass: 0, Shoot: 0, Clear: 0,
-            Support: 0, RunIntoSpace: 0, HoldPosition: 0,
-            Press: 0, Mark: 0, Cover: 0, Delay: 0, Retreat: 0
-        };
+    calculateThreat(x, y, isPlayerTeam) {
+        const goalX = isPlayerTeam ? 800 : 0;
+        const dist = Phaser.Math.Distance.Between(x, y, goalX, 300);
+        let threat = Math.max(0, 100 - (dist / 8));
+        threat += Math.max(0, 30 - Math.abs(y - 300) / 10);
+        return threat;
+    }
 
-        const pos = p.playerData.position;
-        const role = p.playerData.role;
-        const tactic = context.tactic;
-        const isAttacking = context.isAttacking;
-        const hasBall = context.hasBall;
-        const pitchZone = this.getPitchZone(p.x, p.y, p.isPlayerTeam);
+    calculatePassRisk(startX, startY, targetX, targetY, isPlayerTeam) {
+        const enemies = isPlayerTeam ? this.opponentSprites : this.playerSprites;
+        let risk = Phaser.Math.Distance.Between(startX, startY, targetX, targetY) / 10;
+        const dist = risk * 10;
+        enemies.forEach(enemy => {
+            if (dist === 0) return;
+            const t = ((enemy.x - startX) * (targetX - startX) + (enemy.y - startY) * (targetY - startY)) / (dist * dist);
+            if (t >= 0 && t <= 1) {
+                const projX = startX + t * (targetX - startX);
+                const projY = startY + t * (targetY - startY);
+                const distToLine = Phaser.Math.Distance.Between(enemy.x, enemy.y, projX, projY);
+                if (distToLine < 40) risk += 50 * (1 - distToLine / 40);
+            }
+        });
+        return Math.min(100, risk);
+    }
 
-        // --- 1. Base Weights based on Position/Role (from Docs 08-11, 30) ---
-        if (pos === 'GK') {
-            actionScores.HoldPosition = 80;
-            actionScores.Clear = 50;
-            if (role === 'Sweeper') actionScores.RunIntoSpace = 30; // Rush out
-        } else if (pos === 'CB' || pos === 'SB') {
-            actionScores.Retreat = 70;
-            actionScores.HoldPosition = 60;
-            actionScores.Mark = 50;
-            actionScores.Clear = 60;
-            if (role === 'Stopper') actionScores.Press = 40;
-            if (role === 'Attacking' && pos === 'SB') actionScores.RunIntoSpace = 50; // Overlap
-            if (role === 'Inverted' && pos === 'SB') actionScores.Support = 40; // Midfield support
-            if (role === 'Ball-Playing' && pos === 'CB') { actionScores.Dribble = 20; actionScores.Pass = 30; }
-        } else if (pos === 'CDM' || pos === 'CM' || pos === 'CAM') {
-            actionScores.Support = 60;
-            actionScores.Pass = 60;
-            actionScores.Press = 50;
-            if (role === 'Box-to-Box') { actionScores.RunIntoSpace = 50; actionScores.Retreat = 50; }
-            if (role === 'Destroyer') actionScores.Press = 80;
-            if (role === 'Enganche') { actionScores.HoldPosition = 70; actionScores.Pass = 80; actionScores.Press = 10; }
-            if (role === 'Shadow-Striker') { actionScores.RunIntoSpace = 60; actionScores.Shoot = 50; }
-        } else if (pos === 'WG' || pos === 'CF') {
-            actionScores.RunIntoSpace = 70;
-            actionScores.Shoot = 70;
-            actionScores.Dribble = 50;
-            actionScores.Press = 30;
-            if (role === 'Target-Man') { actionScores.HoldPosition = 60; actionScores.RunIntoSpace = 20; }
-            if (role === 'False-9') { actionScores.Support = 60; actionScores.Retreat = 40; }
-            if (role === 'Poacher') { actionScores.RunIntoSpace = 90; actionScores.Shoot = 80; }
-        }
-
-        // --- 2. Context Modifiers ---
-        // Distance to ball
-        const distToBall = Phaser.Math.Distance.Between(p.x, p.y, this.ball.x, this.ball.y);
-        if (distToBall < 100 && !hasBall) {
-            actionScores.Support += 20; // Close enough to support
-        }
-
-        // Zone modifiers
-        if (pitchZone.third === 'Defensive') {
-            actionScores.Clear += 30;
-            actionScores.Retreat += 20;
-            actionScores.Dribble -= 30; // Risky
-        } else if (pitchZone.third === 'Attacking') {
-            actionScores.Shoot += 30;
-            actionScores.RunIntoSpace += 20;
-            actionScores.Press += 10; // High press context
-        }
-
-        // Fatigue penalty (IQ Drop applied to complex actions)
+    evaluateActions(p, context) {
+        let actionScores = { Keep: 0, Dribble: 0, Pass: 0, Shoot: 0, Clear: 0, Support: 0, RunIntoSpace: 0, HoldPosition: 0, Press: 0, Mark: 0, Cover: 0, Delay: 0, Retreat: 0 };
+        const pos = p.playerData.position; const role = p.playerData.role; const tactic = context.tactic;
+        const isAttacking = context.isAttacking; const hasBall = context.hasBall; const pitchZone = this.getPitchZone(p.x, p.y, p.isPlayerTeam);
+        const currentThreat = this.calculateThreat(p.x, p.y, p.isPlayerTeam);
         const staminaFactor = Math.max(0.3, p.playerData.currentStamina / 100);
-        if (staminaFactor < 0.5) {
-            actionScores.RunIntoSpace *= staminaFactor; // Less sprinting
-            actionScores.Press *= staminaFactor; // Less pressing
-            actionScores.Retreat *= staminaFactor; // Lazy tracking back
+
+        if (hasBall) {
+            const goalX = p.isPlayerTeam ? 800 : 0;
+            const distToGoal = Phaser.Math.Distance.Between(p.x, p.y, goalX, 300);
+            if (distToGoal < 250) {
+                actionScores.Shoot = currentThreat * 1.5;
+                actionScores.Shoot -= this.calculatePassRisk(p.x, p.y, goalX, 300, p.isPlayerTeam) * 0.8;
+            }
+
+            const teammates = (p.isPlayerTeam ? this.playerSprites : this.opponentSprites).filter(mate => mate !== p);
+            let bestPassScore = -Infinity; let bestPassTarget = null;
+            teammates.forEach(mate => {
+                const mateThreat = this.calculateThreat(mate.x, mate.y, p.isPlayerTeam);
+                const passRisk = this.calculatePassRisk(p.x, p.y, mate.x, mate.y, p.isPlayerTeam);
+                let passScore = mateThreat * 1.2 - passRisk * 1.5;
+                if (tactic === 'Possession' && passRisk < 30) passScore += 20;
+                if (tactic === 'Counter' && mateThreat > currentThreat) passScore += 30;
+                if (passScore > bestPassScore) { bestPassScore = passScore; bestPassTarget = mate; }
+            });
+            actionScores.Pass = bestPassScore; context.bestPassTarget = bestPassTarget;
+
+            const dir = p.isPlayerTeam ? 1 : -1;
+            const dribbleTargetX = p.x + dir * 50;
+            actionScores.Dribble = this.calculateThreat(dribbleTargetX, p.y, p.isPlayerTeam) - this.calculatePassRisk(p.x, p.y, dribbleTargetX, p.y, p.isPlayerTeam);
+            if (pos === 'WG' || role === 'Ball-Playing') actionScores.Dribble += 20;
+
+            if (pitchZone.third === 'Defensive' && this.calculatePassRisk(p.x, p.y, p.x + 10, p.y, p.isPlayerTeam) > 50) actionScores.Clear = 75;
+            actionScores.Keep = 10;
+        } else if (isAttacking) {
+            const dir = p.isPlayerTeam ? 1 : -1;
+            const forwardX = p.x + dir * 80;
+            let laneRisk = this.ball.owner && this.ball.owner.isPlayerTeam === p.isPlayerTeam ? this.calculatePassRisk(this.ball.owner.x, this.ball.owner.y, forwardX, p.y, p.isPlayerTeam) : 100;
+            actionScores.RunIntoSpace = this.calculateThreat(forwardX, p.y, p.isPlayerTeam) - (laneRisk * 0.5);
+            if (pos === 'WG' || pos === 'CF' || role === 'Attacking') actionScores.RunIntoSpace += 30;
+
+            if (this.ball.owner && this.ball.owner.isPlayerTeam === p.isPlayerTeam) {
+                const distToBall = Phaser.Math.Distance.Between(p.x, p.y, this.ball.owner.x, this.ball.owner.y);
+                if (distToBall > 100 && distToBall < 250) {
+                    actionScores.Support = 80 - this.calculatePassRisk(this.ball.owner.x, this.ball.owner.y, p.x, p.y, p.isPlayerTeam);
+                }
+            }
+            actionScores.HoldPosition = 40;
+        } else {
+            const teammates = p.isPlayerTeam ? this.playerSprites : this.opponentSprites;
+            let closestDist = Infinity; let closestMate = null;
+            teammates.forEach(mate => {
+                const dist = Phaser.Math.Distance.Between(mate.x, mate.y, this.ball.x, this.ball.y);
+                if (dist < closestDist) { closestDist = dist; closestMate = mate; }
+            });
+            const isFirstDefender = (closestMate === p);
+
+            const ballThreat = this.calculateThreat(this.ball.x, this.ball.y, !p.isPlayerTeam);
+            const distToBall = Phaser.Math.Distance.Between(p.x, p.y, this.ball.x, this.ball.y);
+
+            actionScores.Press = ballThreat * 1.2 - (distToBall / 5);
+            if (tactic === 'HighPress') actionScores.Press += 40;
+            if (isFirstDefender && distToBall < 300) actionScores.Press += 100;
+
+            actionScores.Mark = 50;
+            const goalX = p.isPlayerTeam ? 0 : 800;
+            const distToOwnGoal = Phaser.Math.Distance.Between(p.x, p.y, goalX, 300);
+
+            if (Phaser.Math.Distance.Between(this.ball.x, this.ball.y, goalX, 300) < distToOwnGoal) {
+                actionScores.Retreat = 100;
+                if (isFirstDefender && distToBall < 100) actionScores.Press += 50;
+            } else {
+                actionScores.Retreat = 50 - (distToOwnGoal / 10);
+            }
+            if (pos === 'CB' || pos === 'SB') { actionScores.Retreat += 30; actionScores.Delay += 20; }
         }
 
-        // --- 3. Tactical Directives Multipliers ---
-        if (tactic === 'Possession') {
-            actionScores.Support *= 1.5;
-            actionScores.Pass *= 1.3;
-            actionScores.HoldPosition *= 1.2;
-            actionScores.Clear *= 0.5; // Avoid clearing
-        } else if (tactic === 'Counter') {
-            // Positive transition context: if just won the ball
-            actionScores.RunIntoSpace *= 1.5;
-            actionScores.Pass *= 1.2; // Long ball bias handled later
-            actionScores.Retreat *= 1.3; // Fall back quickly when losing
-            actionScores.HoldPosition *= 0.8;
-        } else if (tactic === 'HighPress') {
-            actionScores.Press *= 1.6;
-        } else if (tactic === 'Retreat') {
-            actionScores.Retreat *= 1.6;
-            actionScores.Press *= 0.5;
-            actionScores.Delay *= 1.4;
-        }
-
-        // Add small random noise (0-10) to break ties and simulate human error
         for (let key in actionScores) {
-            actionScores[key] += Math.random() * 10;
+            actionScores[key] *= staminaFactor;
+            actionScores[key] += Math.random() * (10 + (1 - staminaFactor) * 20);
         }
 
-        // 4. Defensive Line Control Penalty (Invisible Chain)
-        // CBs and SBs are heavily penalized for breaking the horizontal defensive line
         let targetLineX = null;
         if (!isAttacking && !hasBall && (pos === 'CB' || pos === 'SB')) {
             const myTeam = p.isPlayerTeam ? this.playerSprites : this.opponentSprites;
             const cbs = myTeam.filter(mate => mate.playerData.position === 'CB');
-            if (cbs.length > 0) {
-                let deepestCB = cbs.sort((a,b) => p.isPlayerTeam ? a.x - b.x : b.x - a.x)[0];
-                targetLineX = deepestCB.x;
-            }
+            if (cbs.length > 0) targetLineX = cbs.sort((a,b) => p.isPlayerTeam ? a.x - b.x : b.x - a.x)[0].x;
         }
 
-        // Find highest scored action
-        let bestAction = 'HoldPosition';
-        let maxScore = -Infinity;
-
-        // Filter actions based on state (on-ball vs off-ball)
-        const validActions = hasBall
-            ? ['Keep', 'Dribble', 'Pass', 'Shoot', 'Clear']
-            : (isAttacking ? ['Support', 'RunIntoSpace', 'HoldPosition'] : ['Press', 'Mark', 'Cover', 'Delay', 'Retreat']);
+        let bestAction = 'HoldPosition'; let maxScore = -Infinity;
+        const validActions = hasBall ? ['Keep', 'Dribble', 'Pass', 'Shoot', 'Clear'] : (isAttacking ? ['Support', 'RunIntoSpace', 'HoldPosition'] : ['Press', 'Mark', 'Cover', 'Delay', 'Retreat']);
 
         validActions.forEach(action => {
             let score = actionScores[action];
-
-            // Apply invisible chain penalty for breaking the line
             if (targetLineX !== null) {
-                // If action pushes them far from the line, penalize quadratically
-                // Let's assume Press moves them toward ball, Retreat moves them back
-                // Simplification: We subtract a penalty based on their current distance to target line
-                // To keep it clean, we just heavily buff HoldPosition/Retreat if they are out of line
                 let distToLine = Math.abs(p.x - targetLineX);
                 if (distToLine > 30) {
-                    if (action === 'HoldPosition' || action === 'Retreat' || action === 'Delay') {
-                        score += (distToLine * 0.5); // quadratic or linear buff to fix shape
-                    }
-                    if (action === 'Press' || action === 'Mark') {
-                        score -= (distToLine * 0.5); // Penalty for rushing out of line
-                    }
+                    if (action === 'HoldPosition' || action === 'Retreat' || action === 'Delay') score += (distToLine * 0.8);
+                    if (action === 'Press' || action === 'Mark') score -= (distToLine * 0.8);
                 }
             }
-
-            if (score > maxScore) {
-                maxScore = score;
-                bestAction = action;
-            }
+            if (score > maxScore) { maxScore = score; bestAction = action; }
         });
 
         return { action: bestAction, score: maxScore, targetLineX: targetLineX };
@@ -1169,8 +928,8 @@ class MatchScene extends Phaser.Scene {
                 const context = { tactic, isAttacking, hasBall };
                 const evaluation = this.evaluateActions(p, context);
                 const bestAction = evaluation.action;
-                p.currentAction = bestAction; // store for debug/render
-                p.lastEvaluation = { bestPassTarget: context.bestPassTarget, targetLineX: evaluation.targetLineX };
+                p.currentAction = bestAction;
+                p.lastEvaluation = { bestPassTarget: context.bestPassTarget, targetLineX: evaluation.targetLineX }; // store for debug/render
 
                 // Translate Action to Force Vectors
                 let targetX = p.x;
@@ -1182,116 +941,60 @@ class MatchScene extends Phaser.Scene {
                 switch (bestAction) {
                     case 'HoldPosition':
                         targetX = (evaluation.targetLineX !== null) ? evaluation.targetLineX : base.x;
-                        // Tuck in slightly based on ball position to maintain compactness
                         targetY = Phaser.Math.Linear(base.y, this.ball.y, 0.2);
                         break;
                     case 'RunIntoSpace':
-                        // Run towards highest threat area (forward, but drifting center if wide, or drifting wide if blocked)
                         let targetForwardX = p.x + (dir * 80);
-
-                        // Smart Offside Awareness
-                        // Calculate offside line
-                        let offsideLineX = p.isPlayerTeam ? 800 : 0; // Default to goal line
+                        let offsideLineX = p.isPlayerTeam ? 800 : 0;
                         if (p.isPlayerTeam && p.x > 400) {
                             let oppDefenders = [...this.opponentSprites].sort((a, b) => b.x - a.x);
-                            if (oppDefenders.length > 1) offsideLineX = oppDefenders[1].x - 5; // Stay 5px behind
+                            if (oppDefenders.length > 1) offsideLineX = oppDefenders[1].x - 5;
                         } else if (!p.isPlayerTeam && p.x < 400) {
                             let playerDefenders = [...this.playerSprites].sort((a, b) => a.x - b.x);
-                            if (playerDefenders.length > 1) offsideLineX = playerDefenders[1].x + 5; // Stay 5px behind
+                            if (playerDefenders.length > 1) offsideLineX = playerDefenders[1].x + 5;
                         }
-
-                        // If moving forward crosses the offside line, clamp it
-                        if (p.isPlayerTeam) {
-                            if (targetForwardX > offsideLineX && offsideLineX > p.x) targetForwardX = offsideLineX;
-                        } else {
-                            if (targetForwardX < offsideLineX && offsideLineX < p.x) targetForwardX = offsideLineX;
-                        }
-
+                        if (p.isPlayerTeam && targetForwardX > offsideLineX && offsideLineX > p.x) targetForwardX = offsideLineX;
+                        if (!p.isPlayerTeam && targetForwardX < offsideLineX && offsideLineX < p.x) targetForwardX = offsideLineX;
                         targetX = targetForwardX;
-                        // Default to maintaining width, but angle slightly towards goal (300)
                         targetY = p.y + (300 - p.y) * 0.1;
                         break;
                     case 'Support':
-                        // Instead of running straight at the ball (bunchball), move to a safe pass lane
                         if (this.ball.owner) {
-                            const bX = this.ball.owner.x;
-                            const bY = this.ball.owner.y;
-                            // Find an angle that is safe
-                            let safeAngle = Phaser.Math.Angle.Between(bX, bY, p.x, p.y);
-                            // We want to be roughly 150-200px away, not on top of the ball
+                            let safeAngle = Phaser.Math.Angle.Between(this.ball.owner.x, this.ball.owner.y, p.x, p.y);
                             const idealDist = 180;
-                            targetX = bX + Math.cos(safeAngle) * idealDist;
-                            targetY = bY + Math.sin(safeAngle) * idealDist;
-
-                            // If we are already far away, move closer but keep distance
-                            const currentDist = Phaser.Math.Distance.Between(p.x, p.y, bX, bY);
-                            if (currentDist > idealDist + 50) {
-                                targetX = p.x + Math.cos(safeAngle - Math.PI) * 50; // move closer
-                                targetY = p.y + Math.sin(safeAngle - Math.PI) * 50;
+                            targetX = this.ball.owner.x + Math.cos(safeAngle) * idealDist;
+                            targetY = this.ball.owner.y + Math.sin(safeAngle) * idealDist;
+                            if (Phaser.Math.Distance.Between(p.x, p.y, this.ball.owner.x, this.ball.owner.y) > idealDist + 50) {
+                                targetX = p.x + Math.cos(safeAngle - Math.PI) * 50; targetY = p.y + Math.sin(safeAngle - Math.PI) * 50;
                             }
-                        } else {
-                            targetX = p.x; targetY = p.y;
-                        }
+                        } else { targetX = p.x; targetY = p.y; }
                         break;
                     case 'Retreat':
                     case 'Delay':
                         targetX = (p.lastEvaluation && p.lastEvaluation.targetLineX !== null) ? p.lastEvaluation.targetLineX : base.x - (dir * 100);
-                        // Zonal Maintenance: Don't cross the center line if on the opposite side of the pitch
-                        const isBallTopHalf = this.ball.y < 300;
-                        const amITopHalf = base.y < 300;
-                        let pullWeight = 0.5;
-                        // If I am on the opposite side of the ball, don't tuck in too far (Anti-ball watching)
-                        if (isBallTopHalf !== amITopHalf && Math.abs(base.y - 300) > 100) {
-                            pullWeight = 0.1; // Stay wide
-                        }
+                        let pullWeight = (this.ball.y < 300 !== base.y < 300 && Math.abs(base.y - 300) > 100) ? 0.1 : 0.5;
                         targetY = Phaser.Math.Linear(base.y, this.ball.y, pullWeight);
                         break;
                     case 'Press':
                     case 'Clear':
-                        // Move to intercept ball holder, or ball if loose
-                        if (this.ball.owner) {
-                            // Predict owner movement slightly
-                            targetX = this.ball.x + (this.ball.owner.dirX * 20);
-                            targetY = this.ball.y;
-                        } else {
-                            targetX = this.ball.x;
-                            targetY = this.ball.y;
-                        }
+                        if (this.ball.owner) { targetX = this.ball.x + (this.ball.owner.dirX * 20); targetY = this.ball.y; }
+                        else { targetX = this.ball.x; targetY = this.ball.y; }
                         break;
                     case 'Mark':
-                        // Goal-side marking: position between the marked enemy and the goal
                         const enemies = p.isPlayerTeam ? this.opponentSprites : this.playerSprites;
-                        let nearestEnemy = enemies.reduce((nearest, e) => {
-                            let dist = Phaser.Math.Distance.Between(p.x, p.y, e.x, e.y);
-                            return dist < nearest.dist ? {sprite: e, dist: dist} : nearest;
-                        }, {sprite: null, dist: Infinity});
-
-                        if (nearestEnemy.sprite) {
-                            const myGoalX = p.isPlayerTeam ? 0 : 800;
-                            const markAngle = Phaser.Math.Angle.Between(nearestEnemy.sprite.x, nearestEnemy.sprite.y, myGoalX, 300);
-                            targetX = nearestEnemy.sprite.x + Math.cos(markAngle) * 30; // 30px goal-side
-                            targetY = nearestEnemy.sprite.y + Math.sin(markAngle) * 30;
-                        } else {
-                            targetX = p.x; targetY = p.y;
-                        }
+                        let nearestEnemy = enemies.reduce((n, e) => Phaser.Math.Distance.Between(p.x, p.y, e.x, e.y) < n.d ? {s: e, d: Phaser.Math.Distance.Between(p.x, p.y, e.x, e.y)} : n, {s: null, d: Infinity});
+                        if (nearestEnemy.s) {
+                            const markAngle = Phaser.Math.Angle.Between(nearestEnemy.s.x, nearestEnemy.s.y, p.isPlayerTeam ? 0 : 800, 300);
+                            targetX = nearestEnemy.s.x + Math.cos(markAngle) * 30; targetY = nearestEnemy.s.y + Math.sin(markAngle) * 30;
+                        } else { targetX = p.x; targetY = p.y; }
                         break;
                     case 'Dribble':
-                        // Dribble towards goal, but avoid enemies
-                        targetX = p.x + (dir * 80);
-                        targetY = 300; // default to center
-                        // Simple avoidance (steer away from enemies in front)
+                        targetX = p.x + (dir * 80); targetY = 300;
                         const opps = p.isPlayerTeam ? this.opponentSprites : this.playerSprites;
-                        for(let o of opps) {
-                            if (Phaser.Math.Distance.Between(p.x, p.y, o.x, o.y) < 60) {
-                                // Steer away
-                                targetY += (p.y < o.y) ? -40 : 40;
-                                break; // Just dodge the closest
-                            }
-                        }
+                        for(let o of opps) { if (Phaser.Math.Distance.Between(p.x, p.y, o.x, o.y) < 60) { targetY += (p.y < o.y) ? -40 : 40; break; } }
                         break;
                     case 'Cover':
-                        targetX = base.x - (dir * 50);
-                        targetY = Phaser.Math.Linear(base.y, this.ball.y, 0.4);
+                        targetX = base.x - (dir * 50); targetY = Phaser.Math.Linear(base.y, this.ball.y, 0.4);
                         break;
                     default:
                         targetX = p.x;
@@ -1301,26 +1004,17 @@ class MatchScene extends Phaser.Scene {
                 forceX = targetX - p.x;
                 forceY = targetY - p.y;
 
-                // 3. Separation Force (Avoid stacking & maintain structure)
-                let sepForceX = 0;
-                let sepForceY = 0;
+                // 3. Separation Force (Avoid stacking)
+                let sepForceX = 0; let sepForceY = 0;
                 const allPlayers = [...this.playerSprites, ...this.opponentSprites];
                 allPlayers.forEach(other => {
                     if (other !== p) {
                         const dist = Phaser.Math.Distance.Between(p.x, p.y, other.x, other.y);
-                        // Increase radius significantly for teammates to spread them out and create passing lanes
-                        // Decrease for enemies so they can press closely
                         let desiredRadius = (p.isPlayerTeam === other.isPlayerTeam) ? 80 : 25;
-
-                        // If both are CBs or SBs, keep them slightly closer so the defensive line doesn't snap
-                        if (p.isPlayerTeam === other.isPlayerTeam && (p.playerData.position === 'CB' || p.playerData.position === 'SB') && (other.playerData.position === 'CB' || other.playerData.position === 'SB')) {
-                             desiredRadius = 60;
-                        }
-
-                        if (dist < desiredRadius && dist > 0) { // avoid division by zero
-                            // Force scales inversely with distance
+                        if (p.isPlayerTeam === other.isPlayerTeam && (p.playerData.position === 'CB' || p.playerData.position === 'SB') && (other.playerData.position === 'CB' || other.playerData.position === 'SB')) desiredRadius = 60;
+                        if (dist < desiredRadius && dist > 0) {
                             const forceScale = (desiredRadius - dist) / desiredRadius;
-                            sepForceX += ((p.x - other.x) / dist) * forceScale * 30; // multiply by 30 to give it weight
+                            sepForceX += ((p.x - other.x) / dist) * forceScale * 30;
                             sepForceY += ((p.y - other.y) / dist) * forceScale * 30;
                         }
                     }
@@ -1518,6 +1212,7 @@ class MatchScene extends Phaser.Scene {
 
                 if (Math.random() * 100 > trapChance && this.ballSpeed > 5) {
                     // Trap Miss / Punching (if GK)
+                    this.lastTouchedByPlayerTeam = interceptor.isPlayerTeam;
                     this.ball.owner = null;
                     this.ballTarget = null;
                     this.ballSpeed = this.ballSpeed * 0.5; // Loses some speed
@@ -1527,6 +1222,7 @@ class MatchScene extends Phaser.Scene {
                 } else {
                     // Success
                     this.ball.owner = interceptor;
+                    this.lastTouchedByPlayerTeam = interceptor.isPlayerTeam;
                     this.ballTarget = null;
                     this.isHighBall = false;
                     this.ball.z = 0;
@@ -1554,6 +1250,7 @@ class MatchScene extends Phaser.Scene {
                 if (Math.random() * 100 < tackleStat - (dribbleStat / 2)) {
                     // Tackle success
                     this.ball.owner = tackler;
+                    this.lastTouchedByPlayerTeam = tackler.isPlayerTeam;
                     // Visual feedback
                     const flash = this.add.circle(this.ball.x, this.ball.y, 15, 0xe74c3c, 0.6);
                     this.tweens.add({ targets: flash, alpha: 0, duration: 200, onComplete: () => flash.destroy() });
@@ -1636,32 +1333,22 @@ class MatchScene extends Phaser.Scene {
                 // Pass Logic
                 else {
                     const teammates = (isPlayer ? this.playerSprites : this.opponentSprites).filter(p => p !== this.ball.owner);
+                    let targetMate = this.ball.owner.lastEvaluation ? this.ball.owner.lastEvaluation.bestPassTarget : teammates[0];
+                    if (!targetMate) targetMate = teammates[0];
 
-                    // We now use the scientifically calculated best pass target from the Utility AI (Threat vs Risk)
-                    let targetMate = this.ball.owner.lastEvaluation ? this.ball.owner.lastEvaluation.bestPassTarget : null;
-
-                    if (!targetMate) {
-                         // Fallback if context wasn't saved properly
-                         targetMate = teammates[0];
-                    }
-
-                    const teamManager = isPlayer ? window.MasterData.Managers.find(m => m.id === window.gameState.playerTeam.managerId) : window.MasterData.Managers.find(m => m.id === managementUI.getNextOpponent().managerId);
-                    const tactic = teamManager ? teamManager.preference : (isPlayer ? window.gameState.playerTeam.tactics : managementUI.getNextOpponent().tactics);
-
-                    // Determine pass type structurally
-                    // If target is ahead and far, it's a through ball/long ball
                     let isForward = isPlayer ? targetMate.x > this.ball.owner.x : targetMate.x < this.ball.owner.x;
                     let isLongDist = Math.abs(targetMate.x - this.ball.owner.x) > 150 || Math.abs(targetMate.y - this.ball.owner.y) > 150;
-
                     let isLongBall = forceLongBall || (isForward && isLongDist);
                     let isThroughBall = isForward && isLongDist && targetMate.playerData.position === 'CF';
 
                     let passStat = this.ball.owner.playerData.dynamicStats.pass;
                     if (isPlayer && this.activeBuff && this.activeBuff.target === 'pass') passStat += this.activeBuff.value;
+                    const staminaFactor = Math.max(0.3, this.ball.owner.playerData.currentStamina / 100);
+                    let effectivePassStat = passStat * staminaFactor;
+                    if (this.currentGimmick === 'badWeather') { effectivePassStat -= 20; if (isLongBall) effectivePassStat += 30; }
 
-                    if (this.currentGimmick === 'badWeather') {
-                        passStat -= 20;
-                        if (isLongBall) passStat += 30; // Weather gimmick favors long balls
+                    if (Math.random() * 100 > effectivePassStat) {
+                        // Inaccuracy handled later in block naturally
                     }
 
                     // Visual Kick Effect
@@ -1730,11 +1417,7 @@ class MatchScene extends Phaser.Scene {
                     }
 
                     // Inaccuracy
-                    // Tired players have lower accuracy, leading to wider spread
-                    const staminaFactor = Math.max(0.3, this.ball.owner.playerData.currentStamina / 100);
-                    let effectivePassStat = passStat * staminaFactor;
-
-                    if (Math.random() * 100 > effectivePassStat) {
+                    if (Math.random() * 100 > passStat) {
                         this.ballTarget.x += (Math.random()*150 - 75);
                         this.ballTarget.y += (Math.random()*150 - 75);
                     }
@@ -1786,56 +1469,42 @@ class MatchScene extends Phaser.Scene {
     }
 
     resetPositions() {
-        // Determine kicking team
         const isPlayerKickoff = (this.score.player + this.score.opponent) % 2 === 0;
+        let kickOffTeam = isPlayerKickoff ? this.playerSprites : this.opponentSprites;
+        let forwards = kickOffTeam.filter(p => p.playerData.position === 'CF' || p.playerData.position === 'WG');
+        if (forwards.length < 2) forwards = kickOffTeam.slice(0, 2);
+        let striker = forwards[0];
+        let support = forwards[1];
 
         this.playerSprites.forEach(p => {
             if (p.baseX) { p.x = p.baseX; p.y = p.baseY; }
             else { p.x = Phaser.Math.Between(50, 350); p.y = Phaser.Math.Between(50, 550); }
-            // Ensure all players are in their half
             if (p.x > 390) p.x = 390;
-
-            // Defending team stays out of center circle (radius 70)
-            if (!isPlayerKickoff && Phaser.Math.Distance.Between(p.x, p.y, 400, 300) < 75) {
-                p.x = 320;
+            if (isPlayerKickoff) {
+                if (p !== striker && p !== support && Phaser.Math.Distance.Between(p.x, p.y, 400, 300) < 75) p.x = 320;
+            } else {
+                if (Phaser.Math.Distance.Between(p.x, p.y, 400, 300) < 75) p.x = 320;
             }
         });
+
         this.opponentSprites.forEach(p => {
             if (p.baseX) { p.x = p.baseX; p.y = p.baseY; }
             else { p.x = Phaser.Math.Between(450, 750); p.y = Phaser.Math.Between(50, 550); }
-            // Ensure all opponents are in their half
             if (p.x < 410) p.x = 410;
-
-            // Defending team stays out of center circle (radius 70)
-            if (isPlayerKickoff && Phaser.Math.Distance.Between(p.x, p.y, 400, 300) < 75) {
-                p.x = 480;
+            if (!isPlayerKickoff) {
+                if (p !== striker && p !== support && Phaser.Math.Distance.Between(p.x, p.y, 400, 300) < 75) p.x = 480;
+            } else {
+                if (Phaser.Math.Distance.Between(p.x, p.y, 400, 300) < 75) p.x = 480;
             }
         });
 
-        this.ball.x = 400;
-        this.ball.y = 300;
+        this.ball.x = 400; this.ball.y = 300; this.ball.z = 0; this.ballSpeed = 0; this.isHighBall = false;
 
-        let kickOffTeam = isPlayerKickoff ? this.playerSprites : this.opponentSprites;
-
-        // Find 2 forwards for kickoff
-        let forwards = kickOffTeam.filter(p => p.playerData.position === 'CF' || p.playerData.position === 'WG');
-        if (forwards.length < 2) forwards = kickOffTeam.slice(0, 2);
-
-        let striker = forwards[0];
-        let support = forwards[1];
-
-        if (striker) {
-            striker.x = 400 - (isPlayerKickoff ? 5 : -5);
-            striker.y = 300;
-            this.ball.owner = striker;
-        }
-        if (support) {
-            support.x = 400 - (isPlayerKickoff ? 20 : -20);
-            support.y = 320;
-        }
+        if (striker) { striker.x = 400 - (isPlayerKickoff ? 5 : -5); striker.y = 300; this.ball.owner = striker; }
+        if (support) { support.x = 400 - (isPlayerKickoff ? 20 : -20); support.y = 320; }
 
         this.matchState = 'kickoff';
-        this.kickoffTimer = 20; // 20 ticks delay
+        this.kickoffTimer = 20;
     }
 
     triggerGoal(isPlayerTeam) {
