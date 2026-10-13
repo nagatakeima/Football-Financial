@@ -145,7 +145,7 @@ class MatchScene extends Phaser.Scene {
         const half = 200;
 
         switch (pos) {
-            case 'GK': x = 400 + dir * 350; y = 300; break;
+            case 'GK': x = 400 + dir * 370; y = 300; break; // Push GK closer to the goal line (which is 400 + 400 = 800 or 0)
             case 'CB': x = 400 + dir * 250; y = 300; break;
             case 'SB': x = 400 + dir * 250; y = 100; break;
             case 'CDM': x = 400 + dir * 150; y = 300; break;
@@ -628,63 +628,61 @@ class MatchScene extends Phaser.Scene {
     }
 
     checkBallOut() {
-        // Bounds for pitch (roughly matching visual lines)
-        const leftBound = 10;
-        const rightBound = 790;
-        const topBound = 10;
-        const bottomBound = 590;
+        // Expand the bounds slightly OUTSIDE the pitch to prevent immediate re-triggering of out-of-bounds loops
+        const leftBound = 5;
+        const rightBound = 795;
+        const topBound = 5;
+        const bottomBound = 595;
 
         let isOut = false;
         let type = '';
         let restartX = this.ball.x;
         let restartY = this.ball.y;
-        let isPlayerTeamBall = true; // For MVP, assume random or based on rough direction
 
-        // Check Touchlines (Y-axis) -> Throw-in
+        // Possession goes to the team that DID NOT touch it last
+        let isPlayerTeamBall = !this.lastTouchedByPlayerTeam;
+
         if (this.ball.y < topBound) {
             isOut = true; type = 'Throw In';
-            restartY = topBound + 5;
-            isPlayerTeamBall = Math.random() > 0.5;
+            restartY = 15; // Force restart safely INSIDE the pitch line (which is Y=10)
         } else if (this.ball.y > bottomBound) {
             isOut = true; type = 'Throw In';
-            restartY = bottomBound - 5;
-            isPlayerTeamBall = Math.random() > 0.5;
+            restartY = 585; // Force restart safely INSIDE the pitch line (which is Y=590)
         }
 
-        // Check Goal lines (X-axis) -> Goal Kick or Corner Kick
         if (!isOut && this.ball.x < leftBound) {
-            // Out on Player team's defensive side (x < 10)
             isOut = true;
-            if (this.ball.y >= 260 && this.ball.y <= 340) {
-                 // Opponent scores
+            // Goal check
+            if (this.ball.y >= 260 && this.ball.y <= 340 && this.ball.z <= 30) {
                  this.triggerGoal(false);
                  this.resetPositions();
                  return;
             } else {
-                if (Math.random() > 0.5) {
+                if (!this.lastTouchedByPlayerTeam) {
                     type = 'Goal Kick'; restartX = 50; restartY = 300; isPlayerTeamBall = true;
                 } else {
-                    type = 'Corner Kick'; restartX = leftBound; restartY = this.ball.y < 300 ? topBound : bottomBound; isPlayerTeamBall = false;
+                    type = 'Corner Kick'; restartX = 15; restartY = this.ball.y < 300 ? 15 : 585; isPlayerTeamBall = false;
                 }
             }
         } else if (!isOut && this.ball.x > rightBound) {
-            // Out on Opponent team's defensive side (x > 790)
             isOut = true;
-            if (this.ball.y >= 260 && this.ball.y <= 340) {
-                 // Player team scores
+            // Goal check
+            if (this.ball.y >= 260 && this.ball.y <= 340 && this.ball.z <= 30) {
                  this.triggerGoal(true);
                  this.resetPositions();
                  return;
             } else {
-                if (Math.random() > 0.5) {
+                if (this.lastTouchedByPlayerTeam) {
                     type = 'Goal Kick'; restartX = 750; restartY = 300; isPlayerTeamBall = false;
                 } else {
-                    type = 'Corner Kick'; restartX = rightBound; restartY = this.ball.y < 300 ? topBound : bottomBound; isPlayerTeamBall = true;
+                    type = 'Corner Kick'; restartX = 785; restartY = this.ball.y < 300 ? 15 : 585; isPlayerTeamBall = true;
                 }
             }
         }
 
         if (isOut) {
+            // Safety: if the ball is out but moving super fast, stop it completely to prevent physics clipping
+            this.ballSpeed = 0;
             this.handleSetPiece(type, restartX, restartY, isPlayerTeamBall);
         }
     }
@@ -710,9 +708,17 @@ class MatchScene extends Phaser.Scene {
         let taker = team.sort((a,b) => Phaser.Math.Distance.Between(a.x, a.y, x, y) - Phaser.Math.Distance.Between(b.x, b.y, x, y))[0];
 
         if (taker) {
-            taker.x = x + (x < 400 ? 5 : -5);
-            taker.y = y + (y < 300 ? 5 : -5);
+            // Push the taker firmly INSIDE the pitch (15px away from lines) to prevent loop
+            let offsetX = 0;
+            let offsetY = 0;
+            if (x < 20) offsetX = 15; else if (x > 780) offsetX = -15;
+            if (y < 20) offsetY = 15; else if (y > 580) offsetY = -15;
+
+            taker.x = x + offsetX;
+            taker.y = y + offsetY;
+
             this.ball.owner = taker;
+            this.lastTouchedByPlayerTeam = taker.isPlayerTeam; // Ensure possession matches owner
         }
 
         // Push others slightly away from ball to give space
@@ -999,7 +1005,11 @@ class MatchScene extends Phaser.Scene {
                         break;
                     case 'Retreat':
                     case 'Delay':
-                        targetX = (evaluation.targetLineX !== null) ? evaluation.targetLineX : base.x - (dir * 80);
+                        if (p.playerData.position === 'GK') {
+                            targetX = base.x; // GK stays firmly at base (near goal)
+                        } else {
+                            targetX = (evaluation.targetLineX !== null) ? evaluation.targetLineX : base.x - (dir * 80);
+                        }
                         targetY = Phaser.Math.Linear(base.y, this.ball.y, 0.5); // tuck in
                         break;
                     case 'Press':
