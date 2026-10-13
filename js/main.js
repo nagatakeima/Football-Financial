@@ -152,7 +152,7 @@ class MatchScene extends Phaser.Scene {
             case 'CM': x = 400 + dir * 100; y = 300; break;
             case 'CAM': x = 400 + dir * 50; y = 300; break;
             case 'WG': x = 400 + dir * 100; y = 100; break;
-            case 'CF': x = 400 - dir * 50; y = 300; break;
+            case 'CF': x = 400 + dir * 50; y = 300; break; // Corrected from - dir * 50 to ensure they are in their own half
             default: x = 400 + dir * 100; y = 300; break;
         }
         return { x, y };
@@ -643,9 +643,9 @@ class MatchScene extends Phaser.Scene {
         if (!isOut && this.ball.x < leftBound) {
             // Out on Player team's defensive side (x < 10)
             isOut = true;
-            if (this.ball.y > 260 && this.ball.y < 340) {
-                 // It's a goal, handled by triggerGoal elsewhere if it was a valid shot
-                 // but if it just rolled in without a shot, force a reset
+            if (this.ball.y >= 260 && this.ball.y <= 340) {
+                 // Opponent scores
+                 this.triggerGoal(false);
                  this.resetPositions();
                  return;
             } else {
@@ -658,7 +658,9 @@ class MatchScene extends Phaser.Scene {
         } else if (!isOut && this.ball.x > rightBound) {
             // Out on Opponent team's defensive side (x > 790)
             isOut = true;
-            if (this.ball.y > 260 && this.ball.y < 340) {
+            if (this.ball.y >= 260 && this.ball.y <= 340) {
+                 // Player team scores
+                 this.triggerGoal(true);
                  this.resetPositions();
                  return;
             } else {
@@ -1315,17 +1317,18 @@ class MatchScene extends Phaser.Scene {
                     this.ball.owner = null;
 
                     if (Math.random() * 100 < shootStat - (oppTeamStats / 2) + 20) {
-                        this.time.delayedCall(300, () => {
-                            this.triggerGoal(isPlayer);
-                            this.resetPositions();
-                        });
+                        // Successful shot, target is within goal frame
+                        this.ballTarget = {x: isPlayer ? 850 : -50, y: Phaser.Math.Between(265, 335)};
                     } else {
-                        this.time.delayedCall(300, () => {
-                            this.ballTarget = null;
-                            this.ball.x = isPlayer ? 750 : 50;
-                            this.ball.y = 300;
-                            this.resetPositions();
-                        });
+                        // Missed shot or saved, deflect it away or catch it
+                        if (Math.random() > 0.5) {
+                            // Saved (catch) - simplifed by giving to GK or resetting near goal
+                            this.ballTarget = {x: isPlayer ? 780 : 20, y: 300};
+                            this.ballSpeed = 10;
+                        } else {
+                            // Miss wide
+                            this.ballTarget = {x: isPlayer ? 850 : -50, y: Math.random() > 0.5 ? 200 : 400};
+                        }
                     }
                 }
                 // Clear Logic
@@ -1407,13 +1410,18 @@ class MatchScene extends Phaser.Scene {
                     let isOffside = false;
                     if (isPlayer) {
                         // Player attacks Right (X=800).
+                        // Offside only applies in the opponent's half
                         if (targetMate.x > 400) {
-                            let oppDefenders = this.opponentSprites.filter(p => p.playerData.position !== 'GK').sort((a,b) => a.x - b.x);
-                            // Second deepest defender technically (GK is usually deepest), but we filtered GK out.
-                            if (oppDefenders.length > 0) {
-                                let offsideLine = Math.max(400, oppDefenders[0].x); // Line cannot be in own half
-                                // Offside if target is ahead of line AND ahead of ball at moment of pass
-                                if (targetMate.x > offsideLine && targetMate.x > this.ball.x) {
+                            // Sort all opponent players by their X coordinate, closest to their goal line (X=800) first
+                            let oppDefenders = [...this.opponentSprites].sort((a, b) => b.x - a.x);
+                            // The offside line is the 2nd-to-last defender (index 1)
+                            if (oppDefenders.length > 1) {
+                                let offsideLine = oppDefenders[1].x;
+
+                                // To be offside:
+                                // 1. Target must be ahead of the ball
+                                // 2. Target must be ahead of the offside line
+                                if (targetMate.x > this.ball.x && targetMate.x > offsideLine) {
                                     isOffside = true;
                                 }
                             }
@@ -1421,10 +1429,14 @@ class MatchScene extends Phaser.Scene {
                     } else {
                         // Opponent attacks Left (X=0).
                         if (targetMate.x < 400) {
-                            let playerDefenders = this.playerSprites.filter(p => p.playerData.position !== 'GK').sort((a,b) => b.x - a.x);
-                            if (playerDefenders.length > 0) {
-                                let offsideLine = Math.min(400, playerDefenders[0].x);
-                                if (targetMate.x < offsideLine && targetMate.x < this.ball.x) {
+                            // Sort all player team players by their X coordinate, closest to their goal line (X=0) first
+                            let playerDefenders = [...this.playerSprites].sort((a, b) => a.x - b.x);
+
+                            // The offside line is the 2nd-to-last defender (index 1)
+                            if (playerDefenders.length > 1) {
+                                let offsideLine = playerDefenders[1].x;
+
+                                if (targetMate.x < this.ball.x && targetMate.x < offsideLine) {
                                     isOffside = true;
                                 }
                             }
@@ -1509,29 +1521,54 @@ class MatchScene extends Phaser.Scene {
     }
 
     resetPositions() {
+        // Determine kicking team
+        const isPlayerKickoff = (this.score.player + this.score.opponent) % 2 === 0;
+
         this.playerSprites.forEach(p => {
             if (p.baseX) { p.x = p.baseX; p.y = p.baseY; }
             else { p.x = Phaser.Math.Between(50, 350); p.y = Phaser.Math.Between(50, 550); }
+            // Ensure all players are in their half
+            if (p.x > 390) p.x = 390;
+
+            // Defending team stays out of center circle (radius 70)
+            if (!isPlayerKickoff && Phaser.Math.Distance.Between(p.x, p.y, 400, 300) < 75) {
+                p.x = 320;
+            }
         });
         this.opponentSprites.forEach(p => {
             if (p.baseX) { p.x = p.baseX; p.y = p.baseY; }
             else { p.x = Phaser.Math.Between(450, 750); p.y = Phaser.Math.Between(50, 550); }
+            // Ensure all opponents are in their half
+            if (p.x < 410) p.x = 410;
+
+            // Defending team stays out of center circle (radius 70)
+            if (isPlayerKickoff && Phaser.Math.Distance.Between(p.x, p.y, 400, 300) < 75) {
+                p.x = 480;
+            }
         });
 
         this.ball.x = 400;
         this.ball.y = 300;
 
-        // Determine kicking team (alternates or based on goal)
-        // For simplicity, team that conceded kicks off. If score is tied or start of match, random or player team.
-        const isPlayerKickoff = (this.score.player + this.score.opponent) % 2 === 0;
-
         let kickOffTeam = isPlayerKickoff ? this.playerSprites : this.opponentSprites;
-        let striker = kickOffTeam.find(p => p.playerData.position === 'CF') || kickOffTeam[kickOffTeam.length - 1];
 
-        striker.x = 400 - (isPlayerKickoff ? 10 : -10);
-        striker.y = 300;
+        // Find 2 forwards for kickoff
+        let forwards = kickOffTeam.filter(p => p.playerData.position === 'CF' || p.playerData.position === 'WG');
+        if (forwards.length < 2) forwards = kickOffTeam.slice(0, 2);
 
-        this.ball.owner = striker;
+        let striker = forwards[0];
+        let support = forwards[1];
+
+        if (striker) {
+            striker.x = 400 - (isPlayerKickoff ? 5 : -5);
+            striker.y = 300;
+            this.ball.owner = striker;
+        }
+        if (support) {
+            support.x = 400 - (isPlayerKickoff ? 20 : -20);
+            support.y = 320;
+        }
+
         this.matchState = 'kickoff';
         this.kickoffTimer = 20; // 20 ticks delay
     }
