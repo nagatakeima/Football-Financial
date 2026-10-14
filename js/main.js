@@ -31,7 +31,7 @@ class MatchScene extends Phaser.Scene {
         this.matchState = 'playing';
         this.currentSetPieceType = null;
         this.kickoffTimer = 0;
-        this.ball = { x: 400, y: 300, z: 0, owner: null };
+        this.ball = { x: 400, y: 300, z: 0, owner: null, cooldown: 0 };
         this.lastTouchedByPlayerTeam = true;
 
         this.playerSprites = [];
@@ -450,6 +450,7 @@ class MatchScene extends Phaser.Scene {
             if (y < 20) offsetY = 15; else if (y > 580) offsetY = -15;
             taker.x = x + offsetX; taker.y = y + offsetY;
             this.ball.owner = taker;
+            this.ball.cooldown = 5;
             this.lastTouchedByPlayerTeam = taker.isPlayerTeam;
         }
 
@@ -832,6 +833,9 @@ class MatchScene extends Phaser.Scene {
             }
         } else { if (!this.isHighBall) this.ball.z = 0; }
 
+        // Decrement global ball cooldown
+        if (this.ball.cooldown > 0) this.ball.cooldown--;
+
         if (!this.ball.owner) {
             const allPlayers = [...this.playerSprites, ...this.opponentSprites];
             let interceptor = null;
@@ -845,7 +849,7 @@ class MatchScene extends Phaser.Scene {
                     const isOppSidePA = !p.isPlayerTeam && p.x > 640 && p.y > 150 && p.y < 450;
                     if (isPlayerSidePA || isOppSidePA) { interceptRadius = 40; zLimit = 40; }
                 }
-                if (bDist < interceptRadius && this.ball.z <= zLimit && p.actionCooldown <= 0) { interceptor = p; break; }
+                if (bDist < interceptRadius && this.ball.z <= zLimit && p.actionCooldown <= 0 && this.ball.cooldown <= 0) { interceptor = p; break; }
             }
 
             if (interceptor) {
@@ -856,11 +860,14 @@ class MatchScene extends Phaser.Scene {
                 if (interceptor.playerData.position === 'GK') trapChance += 30;
 
                 if (Math.random() * 100 > trapChance && this.ballSpeed > 5) {
+                    this.showActionText(interceptor, "トラップ:失敗", "#e74c3c");
                     this.lastTouchedByPlayerTeam = interceptor.isPlayerTeam;
                     this.ball.owner = null; this.ballTarget = null; this.ballSpeed = this.ballSpeed * 0.5;
                     this.ball.angle = this.ball.angle + (Math.random() * Math.PI - Math.PI/2);
                     this.isHighBall = true; this.ballZVelocity = 5;
+                    interceptor.actionCooldown = 10; // Prevent interceptor from instantly trying to trap it again
                 } else {
+                    this.showActionText(interceptor, "トラップ:成功", "#3498db");
                     this.ball.owner = interceptor; this.lastTouchedByPlayerTeam = interceptor.isPlayerTeam;
                     this.ballTarget = null; this.isHighBall = false; this.ball.z = 0;
                 }
@@ -930,7 +937,7 @@ class MatchScene extends Phaser.Scene {
                     const oppTeamStats = isPlayer ? this.opponentTeamData.getOverallStrength() : this.playerTeamData.getOverallStrength();
                     this.createKickEffect(this.ball.x, this.ball.y);
                     this.ballTarget = {x: targetGoalX, y: 300 + (Math.random()*100 - 50)};
-                    this.ballSpeed = 25; this.ball.owner = null;
+                    this.ballSpeed = 25; this.ball.owner = null; this.ball.cooldown = 5;
 
                     if (Math.random() * 100 < shootStat - (oppTeamStats / 2) + 20) {
                         this.showActionText(this.ball.owner, "シュート:成功", "#3498db");
@@ -941,7 +948,7 @@ class MatchScene extends Phaser.Scene {
                             const defendingTeam = isPlayer ? this.opponentSprites : this.playerSprites;
                             const defendingGK = defendingTeam.find(p => p.playerData.position === 'GK');
                             if (defendingGK) this.showActionText(defendingGK, "セーブ:成功", "#f1c40f");
-                            this.ballTarget = {x: isPlayer ? 780 : 20, y: 300}; this.ballSpeed = 10;
+                            this.ballTarget = {x: isPlayer ? 780 : 20, y: 300}; this.ballSpeed = 10; this.ball.cooldown = 5;
                         } else {
                             this.showActionText(this.ball.owner, "シュート:失敗", "#e74c3c");
                             this.ballTarget = {x: isPlayer ? 850 : -50, y: Math.random() > 0.5 ? 200 : 400};
@@ -953,6 +960,7 @@ class MatchScene extends Phaser.Scene {
                     this.ballTarget = {x: isPlayer ? 800 : 0, y: Math.random() * 600};
                     this.ballSpeed = 25; this.isHighBall = true; this.ballZVelocity = 20;
                     this.ball.owner.actionCooldown = 15;
+                    this.ball.cooldown = 5;
                     this.ball.owner = null;
                 } else {
                     const teammates = (isPlayer ? this.playerSprites : this.opponentSprites).filter(p => p !== this.ball.owner);
@@ -1010,6 +1018,7 @@ class MatchScene extends Phaser.Scene {
 
                     // Apply cooldown so the kicker doesn't immediately trap their own bad pass
                     this.ball.owner.actionCooldown = 15;
+                    this.ball.cooldown = 3; // Short immunity so it leaves the kicker's feet safely
                     this.ball.owner = null;
                     if (forceLongBall) this.activeBuff = null;
                     this.createKickEffect(this.ball.x, this.ball.y);
