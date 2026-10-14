@@ -882,7 +882,9 @@ class MatchScene extends Phaser.Scene {
             this.ball.y = Phaser.Math.Clamp(this.ball.y, 15, 585);
 
             const enemies = this.ball.owner.isPlayerTeam ? this.opponentSprites : this.playerSprites;
-            const tacklers = enemies.filter(p => Phaser.Math.Distance.Between(p.x, p.y, this.ball.x, this.ball.y) < 20);
+            // Only engage duel if an enemy is very close, AND neither player is already stunned
+            const tacklers = enemies.filter(p => Phaser.Math.Distance.Between(p.x, p.y, this.ball.x, this.ball.y) < 20 && p.stunTimer <= 0 && this.ball.owner.stunTimer <= 0);
+
             if (tacklers.length > 0) {
                 let tackler = tacklers[0];
                 let tackleStat = tackler.playerData.stats.defense;
@@ -891,11 +893,27 @@ class MatchScene extends Phaser.Scene {
                 if (this.activeBuff && this.activeBuff.target === 'dribble' && this.ball.owner.isPlayerTeam) dribbleStat += this.activeBuff.value;
 
                 if (Math.random() * 100 < tackleStat - (dribbleStat / 2)) {
+                    // Tackle Success! FW loses the ball.
                     const oldOwner = this.ball.owner;
                     this.ball.owner = tackler;
                     this.lastTouchedByPlayerTeam = tackler.isPlayerTeam;
                     this.showActionText(tackler, "タックル:成功", "#3498db");
                     this.showActionText(oldOwner, "ドリブル:失敗", "#e74c3c");
+
+                    // Stun the FW (loser)
+                    oldOwner.stunTimer = 25;
+                    // White flash effect
+                    if (oldOwner.list && oldOwner.list.length > 0) {
+                        oldOwner.list.forEach(part => {
+                            if (part.type === 'Rectangle' || part.type === 'Arc' || part.type === 'Ellipse' || part.type === 'Graphics') {
+                                if (part.setTintFill) part.setTintFill(0xffffff);
+                            }
+                        });
+                        this.time.delayedCall(500, () => {
+                            oldOwner.list.forEach(part => { if(part.clearTint) part.clearTint(); });
+                        });
+                    }
+
                     const flash = this.add.circle(this.ball.x, this.ball.y, 15, 0xe74c3c, 0.6);
                     this.tweens.add({ targets: flash, alpha: 0, duration: 200, onComplete: () => flash.destroy() });
                 } else if (Math.random() * 100 < (tackleStat / 3)) {
@@ -905,8 +923,27 @@ class MatchScene extends Phaser.Scene {
                     this.handleSetPiece(isPK ? 'Penalty Kick' : 'Free Kick', this.ball.x, this.ball.y, !tackler.isPlayerTeam);
                     return;
                 } else {
+                    // Dribble Success! DF loses the duel.
                     this.showActionText(this.ball.owner, "ドリブル:成功", "#3498db");
-                    tackler.stunTimer = 20;
+
+                    // Stun the DF (loser)
+                    tackler.stunTimer = 25;
+                    if (tackler.list && tackler.list.length > 0) {
+                        tackler.list.forEach(part => {
+                            if (part.type === 'Rectangle' || part.type === 'Arc' || part.type === 'Ellipse' || part.type === 'Graphics') {
+                                if (part.setTintFill) part.setTintFill(0xffffff);
+                            }
+                        });
+                        this.time.delayedCall(500, () => {
+                            tackler.list.forEach(part => { if(part.clearTint) part.clearTint(); });
+                        });
+                    }
+
+                    // Dribbler teleports past the defender (Game-like breakthrough)
+                    const pushX = (this.ball.owner.dirX > 0) ? 30 : -30;
+                    this.ball.owner.x += pushX;
+                    // Clamp to bounds just in case
+                    this.ball.owner.x = Phaser.Math.Clamp(this.ball.owner.x, 15, 785);
                 }
             }
 
@@ -937,24 +974,31 @@ class MatchScene extends Phaser.Scene {
                     const oppTeamStats = isPlayer ? this.opponentTeamData.getOverallStrength() : this.playerTeamData.getOverallStrength();
                     this.createKickEffect(this.ball.x, this.ball.y);
                     this.ballTarget = {x: targetGoalX, y: 300 + (Math.random()*100 - 50)};
-                    this.ballSpeed = 25; this.ball.owner = null; this.ball.cooldown = 5;
+                    this.ballSpeed = 25;
+
+                    // Keep a reference to the kicker before clearing owner
+                    const kicker = this.ball.owner;
+
+                    this.ball.cooldown = 5;
 
                     if (Math.random() * 100 < shootStat - (oppTeamStats / 2) + 20) {
-                        this.showActionText(this.ball.owner, "シュート:成功", "#3498db");
+                        this.showActionText(kicker, "シュート:成功", "#3498db");
                         this.ballTarget = {x: isPlayer ? 850 : -50, y: Phaser.Math.Between(265, 335)};
                     } else {
                         if (Math.random() > 0.5) {
-                            this.showActionText(this.ball.owner, "シュート:失敗", "#e74c3c");
+                            this.showActionText(kicker, "シュート:失敗", "#e74c3c");
                             const defendingTeam = isPlayer ? this.opponentSprites : this.playerSprites;
                             const defendingGK = defendingTeam.find(p => p.playerData.position === 'GK');
                             if (defendingGK) this.showActionText(defendingGK, "セーブ:成功", "#f1c40f");
                             this.ballTarget = {x: isPlayer ? 780 : 20, y: 300}; this.ballSpeed = 10; this.ball.cooldown = 5;
                         } else {
-                            this.showActionText(this.ball.owner, "シュート:失敗", "#e74c3c");
+                            this.showActionText(kicker, "シュート:失敗", "#e74c3c");
                             this.ballTarget = {x: isPlayer ? 850 : -50, y: Math.random() > 0.5 ? 200 : 400};
                         }
                     }
-                    this.ball.owner.actionCooldown = 15;
+
+                    kicker.actionCooldown = 15;
+                    this.ball.owner = null;
                 } else if (currentAction === 'Clear') {
                     this.createKickEffect(this.ball.x, this.ball.y);
                     this.ballTarget = {x: isPlayer ? 800 : 0, y: Math.random() * 600};
