@@ -819,6 +819,21 @@ class MatchScene extends Phaser.Scene {
             if (cbs.length > 0) {
                 let deepestCB = cbs.sort((a,b) => p.isPlayerTeam ? a.x - b.x : b.x - a.x)[0];
                 targetLineX = deepestCB.x;
+
+                // 2.3 Adjust defensive line based on ball situation
+                if (this.ballSpeed > 0 && this.ballTarget) {
+                     // Check if opponent is playing a backpass
+                     const isBackpass = p.isPlayerTeam ? (this.ballTarget.x > this.ball.x) : (this.ballTarget.x < this.ball.x);
+                     if (isBackpass) {
+                          // Push line up
+                          targetLineX += p.isPlayerTeam ? 30 : -30;
+                     }
+                } else if (this.ball.owner) {
+                     // Opponent has ball in middle third, drop line slightly
+                     if (this.ball.x > 266 && this.ball.x < 533) {
+                          targetLineX -= p.isPlayerTeam ? 20 : -20;
+                     }
+                }
             }
         }
 
@@ -983,7 +998,16 @@ class MatchScene extends Phaser.Scene {
                     case 'Retreat':
                     case 'Delay':
                         targetX = (evaluation.targetLineX !== null) ? evaluation.targetLineX : base.x - (dir * 80);
-                        targetY = Phaser.Math.Linear(base.y, this.ball.y, 0.5); // tuck in
+                        // 2.4 Anti-Ball-Watching: Clamp tuck in for weak side players
+                        let intendedY = Phaser.Math.Linear(base.y, this.ball.y, 0.5);
+                        if (Math.abs(base.y - this.ball.y) > 200) { // Weak side
+                            if (base.y < 300) { // Top side player, ball is bottom
+                                intendedY = Math.min(intendedY, 250);
+                            } else { // Bottom side player, ball is top
+                                intendedY = Math.max(intendedY, 350);
+                            }
+                        }
+                        targetY = intendedY;
                         break;
                     case 'Press':
                     case 'Clear': // If ball is loose near goal, charge it
