@@ -116,6 +116,64 @@ class MatchScene extends Phaser.Scene {
         }
         return { x, y };
     }
+    getDynamicBasePosition(p, isPlayerTeam, isAttacking) {
+        // Base coordinate from original formation
+        let base = this.getBasePosition(p.expectedPosStr || p.playerData.position, isPlayerTeam);
+        if (p.baseOffsetY) base.y += p.baseOffsetY;
+
+        // Dynamic Line Control based on Ball X
+        const ballX = this.ball.x;
+        const dir = isPlayerTeam ? 1 : -1; // 1 means attacking Right (towards 800)
+
+        // Define team center of mass target based on possession
+        let lineShift = 0;
+
+        if (isAttacking) {
+            // Push Up: Team moves forward with the ball
+            // If ball is in enemy third, push the defensive line up to midfield
+            if (isPlayerTeam) {
+                if (ballX > 500) lineShift = 200;
+                else if (ballX > 300) lineShift = 100;
+            } else {
+                if (ballX < 300) lineShift = -200;
+                else if (ballX < 500) lineShift = -100;
+            }
+        } else {
+            // Fall Back (Retreat): Form a compact defensive block
+            // If enemy is attacking, drop the whole team back towards own goal
+            if (isPlayerTeam) {
+                // Defending Left goal (0)
+                if (ballX < 400) lineShift = -150; // Deep block
+                else lineShift = -50;
+            } else {
+                // Defending Right goal (800)
+                if (ballX > 400) lineShift = 150; // Deep block
+                else lineShift = 50;
+            }
+        }
+
+        // Apply position-specific logic to keep compactness
+        const pos = p.playerData.position;
+        if (pos === 'CB' || pos === 'SB' || pos === 'GK') {
+            base.x += lineShift;
+            // Prevent DF line from pushing past halfway line
+            if (isPlayerTeam && base.x > 380) base.x = 380;
+            if (!isPlayerTeam && base.x < 420) base.x = 420;
+        } else if (pos === 'CDM' || pos === 'CM' || pos === 'CAM' || pos === 'WG') {
+            base.x += lineShift * 0.8; // Midfield shifts slightly less to compress space
+        } else if (pos === 'CF') {
+            base.x += lineShift * 0.5; // FW stays high to offer outlet
+            // But force FW to come back behind the ball if defending deep
+            if (!isAttacking) {
+                if (isPlayerTeam && base.x > ballX + 50) base.x = ballX + 50;
+                if (!isPlayerTeam && base.x < ballX - 50) base.x = ballX - 50;
+            }
+        }
+
+        // Strict boundary check for dynamic base
+        base.x = Phaser.Math.Clamp(base.x, 20, 780);
+        return base;
+    }
 
     createPlayerSprite(x, y, color, number, isPlayerTeam, player) {
         let container = this.add.container(x, y);
@@ -661,13 +719,12 @@ class MatchScene extends Phaser.Scene {
 
                 let targetX = p.x; let targetY = p.y;
                 const dir = p.isPlayerTeam ? 1 : -1;
-                const base = this.getBasePosition(p.expectedPosStr || p.playerData.position, p.isPlayerTeam);
-                if (p.baseOffsetY) base.y += p.baseOffsetY;
+                const base = this.getDynamicBasePosition(p, p.isPlayerTeam, isAttacking);
 
                 switch (bestAction) {
                     case 'HoldPosition':
-                        targetX = (evaluation.targetLineX !== null) ? evaluation.targetLineX : base.x;
-                        targetY = Phaser.Math.Linear(base.y, this.ball.y, 0.2);
+                        targetX = base.x;
+                        targetY = Phaser.Math.Linear(base.y, this.ball.y, 0.3);
                         break;
                     case 'RunIntoSpace':
                         let targetForwardX = p.x + (dir * 80);
@@ -701,8 +758,9 @@ class MatchScene extends Phaser.Scene {
                             targetX = base.x;
                             targetY = 300;
                         } else {
-                            targetX = (p.lastEvaluation && p.lastEvaluation.targetLineX !== null) ? p.lastEvaluation.targetLineX : base.x - (dir * 100);
-                            let pullWeight = (this.ball.y < 300 !== base.y < 300 && Math.abs(base.y - 300) > 100) ? 0.1 : 0.5;
+                            // Use dynamic base for retreat to form a compact block
+                            targetX = base.x;
+                            let pullWeight = (this.ball.y < 300 !== base.y < 300 && Math.abs(base.y - 300) > 100) ? 0.1 : 0.6;
                             targetY = Phaser.Math.Linear(base.y, this.ball.y, pullWeight);
                         }
                         break;
@@ -954,9 +1012,16 @@ class MatchScene extends Phaser.Scene {
             }
 
             let currentAction = this.ball.owner.currentAction;
-            // Throw-in shoot restriction
-            if (this.currentSetPieceType === 'Throw In' || this.currentSetPieceType === 'Offside') {
-                if (currentAction === 'Shoot' || forceShoot) { currentAction = 'Pass'; forceShoot = false; }
+            // Set-piece action restrictions
+            if (this.currentSetPieceType) {
+                // Cannot dribble or keep the ball during a set piece restart
+                if (currentAction === 'Dribble' || currentAction === 'Keep' || currentAction === 'Clear') {
+                    currentAction = 'Pass';
+                }
+                // Cannot shoot directly from throw-ins or indirect free kicks (Offside)
+                if (this.currentSetPieceType === 'Throw In' || this.currentSetPieceType === 'Offside') {
+                    if (currentAction === 'Shoot' || forceShoot) { currentAction = 'Pass'; forceShoot = false; }
+                }
             }
 
             if (forceShoot || forceLongBall || ['Pass', 'Shoot', 'Clear'].includes(currentAction)) {
