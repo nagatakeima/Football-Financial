@@ -911,11 +911,23 @@ class MatchScene extends Phaser.Scene {
             }
 
             if (interceptor) {
-                let trapChance = (interceptor.playerData.dynamicStats.mental * 0.5) + (interceptor.playerData.dynamicStats.pass * 0.5);
-                if (this.ballSpeed > 15) trapChance -= 10;
-                if (this.isHighBall) trapChance -= 15;
-                if (this.currentGimmick === 'badWeather') trapChance -= 20;
-                if (interceptor.playerData.position === 'GK') trapChance += 30;
+                // Base trap chance is very high (95%+)
+                let trapChance = 95 + (interceptor.playerData.dynamicStats.mental / 20) + (interceptor.playerData.dynamicStats.pass / 20);
+
+                // Pressure from enemies reduces trap chance
+                const enemies = interceptor.isPlayerTeam ? this.opponentSprites : this.playerSprites;
+                const closestEnemyDist = enemies.reduce((min, e) => Math.min(min, Phaser.Math.Distance.Between(interceptor.x, interceptor.y, e.x, e.y)), Infinity);
+
+                if (closestEnemyDist < 40) trapChance -= 15; // High pressure
+                else if (closestEnemyDist < 80) trapChance -= 5; // Mild pressure
+
+                if (this.ballSpeed > 18) trapChance -= 10;
+                if (this.isHighBall) trapChance -= 10;
+                if (this.currentGimmick === 'badWeather') trapChance -= 15;
+                if (interceptor.playerData.position === 'GK') trapChance += 20;
+
+                // Cap maximum chance
+                trapChance = Math.min(100, trapChance);
 
                 if (Math.random() * 100 > trapChance && this.ballSpeed > 5) {
                     this.showActionText(interceptor, "トラップ:失敗", "#e74c3c");
