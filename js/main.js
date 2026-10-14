@@ -145,6 +145,7 @@ class MatchScene extends Phaser.Scene {
         container.baseColor = color; container.dirX = 1;
 
         container.stunTimer = 0;
+        container.actionCooldown = 0; // Prevent re-touching ball immediately
         container.aiTickTimer = 0;
         let mentalStat = player.dynamicStats ? player.dynamicStats.mental : player.stats.mental;
         container.mentalTickRate = Math.max(1, Math.floor(10 - (mentalStat / 10)));
@@ -613,6 +614,8 @@ class MatchScene extends Phaser.Scene {
             let moved = false;
 
             // Stun enforcement
+            if (p.actionCooldown > 0) p.actionCooldown--;
+
             if (p.stunTimer > 0) {
                 p.stunTimer--;
                 p.legL.y = 12; p.legR.y = 12; // Freeze animation
@@ -842,7 +845,7 @@ class MatchScene extends Phaser.Scene {
                     const isOppSidePA = !p.isPlayerTeam && p.x > 640 && p.y > 150 && p.y < 450;
                     if (isPlayerSidePA || isOppSidePA) { interceptRadius = 40; zLimit = 40; }
                 }
-                if (bDist < interceptRadius && this.ball.z <= zLimit) { interceptor = p; break; }
+                if (bDist < interceptRadius && this.ball.z <= zLimit && p.actionCooldown <= 0) { interceptor = p; break; }
             }
 
             if (interceptor) {
@@ -944,10 +947,13 @@ class MatchScene extends Phaser.Scene {
                             this.ballTarget = {x: isPlayer ? 850 : -50, y: Math.random() > 0.5 ? 200 : 400};
                         }
                     }
+                    this.ball.owner.actionCooldown = 15;
                 } else if (currentAction === 'Clear') {
                     this.createKickEffect(this.ball.x, this.ball.y);
                     this.ballTarget = {x: isPlayer ? 800 : 0, y: Math.random() * 600};
-                    this.ballSpeed = 25; this.isHighBall = true; this.ballZVelocity = 20; this.ball.owner = null;
+                    this.ballSpeed = 25; this.isHighBall = true; this.ballZVelocity = 20;
+                    this.ball.owner.actionCooldown = 15;
+                    this.ball.owner = null;
                 } else {
                     const teammates = (isPlayer ? this.playerSprites : this.opponentSprites).filter(p => p !== this.ball.owner);
                     let targetMate = this.ball.owner.lastEvaluation ? this.ball.owner.lastEvaluation.bestPassTarget : teammates[0];
@@ -966,46 +972,44 @@ class MatchScene extends Phaser.Scene {
 
                     if (Math.random() * 100 > effectivePassStat) {
                         this.showActionText(this.ball.owner, "パス:失敗", "#e74c3c");
-                        this.ballTarget = {x: targetMate.x + (Math.random()*150 - 75), y: targetMate.y + (Math.random()*150 - 75)};
+
+                        // Misplace the pass severely towards an enemy or random space
+                        const enemies = isPlayer ? this.opponentSprites : this.playerSprites;
+                        // Find an enemy somewhere near the target
+                        const nearbyEnemies = enemies.filter(e => Phaser.Math.Distance.Between(e.x, e.y, targetMate.x, targetMate.y) < 150);
+
+                        if (nearbyEnemies.length > 0) {
+                            // Pass directly to the enemy by mistake
+                            const badTarget = nearbyEnemies[Math.floor(Math.random() * nearbyEnemies.length)];
+                            this.ballTarget = {x: badTarget.x, y: badTarget.y};
+                        } else {
+                            // Wildly inaccurate pass
+                            this.ballTarget = {
+                                x: targetMate.x + (Math.random() > 0.5 ? 100 : -100),
+                                y: targetMate.y + (Math.random() > 0.5 ? 100 : -100)
+                            };
+                        }
+
+                        // Slower ball speed so enemies can intercept easily
+                        this.ballSpeed = 12;
+                        this.isHighBall = Math.random() > 0.5; // Sometimes randomly pops up
+                        this.ballZVelocity = this.isHighBall ? 10 : 0;
+
                     } else {
                         this.showActionText(this.ball.owner, "パス:成功", "#3498db");
                         this.ballTarget = {x: targetMate.x, y: targetMate.y};
-                    }
 
-                    // Offside rule enforcement
-                    let isOffside = false;
-                    if (isPlayer) {
-                        if (targetMate.x > 400) {
-                            let oppDefenders = [...this.opponentSprites].sort((a, b) => b.x - a.x);
-                            if (oppDefenders.length > 1) {
-                                let offsideLine = oppDefenders[1].x;
-                                if (targetMate.x > this.ball.x && targetMate.x > offsideLine) isOffside = true;
-                            }
-                        }
-                    } else {
-                        if (targetMate.x < 400) {
-                            let playerDefenders = [...this.playerSprites].sort((a, b) => a.x - b.x);
-                            if (playerDefenders.length > 1) {
-                                let offsideLine = playerDefenders[1].x;
-                                if (targetMate.x < this.ball.x && targetMate.x < offsideLine) isOffside = true;
-                            }
+                        if (isLongBall) {
+                            let leadDist = isThroughBall ? (isPlayer ? 100 : -100) : 0;
+                            this.ballTarget.x += leadDist;
+                            this.ballSpeed = 22; this.isHighBall = true; this.ballZVelocity = 15;
+                        } else {
+                            this.ballSpeed = 16; this.isHighBall = false;
                         }
                     }
 
-                    if (isOffside) {
-                        this.handleSetPiece('Offside', targetMate.x, targetMate.y, !isPlayer);
-                        this.ball.owner = null;
-                        this.ballSpeed = 0;
-                        return;
-                    }
-
-                    if (isLongBall) {
-                        let leadDist = isThroughBall ? (isPlayer ? 100 : -100) : 0;
-                        this.ballTarget.x += leadDist;
-                        this.ballSpeed = 22; this.isHighBall = true; this.ballZVelocity = 15;
-                    } else {
-                        this.ballSpeed = 16; this.isHighBall = false;
-                    }
+                    // Apply cooldown so the kicker doesn't immediately trap their own bad pass
+                    this.ball.owner.actionCooldown = 15;
                     this.ball.owner = null;
                     if (forceLongBall) this.activeBuff = null;
                     this.createKickEffect(this.ball.x, this.ball.y);
