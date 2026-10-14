@@ -24,11 +24,15 @@
    - ゲームのコンセプト、3つの階層（シーズン）、サバイバル（即時解任）ルールについて。
 2. [試合システム](docs/02_MatchSystem.md)
    - マクロ（宝物）とミクロ（コマンド）の相互作用、アウェー・天候ギミックなどの試合仕様。
-3. [選手・ケミストリーシステム](docs/03_PlayerAndChemistry.md)
+3. [試合エンジン・コア / フォーメーション・戦術](docs/10_MatchEngine_Core/07_MatchEngine_Core.md)
+   - ボトムアップ型AIの根幹ルール。
+   - [フォーメーション＆可変システム](docs/10_MatchEngine_Core/07_2_Formation_and_Shape.md): 創発的な陣形可変とセットプレー配置。
+   - [チーム戦術＆意思決定アルゴリズム](docs/10_MatchEngine_Core/07_3_TeamTactics.md): 意思決定プロトコルと構造的相性。
+4. [選手・ケミストリーシステム](docs/03_PlayerAndChemistry.md)
    - 選手のパラメータ、フォーメーション配置によるケミストリーリンク（国籍・所属縛りなど）の仕様。
-4. [イベント・リソースシステム](docs/04_EventsAndResources.md)
+5. [イベント・リソースシステム](docs/04_EventsAndResources.md)
    - 試合間の行動力（AP）と資金の管理、Lonestar形式のランダムイベントとレア度変動の仕組み。
-5. [ミクロ（コマンド）リスト全100種](docs/05_MicroCommandsList.md)
+6. [ミクロ（コマンド）リスト全100種](docs/05_MicroCommandsList.md)
    - 試合中に使用する全100種類の戦術コマンド一覧（汎用・専用、レアリティ別）。
 
 ## 実行方法
