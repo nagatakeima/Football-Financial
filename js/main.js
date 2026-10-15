@@ -50,6 +50,35 @@ class MatchScene extends Phaser.Scene {
         this.createMatchUI();
     }
 
+
+    getOffsideLineX(isPlayerTeamDefense) {
+        // isPlayerTeamDefense is TRUE if Player Team is defending (opponent is attacking)
+        // For Player Team Defense: Goal is at 0. Offside line is max(secondToLast, 400).
+        // For Opponent Team Defense: Goal is at 800. Offside line is min(secondToLast, 400).
+        const defendingTeam = isPlayerTeamDefense ? this.playerSprites : this.opponentSprites;
+        const sortedDefenders = [...defendingTeam].sort((a, b) => a.x - b.x); // Left to right
+
+        if (isPlayerTeamDefense) {
+            // Defending Left side (X=0)
+            if (sortedDefenders.length > 1) {
+                // The opponent is attacking left (towards 0).
+                // They cannot be closer to 0 than the second to last defender, AND they cannot be offside in their own half (X > 400).
+                // So the limit is the minimum (closest to 0) of the defender's position and 400.
+                return Math.min(sortedDefenders[1].x, 400);
+            }
+            return 400;
+        } else {
+            // Defending Right side (X=800)
+            if (sortedDefenders.length > 1) {
+                // The player is attacking right (towards 800).
+                // They cannot be closer to 800 than the second to last defender, AND they cannot be offside in their own half (X < 400).
+                // So the limit is the maximum (closest to 800) of the defender's position and 400.
+                return Math.max(sortedDefenders[sortedDefenders.length - 2].x, 400);
+            }
+            return 400;
+        }
+    }
+
     getPitchZone(x, y, isPlayerTeam) {
         let third = '';
         if (isPlayerTeam) {
@@ -883,14 +912,8 @@ class MatchScene extends Phaser.Scene {
                         break;
                     case 'RunIntoSpace':
                         let targetForwardX = p.x + (dir * 80);
-                        let offsideLineX = p.isPlayerTeam ? 800 : 0;
-                        if (p.isPlayerTeam && p.x > 400) {
-                            let oppDefenders = [...this.opponentSprites].sort((a, b) => b.x - a.x);
-                            if (oppDefenders.length > 1) offsideLineX = oppDefenders[1].x - 5;
-                        } else if (!p.isPlayerTeam && p.x < 400) {
-                            let playerDefenders = [...this.playerSprites].sort((a, b) => a.x - b.x);
-                            if (playerDefenders.length > 1) offsideLineX = playerDefenders[1].x + 5;
-                        }
+                        let offsideLineX = this.getOffsideLineX(!p.isPlayerTeam);
+                        if (p.isPlayerTeam) offsideLineX -= 5; else offsideLineX += 5;
                         if (p.isPlayerTeam && targetForwardX > offsideLineX && offsideLineX > p.x) targetForwardX = offsideLineX;
                         if (!p.isPlayerTeam && targetForwardX < offsideLineX && offsideLineX < p.x) targetForwardX = offsideLineX;
                         targetX = targetForwardX;
@@ -1238,6 +1261,28 @@ class MatchScene extends Phaser.Scene {
                     let isLongBall = forceLongBall || (isForward && isLongDist);
                     let isThroughBall = isForward && isLongDist && targetMate.playerData.position === 'CF';
 
+
+                    let isOffside = false;
+                    const offsideLineX = this.getOffsideLineX(!isPlayer);
+                    if (isPlayer) {
+                        // Player attacking right (goal 800)
+                        if (targetMate.x > 400 && targetMate.x > this.ball.x && targetMate.x > offsideLineX) {
+                            isOffside = true;
+                        }
+                    } else {
+                        // Opponent attacking left (goal 0)
+                        if (targetMate.x < 400 && targetMate.x < this.ball.x && targetMate.x < offsideLineX) {
+                            isOffside = true;
+                        }
+                    }
+
+                    if (isOffside) {
+                        this.showActionText(this.ball.owner, "パス", "#f1c40f");
+                        this.showActionText(targetMate, "オフサイド", "#e74c3c");
+                        this.handleSetPiece('Indirect Free Kick', targetMate.x, targetMate.y, !isPlayer);
+                        return;
+                    }
+
                     let passStat = this.ball.owner.playerData.dynamicStats.pass;
                     if (isPlayer && this.activeBuff && this.activeBuff.target === 'pass') passStat += this.activeBuff.value;
                     const staminaFactor2 = Math.max(0.3, this.ball.owner.playerData.currentStamina / 100);
@@ -1325,10 +1370,15 @@ class MatchScene extends Phaser.Scene {
         this.playerSprites.forEach(p => {
             if (p.baseX) { p.x = p.baseX; p.y = p.baseY; }
             else { p.x = Phaser.Math.Between(50, 350); p.y = Phaser.Math.Between(50, 550); }
-            if (p.x > 390) p.x = 390;
+
+            // All players must be in their own half initially
+            if (p.x > 395) p.x = 395;
+
             if (isPlayerKickoff) {
+                // If taking kickoff, keep outside center circle except for striker/support
                 if (p !== striker && p !== support && Phaser.Math.Distance.Between(p.x, p.y, 400, 300) < 75) p.x = 320;
             } else {
+                // If defending kickoff, ALL players must be outside center circle
                 if (Phaser.Math.Distance.Between(p.x, p.y, 400, 300) < 75) p.x = 320;
             }
         });
@@ -1336,17 +1386,25 @@ class MatchScene extends Phaser.Scene {
         this.opponentSprites.forEach(p => {
             if (p.baseX) { p.x = p.baseX; p.y = p.baseY; }
             else { p.x = Phaser.Math.Between(450, 750); p.y = Phaser.Math.Between(50, 550); }
-            if (p.x < 410) p.x = 410;
+
+            // All players must be in their own half initially
+            if (p.x < 405) p.x = 405;
+
             if (!isPlayerKickoff) {
+                // If taking kickoff, keep outside center circle except for striker/support
                 if (p !== striker && p !== support && Phaser.Math.Distance.Between(p.x, p.y, 400, 300) < 75) p.x = 480;
             } else {
+                // If defending kickoff, ALL players must be outside center circle
                 if (Phaser.Math.Distance.Between(p.x, p.y, 400, 300) < 75) p.x = 480;
             }
         });
 
         this.ball.x = 400; this.ball.y = 300; this.ball.z = 0; this.ballSpeed = 0; this.isHighBall = false;
+
+        // Place striker and support in center circle AFTER enforcing own half rule for others
         if (striker) { striker.x = 400 - (isPlayerKickoff ? 5 : -5); striker.y = 300; this.ball.owner = striker; }
         if (support) { support.x = 400 - (isPlayerKickoff ? 20 : -20); support.y = 320; }
+
         this.matchState = 'kickoff'; this.kickoffTimer = 20;
     }
 

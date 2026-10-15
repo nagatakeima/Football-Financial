@@ -9,6 +9,21 @@ window.MasterData = {
         { id: 10, name: "Veteran", effectType: "LOW_STAT_BOOST", threshold: 40, value: 10 }
     ], MicroCommands: [], Positions: []
 };
+
+if (!window.MasterData) window.MasterData = {};
+if (!window.MasterData.Formations) {
+    window.MasterData.Formations = {
+        "4-4-2": { chemistryLinks: [] },
+        "4-3-3": { chemistryLinks: [] },
+        "3-2-4-1": { chemistryLinks: [] },
+        "4-1-4-1": { chemistryLinks: [] },
+        "4-2-3-1": { chemistryLinks: [] },
+        "5-3-2": { chemistryLinks: [] },
+        "4-3-1-2": { chemistryLinks: [] },
+        "3-5-2": { chemistryLinks: [] }
+    };
+}
+
 eval(fs.readFileSync('js/models/chemistry.js', 'utf8'));
 
 const p1 = { stats: { pass: 30, speed: 50 }, preference: 'A', skills: [] };
