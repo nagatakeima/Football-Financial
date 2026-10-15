@@ -62,11 +62,13 @@ class MatchScene extends Phaser.Scene {
             else third = 'Attacking';
         }
         let lane = '';
+        // Issue 9: Y-axis is now logically 60 to 540 (total height 480).
+        // 480 / 5 lanes = 96 pixels per lane
         let viewY = isPlayerTeam ? y : 600 - y;
-        if (viewY < 120) lane = 'Left Outside';
-        else if (viewY < 240) lane = 'Left Half-space';
-        else if (viewY < 360) lane = 'Center';
-        else if (viewY < 480) lane = 'Right Half-space';
+        if (viewY < 60 + 96) lane = 'Left Outside';
+        else if (viewY < 60 + 192) lane = 'Left Half-space';
+        else if (viewY < 60 + 288) lane = 'Center';
+        else if (viewY < 60 + 384) lane = 'Right Half-space';
         else lane = 'Right Outside';
         return { third, lane };
     }
@@ -106,11 +108,12 @@ class MatchScene extends Phaser.Scene {
         switch (pos) {
             case 'GK': x = 400 + dir * 370; y = 300; break;
             case 'CB': x = 400 + dir * 250; y = 300; break;
-            case 'SB': x = 400 + dir * 250; y = 100; break;
+            case 'SB': x = 400 + dir * 250; y = 300; break;
             case 'CDM': x = 400 + dir * 150; y = 300; break;
             case 'CM': x = 400 + dir * 100; y = 300; break;
             case 'CAM': x = 400 + dir * 50; y = 300; break;
-            case 'WG': x = 400 + dir * 100; y = 100; break;
+            case 'SH': x = 400 + dir * 50; y = 300; break;
+            case 'WG': x = 400 + dir * 50; y = 300; break;
             case 'CF': x = 400 + dir * 50; y = 300; break;
             default: x = 400 + dir * 100; y = 300; break;
         }
@@ -192,6 +195,7 @@ class MatchScene extends Phaser.Scene {
 
         // Strict boundary check for dynamic base
         base.x = Phaser.Math.Clamp(base.x, 20, 780);
+        base.y = Phaser.Math.Clamp(base.y, 65, 535);
         return base;
     }
 
@@ -242,11 +246,21 @@ class MatchScene extends Phaser.Scene {
             let pos = this.getBasePosition(expectedPosStr, true);
             let yOffset = slotDef.offsetY || (i % 2 === 0 ? -1 : 1) * ((i % 3) * 30);
 
-            if (expectedPosStr === 'SB' || expectedPosStr === 'WG') pos.y = i % 2 === 0 ? 100 : 500;
-            if (expectedPosStr === 'CB' || expectedPosStr === 'CM' || expectedPosStr === 'CDM') pos.y = 300 + yOffset;
+            // Do not override with 100/500 if MasterData already has valid offsets
+            if (!slotDef.offsetY) {
+                if (expectedPosStr === 'SB' || expectedPosStr === 'WG') pos.y = i % 2 === 0 ? 100 : 500;
+                if (expectedPosStr === 'CB' || expectedPosStr === 'CM' || expectedPosStr === 'CDM') pos.y = 300 + yOffset;
+            } else {
+                pos.y = 300 + yOffset;
+            }
 
             // X positioning adjusted by offsetX
-            if (!isGK) pos.x = 400 - (slotDef.offsetX || 0);
+            if (!isGK) {
+                // If the MasterData has an explicit offset, use it relative to center (400), otherwise rely on getBasePosition
+                if (slotDef.offsetX !== undefined && slotDef.offsetX !== 0) {
+                    pos.x = 400 - slotDef.offsetX;
+                }
+            }
 
             if (player.position !== expectedPosStr) {
                 player.isMob = true;
@@ -267,11 +281,19 @@ class MatchScene extends Phaser.Scene {
             let pos = this.getBasePosition(expectedPosStr, false);
             let yOffset = slotDef.offsetY || (i % 2 === 0 ? -1 : 1) * ((i % 3) * 30);
 
-            if (expectedPosStr === 'SB' || expectedPosStr === 'WG') pos.y = i % 2 === 0 ? 100 : 500;
-            if (expectedPosStr === 'CB' || expectedPosStr === 'CM' || expectedPosStr === 'CDM') pos.y = 300 + yOffset;
+            if (!slotDef.offsetY) {
+                if (expectedPosStr === 'SB' || expectedPosStr === 'WG') pos.y = i % 2 === 0 ? 100 : 500;
+                if (expectedPosStr === 'CB' || expectedPosStr === 'CM' || expectedPosStr === 'CDM') pos.y = 300 + yOffset;
+            } else {
+                pos.y = 300 + yOffset;
+            }
 
             // X positioning adjusted by offsetX (mirrored for opponent)
-            if (!isGK) pos.x = 400 + (slotDef.offsetX || 0);
+            if (!isGK) {
+                if (slotDef.offsetX !== undefined && slotDef.offsetX !== 0) {
+                    pos.x = 400 + slotDef.offsetX;
+                }
+            }
 
             if (player.position !== expectedPosStr) {
                 player.isMob = true;
@@ -501,14 +523,14 @@ class MatchScene extends Phaser.Scene {
     }
 
     checkBallOut() {
-        const leftBound = 5; const rightBound = 795; const topBound = 5; const bottomBound = 595;
+        const leftBound = 5; const rightBound = 795; const topBound = 60; const bottomBound = 540;
         let isOut = false; let type = ''; let restartX = this.ball.x; let restartY = this.ball.y;
         let isPlayerTeamBall = !this.lastTouchedByPlayerTeam;
 
         if (this.ball.y < topBound) {
-            isOut = true; type = 'Throw In'; restartY = 15;
+            isOut = true; type = 'Throw In'; restartY = 65;
         } else if (this.ball.y > bottomBound) {
-            isOut = true; type = 'Throw In'; restartY = 585;
+            isOut = true; type = 'Throw In'; restartY = 535;
         }
 
         if (!isOut && this.ball.x < leftBound) {
@@ -519,7 +541,7 @@ class MatchScene extends Phaser.Scene {
                 if (!this.lastTouchedByPlayerTeam) {
                     type = 'Goal Kick'; restartX = 50; restartY = 300; isPlayerTeamBall = true;
                 } else {
-                    type = 'Corner Kick'; restartX = 15; restartY = this.ball.y < 300 ? 15 : 585; isPlayerTeamBall = false;
+                    type = 'Corner Kick'; restartX = 15; restartY = this.ball.y < 300 ? 65 : 535; isPlayerTeamBall = false;
                 }
             }
         } else if (!isOut && this.ball.x > rightBound) {
@@ -530,7 +552,7 @@ class MatchScene extends Phaser.Scene {
                 if (this.lastTouchedByPlayerTeam) {
                     type = 'Goal Kick'; restartX = 750; restartY = 300; isPlayerTeamBall = false;
                 } else {
-                    type = 'Corner Kick'; restartX = 785; restartY = this.ball.y < 300 ? 15 : 585; isPlayerTeamBall = true;
+                    type = 'Corner Kick'; restartX = 785; restartY = this.ball.y < 300 ? 65 : 535; isPlayerTeamBall = true;
                 }
             }
         }
@@ -972,7 +994,9 @@ class MatchScene extends Phaser.Scene {
                 p.playerData.currentStamina = Math.min(100, p.playerData.currentStamina + 0.05);
             }
 
-            p.x = Phaser.Math.Clamp(p.x, 10, 790); p.y = Phaser.Math.Clamp(p.y, 10, 590);
+            // Issue 9: Clamp players strictly within the visual pitch (60 to 540)
+            p.x = Phaser.Math.Clamp(p.x, 10, 790);
+            p.y = Phaser.Math.Clamp(p.y, 65, 535);
 
             // Limit GK
             if (p.playerData.position === 'GK') {
