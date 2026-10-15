@@ -101,17 +101,18 @@ const MasterData = {
     Formations: {
         "4-4-2": {
             slots: [
+
                 { id: "GK", position: "GK", expectedPosStr: "GK", offsetX: 0, offsetY: 0, baseMatrix: { lane: "Center", tier: "Defensive" } },
-                { id: "LCB", position: "CB", expectedPosStr: "CB", offsetX: 0, offsetY: -30, baseMatrix: { lane: "Left Half-space", tier: "Defensive" } },
-                { id: "RCB", position: "CB", expectedPosStr: "CB", offsetX: 0, offsetY: 30, baseMatrix: { lane: "Right Half-space", tier: "Defensive" } },
-                { id: "LSB", position: "SB", expectedPosStr: "SB", offsetX: 0, offsetY: -120, baseMatrix: { lane: "Left Outside", tier: "Defensive" } },
-                { id: "RSB", position: "SB", expectedPosStr: "SB", offsetX: 0, offsetY: 120, baseMatrix: { lane: "Right Outside", tier: "Defensive" } },
+                { id: "LCB", position: "CB", expectedPosStr: "CB", offsetX: -15, offsetY: -30, baseMatrix: { lane: "Left Half-space", tier: "Defensive" } },
+                { id: "RCB", position: "CB", expectedPosStr: "CB", offsetX: -15, offsetY: 30, baseMatrix: { lane: "Right Half-space", tier: "Defensive" } },
+                { id: "LSB", position: "SB", expectedPosStr: "SB", offsetX: 10, offsetY: -120, baseMatrix: { lane: "Left Outside", tier: "Defensive" } },
+                { id: "RSB", position: "SB", expectedPosStr: "SB", offsetX: 10, offsetY: 120, baseMatrix: { lane: "Right Outside", tier: "Defensive" } },
                 { id: "LCM", position: "CM", expectedPosStr: "CM", offsetX: 0, offsetY: -50, baseMatrix: { lane: "Left Half-space", tier: "Middle" } },
                 { id: "RCM", position: "CM", expectedPosStr: "CM", offsetX: 0, offsetY: 50, baseMatrix: { lane: "Right Half-space", tier: "Middle" } },
-                { id: "LWG", position: "WG", expectedPosStr: "WG", offsetX: 0, offsetY: -120, baseMatrix: { lane: "Left Outside", tier: "Middle" } },
-                { id: "RWG", position: "WG", expectedPosStr: "WG", offsetX: 0, offsetY: 120, baseMatrix: { lane: "Right Outside", tier: "Middle" } },
-                { id: "LCF", position: "CF", expectedPosStr: "CF", offsetX: 0, offsetY: -30, baseMatrix: { lane: "Left Half-space", tier: "Attacking" } },
-                { id: "RCF", position: "CF", expectedPosStr: "CF", offsetX: 0, offsetY: 30, baseMatrix: { lane: "Right Half-space", tier: "Attacking" } }
+                { id: "LWG", position: "WG", expectedPosStr: "WG", offsetX: 20, offsetY: -120, baseMatrix: { lane: "Left Outside", tier: "Middle" } },
+                { id: "RWG", position: "WG", expectedPosStr: "WG", offsetX: 20, offsetY: 120, baseMatrix: { lane: "Right Outside", tier: "Middle" } },
+                { id: "LCF", position: "CF", expectedPosStr: "CF", offsetX: 40, offsetY: -30, baseMatrix: { lane: "Left Half-space", tier: "Attacking" } },
+                { id: "RCF", position: "CF", expectedPosStr: "CF", offsetX: 40, offsetY: 30, baseMatrix: { lane: "Right Half-space", tier: "Attacking" } }
             ],
             chemistryLinks: [
                 { from: "LCB", to: "LSB" }, { from: "LCB", to: "LCM" }, { from: "LSB", to: "LWG" }, { from: "LCM", to: "LCF" },
@@ -121,17 +122,18 @@ const MasterData = {
         },
         "4-3-3": {
             slots: [
+
                 { id: "GK", position: "GK", expectedPosStr: "GK", offsetX: 0, offsetY: 0, baseMatrix: { lane: "Center", tier: "Defensive" } },
-                { id: "LCB", position: "CB", expectedPosStr: "CB", offsetX: 0, offsetY: -30, baseMatrix: { lane: "Left Half-space", tier: "Defensive" } },
-                { id: "RCB", position: "CB", expectedPosStr: "CB", offsetX: 0, offsetY: 30, baseMatrix: { lane: "Right Half-space", tier: "Defensive" } },
-                { id: "LSB", position: "SB", expectedPosStr: "SB", offsetX: 0, offsetY: -120, baseMatrix: { lane: "Left Outside", tier: "Defensive" } },
-                { id: "RSB", position: "SB", expectedPosStr: "SB", offsetX: 0, offsetY: 120, baseMatrix: { lane: "Right Outside", tier: "Defensive" } },
-                { id: "CDM", position: "CDM", expectedPosStr: "CDM", offsetX: 0, offsetY: 0, baseMatrix: { lane: "Center", tier: "Middle" } },
-                { id: "LCM", position: "CM", expectedPosStr: "CM", offsetX: 0, offsetY: -50, baseMatrix: { lane: "Left Half-space", tier: "Middle" } },
-                { id: "RCM", position: "CM", expectedPosStr: "CM", offsetX: 0, offsetY: 50, baseMatrix: { lane: "Right Half-space", tier: "Middle" } },
-                { id: "LWG", position: "WG", expectedPosStr: "WG", offsetX: 0, offsetY: -120, baseMatrix: { lane: "Left Outside", tier: "Attacking" } },
-                { id: "RWG", position: "WG", expectedPosStr: "WG", offsetX: 0, offsetY: 120, baseMatrix: { lane: "Right Outside", tier: "Attacking" } },
-                { id: "CF", position: "CF", expectedPosStr: "CF", offsetX: 0, offsetY: 0, baseMatrix: { lane: "Center", tier: "Attacking" } }
+                { id: "LCB", position: "CB", expectedPosStr: "CB", offsetX: -15, offsetY: -30, baseMatrix: { lane: "Left Half-space", tier: "Defensive" } },
+                { id: "RCB", position: "CB", expectedPosStr: "CB", offsetX: -15, offsetY: 30, baseMatrix: { lane: "Right Half-space", tier: "Defensive" } },
+                { id: "LSB", position: "SB", expectedPosStr: "SB", offsetX: 10, offsetY: -120, baseMatrix: { lane: "Left Outside", tier: "Defensive" } },
+                { id: "RSB", position: "SB", expectedPosStr: "SB", offsetX: 10, offsetY: 120, baseMatrix: { lane: "Right Outside", tier: "Defensive" } },
+                { id: "CDM", position: "CDM", expectedPosStr: "CDM", offsetX: -10, offsetY: 0, baseMatrix: { lane: "Center", tier: "Middle" } },
+                { id: "LCM", position: "CM", expectedPosStr: "CM", offsetX: 10, offsetY: -50, baseMatrix: { lane: "Left Half-space", tier: "Middle" } },
+                { id: "RCM", position: "CM", expectedPosStr: "CM", offsetX: 10, offsetY: 50, baseMatrix: { lane: "Right Half-space", tier: "Middle" } },
+                { id: "LWG", position: "WG", expectedPosStr: "WG", offsetX: 20, offsetY: -120, baseMatrix: { lane: "Left Outside", tier: "Attacking" } },
+                { id: "RWG", position: "WG", expectedPosStr: "WG", offsetX: 20, offsetY: 120, baseMatrix: { lane: "Right Outside", tier: "Attacking" } },
+                { id: "CF", position: "CF", expectedPosStr: "CF", offsetX: 45, offsetY: 0, baseMatrix: { lane: "Center", tier: "Attacking" } }
             ],
             chemistryLinks: [
                 { from: "LCB", to: "LSB" }, { from: "LCB", to: "CDM" }, { from: "LSB", to: "LCM" }, { from: "LCM", to: "LWG" },
@@ -141,99 +143,205 @@ const MasterData = {
         },
         "3-2-4-1": {
             slots: [
+
                 { id: "GK", position: "GK", expectedPosStr: "GK", offsetX: 0, offsetY: 0, baseMatrix: { lane: "Center", tier: "Defensive" } },
-                { id: "LCB", position: "CB", expectedPosStr: "CB", offsetX: 0, offsetY: -60, baseMatrix: { lane: "Left Half-space", tier: "Defensive" } },
-                { id: "CB", position: "CB", expectedPosStr: "CB", offsetX: 0, offsetY: 0, baseMatrix: { lane: "Center", tier: "Defensive" } },
-                { id: "RCB", position: "CB", expectedPosStr: "CB", offsetX: 0, offsetY: 60, baseMatrix: { lane: "Right Half-space", tier: "Defensive" } },
-                { id: "LCDM", position: "CDM", expectedPosStr: "CDM", offsetX: 0, offsetY: -30, baseMatrix: { lane: "Left Half-space", tier: "Middle" } },
-                { id: "RCDM", position: "CDM", expectedPosStr: "CDM", offsetX: 0, offsetY: 30, baseMatrix: { lane: "Right Half-space", tier: "Middle" } },
-                { id: "LCAM", position: "CAM", expectedPosStr: "CAM", offsetX: 0, offsetY: -30, baseMatrix: { lane: "Left Half-space", tier: "Attacking" } },
-                { id: "RCAM", position: "CAM", expectedPosStr: "CAM", offsetX: 0, offsetY: 30, baseMatrix: { lane: "Right Half-space", tier: "Attacking" } },
-                { id: "LWG", position: "WG", expectedPosStr: "WG", offsetX: 0, offsetY: -120, baseMatrix: { lane: "Left Outside", tier: "Middle" } },
-                { id: "RWG", position: "WG", expectedPosStr: "WG", offsetX: 0, offsetY: 120, baseMatrix: { lane: "Right Outside", tier: "Middle" } },
-                { id: "CF", position: "CF", expectedPosStr: "CF", offsetX: 0, offsetY: 0, baseMatrix: { lane: "Center", tier: "Attacking" } }
+                { id: "LCB", position: "CB", expectedPosStr: "CB", offsetX: -15, offsetY: -60, baseMatrix: { lane: "Left Half-space", tier: "Defensive" } },
+                { id: "CB", position: "CB", expectedPosStr: "CB", offsetX: -15, offsetY: 0, baseMatrix: { lane: "Center", tier: "Defensive" } },
+                { id: "RCB", position: "CB", expectedPosStr: "CB", offsetX: -15, offsetY: 60, baseMatrix: { lane: "Right Half-space", tier: "Defensive" } },
+                { id: "LCDM", position: "CDM", expectedPosStr: "CDM", offsetX: -10, offsetY: -30, baseMatrix: { lane: "Left Half-space", tier: "Middle" } },
+                { id: "RCDM", position: "CDM", expectedPosStr: "CDM", offsetX: -10, offsetY: 30, baseMatrix: { lane: "Right Half-space", tier: "Middle" } },
+                { id: "LCAM", position: "CAM", expectedPosStr: "CAM", offsetX: 20, offsetY: -30, baseMatrix: { lane: "Left Half-space", tier: "Attacking" } },
+                { id: "RCAM", position: "CAM", expectedPosStr: "CAM", offsetX: 20, offsetY: 30, baseMatrix: { lane: "Right Half-space", tier: "Attacking" } },
+                { id: "LWG", position: "WG", expectedPosStr: "WG", offsetX: 20, offsetY: -120, baseMatrix: { lane: "Left Outside", tier: "Middle" } },
+                { id: "RWG", position: "WG", expectedPosStr: "WG", offsetX: 20, offsetY: 120, baseMatrix: { lane: "Right Outside", tier: "Middle" } },
+                { id: "CF", position: "CF", expectedPosStr: "CF", offsetX: 45, offsetY: 0, baseMatrix: { lane: "Center", tier: "Attacking" } }
             ],
-            chemistryLinks: []
+            chemistryLinks: [
+                { from: 'GK', to: 'LCB' },
+                { from: 'GK', to: 'RCB' },
+                { from: 'LCB', to: 'RCB' },
+                { from: 'LCB', to: 'LSB' },
+                { from: 'RCB', to: 'RSB' },
+                { from: 'LSB', to: 'LWG' },
+                { from: 'RSB', to: 'RWG' },
+                { from: 'LCB', to: 'LCM' },
+                { from: 'RCB', to: 'RCM' },
+                { from: 'LCM', to: 'LCF' },
+                { from: 'RCM', to: 'RCF' }
+            ]
         },
         "4-1-4-1": {
             slots: [
+
                 { id: "GK", position: "GK", expectedPosStr: "GK", offsetX: 0, offsetY: 0, baseMatrix: { lane: "Center", tier: "Defensive" } },
-                { id: "LCB", position: "CB", expectedPosStr: "CB", offsetX: 0, offsetY: -30, baseMatrix: { lane: "Left Half-space", tier: "Defensive" } },
-                { id: "RCB", position: "CB", expectedPosStr: "CB", offsetX: 0, offsetY: 30, baseMatrix: { lane: "Right Half-space", tier: "Defensive" } },
-                { id: "LSB", position: "SB", expectedPosStr: "SB", offsetX: 0, offsetY: -120, baseMatrix: { lane: "Left Outside", tier: "Defensive" } },
-                { id: "RSB", position: "SB", expectedPosStr: "SB", offsetX: 0, offsetY: 120, baseMatrix: { lane: "Right Outside", tier: "Defensive" } },
-                { id: "CDM", position: "CDM", expectedPosStr: "CDM", offsetX: 0, offsetY: 0, baseMatrix: { lane: "Center", tier: "Middle" } },
-                { id: "LCM", position: "CM", expectedPosStr: "CM", offsetX: 0, offsetY: -50, baseMatrix: { lane: "Left Half-space", tier: "Attacking" } },
-                { id: "RCM", position: "CM", expectedPosStr: "CM", offsetX: 0, offsetY: 50, baseMatrix: { lane: "Right Half-space", tier: "Attacking" } },
-                { id: "LWG", position: "WG", expectedPosStr: "WG", offsetX: 0, offsetY: -120, baseMatrix: { lane: "Left Outside", tier: "Middle" } },
-                { id: "RWG", position: "WG", expectedPosStr: "WG", offsetX: 0, offsetY: 120, baseMatrix: { lane: "Right Outside", tier: "Middle" } },
-                { id: "CF", position: "CF", expectedPosStr: "CF", offsetX: 0, offsetY: 0, baseMatrix: { lane: "Center", tier: "Attacking" } }
+                { id: "LCB", position: "CB", expectedPosStr: "CB", offsetX: -15, offsetY: -30, baseMatrix: { lane: "Left Half-space", tier: "Defensive" } },
+                { id: "RCB", position: "CB", expectedPosStr: "CB", offsetX: -15, offsetY: 30, baseMatrix: { lane: "Right Half-space", tier: "Defensive" } },
+                { id: "LSB", position: "SB", expectedPosStr: "SB", offsetX: 10, offsetY: -120, baseMatrix: { lane: "Left Outside", tier: "Defensive" } },
+                { id: "RSB", position: "SB", expectedPosStr: "SB", offsetX: 10, offsetY: 120, baseMatrix: { lane: "Right Outside", tier: "Defensive" } },
+                { id: "CDM", position: "CDM", expectedPosStr: "CDM", offsetX: -10, offsetY: 0, baseMatrix: { lane: "Center", tier: "Middle" } },
+                { id: "LCM", position: "CM", expectedPosStr: "CM", offsetX: 10, offsetY: -50, baseMatrix: { lane: "Left Half-space", tier: "Attacking" } },
+                { id: "RCM", position: "CM", expectedPosStr: "CM", offsetX: 10, offsetY: 50, baseMatrix: { lane: "Right Half-space", tier: "Attacking" } },
+                { id: "LWG", position: "WG", expectedPosStr: "WG", offsetX: 35, offsetY: -120, baseMatrix: { lane: "Left Outside", tier: "Middle" } },
+                { id: "RWG", position: "WG", expectedPosStr: "WG", offsetX: 35, offsetY: 120, baseMatrix: { lane: "Right Outside", tier: "Middle" } },
+                { id: "CF", position: "CF", expectedPosStr: "CF", offsetX: 45, offsetY: 0, baseMatrix: { lane: "Center", tier: "Attacking" } }
             ],
-            chemistryLinks: []
+            chemistryLinks: [
+                { from: 'GK', to: 'LCB' },
+                { from: 'GK', to: 'RCB' },
+                { from: 'LCB', to: 'RCB' },
+                { from: 'LCB', to: 'LSB' },
+                { from: 'RCB', to: 'RSB' },
+                { from: 'LCB', to: 'CDM' },
+                { from: 'RCB', to: 'CDM' },
+                { from: 'LSB', to: 'LCM' },
+                { from: 'RSB', to: 'RCM' },
+                { from: 'CDM', to: 'LCM' },
+                { from: 'CDM', to: 'RCM' },
+                { from: 'LCM', to: 'LWG' },
+                { from: 'RCM', to: 'CF' },
+                { from: 'CDM', to: 'RWG' }
+            ]
         },
         "4-2-3-1": {
             slots: [
+
                 { id: "GK", position: "GK", expectedPosStr: "GK", offsetX: 0, offsetY: 0, baseMatrix: { lane: "Center", tier: "Defensive" } },
-                { id: "LCB", position: "CB", expectedPosStr: "CB", offsetX: 0, offsetY: -30, baseMatrix: { lane: "Left Half-space", tier: "Defensive" } },
-                { id: "RCB", position: "CB", expectedPosStr: "CB", offsetX: 0, offsetY: 30, baseMatrix: { lane: "Right Half-space", tier: "Defensive" } },
-                { id: "LSB", position: "SB", expectedPosStr: "SB", offsetX: 0, offsetY: -120, baseMatrix: { lane: "Left Outside", tier: "Defensive" } },
-                { id: "RSB", position: "SB", expectedPosStr: "SB", offsetX: 0, offsetY: 120, baseMatrix: { lane: "Right Outside", tier: "Defensive" } },
-                { id: "LCDM", position: "CDM", expectedPosStr: "CDM", offsetX: 0, offsetY: -30, baseMatrix: { lane: "Left Half-space", tier: "Middle" } },
-                { id: "RCDM", position: "CDM", expectedPosStr: "CDM", offsetX: 0, offsetY: 30, baseMatrix: { lane: "Right Half-space", tier: "Middle" } },
-                { id: "CAM", position: "CAM", expectedPosStr: "CAM", offsetX: 0, offsetY: 0, baseMatrix: { lane: "Center", tier: "Attacking" } },
-                { id: "LWG", position: "WG", expectedPosStr: "WG", offsetX: 0, offsetY: -120, baseMatrix: { lane: "Left Outside", tier: "Attacking" } },
-                { id: "RWG", position: "WG", expectedPosStr: "WG", offsetX: 0, offsetY: 120, baseMatrix: { lane: "Right Outside", tier: "Attacking" } },
-                { id: "CF", position: "CF", expectedPosStr: "CF", offsetX: 0, offsetY: 0, baseMatrix: { lane: "Center", tier: "Attacking" } }
+                { id: "LCB", position: "CB", expectedPosStr: "CB", offsetX: -15, offsetY: -30, baseMatrix: { lane: "Left Half-space", tier: "Defensive" } },
+                { id: "RCB", position: "CB", expectedPosStr: "CB", offsetX: -15, offsetY: 30, baseMatrix: { lane: "Right Half-space", tier: "Defensive" } },
+                { id: "LSB", position: "SB", expectedPosStr: "SB", offsetX: 10, offsetY: -120, baseMatrix: { lane: "Left Outside", tier: "Defensive" } },
+                { id: "RSB", position: "SB", expectedPosStr: "SB", offsetX: 10, offsetY: 120, baseMatrix: { lane: "Right Outside", tier: "Defensive" } },
+                { id: "LCDM", position: "CDM", expectedPosStr: "CDM", offsetX: -10, offsetY: -30, baseMatrix: { lane: "Left Half-space", tier: "Middle" } },
+                { id: "RCDM", position: "CDM", expectedPosStr: "CDM", offsetX: -10, offsetY: 30, baseMatrix: { lane: "Right Half-space", tier: "Middle" } },
+                { id: "CAM", position: "CAM", expectedPosStr: "CAM", offsetX: 20, offsetY: 0, baseMatrix: { lane: "Center", tier: "Attacking" } },
+                { id: "LWG", position: "WG", expectedPosStr: "WG", offsetX: 15, offsetY: -120, baseMatrix: { lane: "Left Outside", tier: "Attacking" } },
+                { id: "RWG", position: "WG", expectedPosStr: "WG", offsetX: 15, offsetY: 120, baseMatrix: { lane: "Right Outside", tier: "Attacking" } },
+                { id: "CF", position: "CF", expectedPosStr: "CF", offsetX: 45, offsetY: 0, baseMatrix: { lane: "Center", tier: "Attacking" } }
             ],
-            chemistryLinks: []
+            chemistryLinks: [
+                { from: 'GK', to: 'LCB' },
+                { from: 'GK', to: 'CB' },
+                { from: 'GK', to: 'RCB' },
+                { from: 'LCB', to: 'CB' },
+                { from: 'CB', to: 'RCB' },
+                { from: 'LCB', to: 'LCDM' },
+                { from: 'CB', to: 'LCDM' },
+                { from: 'CB', to: 'RCDM' },
+                { from: 'RCB', to: 'RCDM' },
+                { from: 'LCDM', to: 'RCDM' },
+                { from: 'LCDM', to: 'LCAM' },
+                { from: 'RCDM', to: 'RCAM' },
+                { from: 'LCDM', to: 'LWG' },
+                { from: 'RCDM', to: 'RWG' },
+                { from: 'LCAM', to: 'LWG' },
+                { from: 'RCAM', to: 'RWG' },
+                { from: 'LWG', to: 'RWG' },
+                { from: 'LWG', to: 'CF' },
+                { from: 'RWG', to: 'CF' }
+            ]
         },
         "5-3-2": {
             slots: [
+
                 { id: "GK", position: "GK", expectedPosStr: "GK", offsetX: 0, offsetY: 0, baseMatrix: { lane: "Center", tier: "Defensive" } },
-                { id: "LCB", position: "CB", expectedPosStr: "CB", offsetX: 0, offsetY: -60, baseMatrix: { lane: "Left Half-space", tier: "Defensive" } },
-                { id: "CB", position: "CB", expectedPosStr: "CB", offsetX: 0, offsetY: 0, baseMatrix: { lane: "Center", tier: "Defensive" } },
-                { id: "RCB", position: "CB", expectedPosStr: "CB", offsetX: 0, offsetY: 60, baseMatrix: { lane: "Right Half-space", tier: "Defensive" } },
-                { id: "LSB", position: "SB", expectedPosStr: "SB", offsetX: 0, offsetY: -120, baseMatrix: { lane: "Left Outside", tier: "Defensive" } },
-                { id: "RSB", position: "SB", expectedPosStr: "SB", offsetX: 0, offsetY: 120, baseMatrix: { lane: "Right Outside", tier: "Defensive" } },
-                { id: "LCM", position: "CM", expectedPosStr: "CM", offsetX: 0, offsetY: -40, baseMatrix: { lane: "Left Half-space", tier: "Middle" } },
+                { id: "LCB", position: "CB", expectedPosStr: "CB", offsetX: -15, offsetY: -60, baseMatrix: { lane: "Left Half-space", tier: "Defensive" } },
+                { id: "CB", position: "CB", expectedPosStr: "CB", offsetX: -20, offsetY: 0, baseMatrix: { lane: "Center", tier: "Defensive" } },
+                { id: "RCB", position: "CB", expectedPosStr: "CB", offsetX: -15, offsetY: 60, baseMatrix: { lane: "Right Half-space", tier: "Defensive" } },
+                { id: "LSB", position: "SB", expectedPosStr: "SB", offsetX: 10, offsetY: -120, baseMatrix: { lane: "Left Outside", tier: "Defensive" } },
+                { id: "RSB", position: "SB", expectedPosStr: "SB", offsetX: 10, offsetY: 120, baseMatrix: { lane: "Right Outside", tier: "Defensive" } },
+                { id: "LCM", position: "CM", expectedPosStr: "CM", offsetX: 10, offsetY: -40, baseMatrix: { lane: "Left Half-space", tier: "Middle" } },
                 { id: "CM", position: "CM", expectedPosStr: "CM", offsetX: 0, offsetY: 0, baseMatrix: { lane: "Center", tier: "Middle" } },
-                { id: "RCM", position: "CM", expectedPosStr: "CM", offsetX: 0, offsetY: 40, baseMatrix: { lane: "Right Half-space", tier: "Middle" } },
-                { id: "LCF", position: "CF", expectedPosStr: "CF", offsetX: 0, offsetY: -30, baseMatrix: { lane: "Left Half-space", tier: "Attacking" } },
-                { id: "RCF", position: "CF", expectedPosStr: "CF", offsetX: 0, offsetY: 30, baseMatrix: { lane: "Right Half-space", tier: "Attacking" } }
+                { id: "RCM", position: "CM", expectedPosStr: "CM", offsetX: 10, offsetY: 40, baseMatrix: { lane: "Right Half-space", tier: "Middle" } },
+                { id: "LCF", position: "CF", expectedPosStr: "CF", offsetX: 40, offsetY: -30, baseMatrix: { lane: "Left Half-space", tier: "Attacking" } },
+                { id: "RCF", position: "CF", expectedPosStr: "CF", offsetX: 40, offsetY: 30, baseMatrix: { lane: "Right Half-space", tier: "Attacking" } }
             ],
-            chemistryLinks: []
+            chemistryLinks: [
+                { from: 'GK', to: 'LCB' },
+                { from: 'GK', to: 'RCB' },
+                { from: 'LCB', to: 'RCB' },
+                { from: 'LCB', to: 'LSB' },
+                { from: 'RCB', to: 'RSB' },
+                { from: 'LCB', to: 'CDM' },
+                { from: 'RCB', to: 'CDM' },
+                { from: 'LSB', to: 'LCM' },
+                { from: 'CDM', to: 'RCM' },
+                { from: 'CDM', to: 'LWG' },
+                { from: 'RSB', to: 'RWG' },
+                { from: 'LCM', to: 'RCM' },
+                { from: 'RCM', to: 'LWG' },
+                { from: 'LWG', to: 'RWG' },
+                { from: 'RCM', to: 'CF' },
+                { from: 'LWG', to: 'CF' }
+            ]
         },
         "4-3-1-2": {
             slots: [
                 { id: "GK", position: "GK", expectedPosStr: "GK", offsetX: 0, offsetY: 0, baseMatrix: { lane: "Center", tier: "Defensive" } },
-                { id: "LCB", position: "CB", expectedPosStr: "CB", offsetX: 0, offsetY: -30, baseMatrix: { lane: "Left Half-space", tier: "Defensive" } },
-                { id: "RCB", position: "CB", expectedPosStr: "CB", offsetX: 0, offsetY: 30, baseMatrix: { lane: "Right Half-space", tier: "Defensive" } },
-                { id: "LSB", position: "SB", expectedPosStr: "SB", offsetX: 0, offsetY: -120, baseMatrix: { lane: "Left Outside", tier: "Defensive" } },
-                { id: "RSB", position: "SB", expectedPosStr: "SB", offsetX: 0, offsetY: 120, baseMatrix: { lane: "Right Outside", tier: "Defensive" } },
+                { id: "LCB", position: "CB", expectedPosStr: "CB", offsetX: -15, offsetY: -30, baseMatrix: { lane: "Left Half-space", tier: "Defensive" } },
+                { id: "RCB", position: "CB", expectedPosStr: "CB", offsetX: -15, offsetY: 30, baseMatrix: { lane: "Right Half-space", tier: "Defensive" } },
+                { id: "LSB", position: "SB", expectedPosStr: "SB", offsetX: 10, offsetY: -120, baseMatrix: { lane: "Left Outside", tier: "Defensive" } },
+                { id: "RSB", position: "SB", expectedPosStr: "SB", offsetX: 10, offsetY: 120, baseMatrix: { lane: "Right Outside", tier: "Defensive" } },
                 { id: "LCM", position: "CM", expectedPosStr: "CM", offsetX: 0, offsetY: -50, baseMatrix: { lane: "Left Half-space", tier: "Middle" } },
                 { id: "CM", position: "CM", expectedPosStr: "CM", offsetX: 0, offsetY: 0, baseMatrix: { lane: "Center", tier: "Middle" } },
                 { id: "RCM", position: "CM", expectedPosStr: "CM", offsetX: 0, offsetY: 50, baseMatrix: { lane: "Right Half-space", tier: "Middle" } },
-                { id: "CAM", position: "CAM", expectedPosStr: "CAM", offsetX: 0, offsetY: 0, baseMatrix: { lane: "Center", tier: "Attacking" } },
-                { id: "LCF", position: "CF", expectedPosStr: "CF", offsetX: 0, offsetY: -30, baseMatrix: { lane: "Left Half-space", tier: "Attacking" } },
-                { id: "RCF", position: "CF", expectedPosStr: "CF", offsetX: 0, offsetY: 30, baseMatrix: { lane: "Right Half-space", tier: "Attacking" } }
+                { id: "CAM", position: "CAM", expectedPosStr: "CAM", offsetX: 20, offsetY: 0, baseMatrix: { lane: "Center", tier: "Attacking" } },
+                { id: "LCF", position: "CF", expectedPosStr: "CF", offsetX: 40, offsetY: -30, baseMatrix: { lane: "Left Half-space", tier: "Attacking" } },
+                { id: "RCF", position: "CF", expectedPosStr: "CF", offsetX: 40, offsetY: 30, baseMatrix: { lane: "Right Half-space", tier: "Attacking" } }
             ],
-            chemistryLinks: []
+            chemistryLinks: [
+                { from: 'GK', to: 'LCB' },
+                { from: 'GK', to: 'RCB' },
+                { from: 'LCB', to: 'RCB' },
+                { from: 'LCB', to: 'LSB' },
+                { from: 'RCB', to: 'RSB' },
+                { from: 'LCB', to: 'LCDM' },
+                { from: 'RCB', to: 'RCDM' },
+                { from: 'LSB', to: 'LCDM' },
+                { from: 'RSB', to: 'RCDM' },
+                { from: 'LCDM', to: 'RCDM' },
+                { from: 'LCDM', to: 'CAM' },
+                { from: 'LCDM', to: 'LWG' },
+                { from: 'RCDM', to: 'LWG' },
+                { from: 'RCDM', to: 'RWG' },
+                { from: 'CAM', to: 'LWG' },
+                { from: 'LWG', to: 'RWG' },
+                { from: 'LWG', to: 'CF' }
+            ]
         },
         "3-5-2": {
             slots: [
                 { id: "GK", position: "GK", expectedPosStr: "GK", offsetX: 0, offsetY: 0, baseMatrix: { lane: "Center", tier: "Defensive" } },
-                { id: "LCB", position: "CB", expectedPosStr: "CB", offsetX: 0, offsetY: -60, baseMatrix: { lane: "Left Half-space", tier: "Defensive" } },
-                { id: "CB", position: "CB", expectedPosStr: "CB", offsetX: 0, offsetY: 0, baseMatrix: { lane: "Center", tier: "Defensive" } },
-                { id: "RCB", position: "CB", expectedPosStr: "CB", offsetX: 0, offsetY: 60, baseMatrix: { lane: "Right Half-space", tier: "Defensive" } },
+                { id: "LCB", position: "CB", expectedPosStr: "CB", offsetX: -15, offsetY: -60, baseMatrix: { lane: "Left Half-space", tier: "Defensive" } },
+                { id: "CB", position: "CB", expectedPosStr: "CB", offsetX: -20, offsetY: 0, baseMatrix: { lane: "Center", tier: "Defensive" } },
+                { id: "RCB", position: "CB", expectedPosStr: "CB", offsetX: -15, offsetY: 60, baseMatrix: { lane: "Right Half-space", tier: "Defensive" } },
                 { id: "CDM", position: "CDM", expectedPosStr: "CDM", offsetX: 0, offsetY: 0, baseMatrix: { lane: "Center", tier: "Middle" } },
                 { id: "LCM", position: "CM", expectedPosStr: "CM", offsetX: 0, offsetY: -40, baseMatrix: { lane: "Left Half-space", tier: "Middle" } },
                 { id: "RCM", position: "CM", expectedPosStr: "CM", offsetX: 0, offsetY: 40, baseMatrix: { lane: "Right Half-space", tier: "Middle" } },
                 { id: "LWG", position: "WG", expectedPosStr: "WG", offsetX: 0, offsetY: -120, baseMatrix: { lane: "Left Outside", tier: "Middle" } },
                 { id: "RWG", position: "WG", expectedPosStr: "WG", offsetX: 0, offsetY: 120, baseMatrix: { lane: "Right Outside", tier: "Middle" } },
-                { id: "LCF", position: "CF", expectedPosStr: "CF", offsetX: 0, offsetY: -30, baseMatrix: { lane: "Left Half-space", tier: "Attacking" } },
-                { id: "RCF", position: "CF", expectedPosStr: "CF", offsetX: 0, offsetY: 30, baseMatrix: { lane: "Right Half-space", tier: "Attacking" } }
+                { id: "LCF", position: "CF", expectedPosStr: "CF", offsetX: 40, offsetY: -30, baseMatrix: { lane: "Left Half-space", tier: "Attacking" } },
+                { id: "RCF", position: "CF", expectedPosStr: "CF", offsetX: 40, offsetY: 30, baseMatrix: { lane: "Right Half-space", tier: "Attacking" } }
             ],
-            chemistryLinks: []
+            chemistryLinks: [
+                { from: 'GK', to: 'LCB' },
+                { from: 'GK', to: 'CB' },
+                { from: 'GK', to: 'RCB' },
+                { from: 'LCB', to: 'CB' },
+                { from: 'CB', to: 'RCB' },
+                { from: 'LCB', to: 'LSB' },
+                { from: 'RCB', to: 'RSB' },
+                { from: 'LCB', to: 'LCM' },
+                { from: 'CB', to: 'CM' },
+                { from: 'RCB', to: 'RCM' },
+                { from: 'LSB', to: 'LCM' },
+                { from: 'RSB', to: 'RCM' },
+                { from: 'LCM', to: 'CM' },
+                { from: 'CM', to: 'RCM' },
+                { from: 'LCM', to: 'LCF' },
+                { from: 'CM', to: 'LCF' },
+                { from: 'CM', to: 'RCF' },
+                { from: 'RCM', to: 'RCF' },
+                { from: 'LCF', to: 'RCF' }
+            ]
         }
     }
 };

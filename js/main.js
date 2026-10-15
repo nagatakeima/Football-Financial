@@ -19,7 +19,7 @@ class MatchScene extends Phaser.Scene {
         }
 
         this.gimmicks = ["none", "fever", "fortress", "badWeather"];
-        this.currentGimmick = this.gimmicks[Math.floor(Math.random() * this.gimmicks.length)];
+        this.currentGimmick = window.gameState.upcomingGimmick || "none";
 
         this.drawPitch();
 
@@ -262,7 +262,7 @@ class MatchScene extends Phaser.Scene {
                 }
             }
 
-            if (player.position !== expectedPosStr) {
+            if (player.position !== expectedPosStr && (!player.subPositions || !player.subPositions.includes(expectedPosStr))) {
                 player.isMob = true;
                 player.dynamicStats = { pass: player.stats.pass / 2, shoot: player.stats.shoot / 2, defense: player.stats.defense / 2, physical: player.stats.physical / 2, speed: player.stats.speed / 2, mental: player.stats.mental / 2, stamina: player.stats.stamina / 2 };
             } else { player.isMob = false; }
@@ -295,7 +295,7 @@ class MatchScene extends Phaser.Scene {
                 }
             }
 
-            if (player.position !== expectedPosStr) {
+            if (player.position !== expectedPosStr && (!player.subPositions || !player.subPositions.includes(expectedPosStr))) {
                 player.isMob = true;
                 player.dynamicStats = { pass: player.stats.pass / 2, shoot: player.stats.shoot / 2, defense: player.stats.defense / 2, physical: player.stats.physical / 2, speed: player.stats.speed / 2, mental: player.stats.mental / 2, stamina: player.stats.stamina / 2 };
             } else { player.isMob = false; }

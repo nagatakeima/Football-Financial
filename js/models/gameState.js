@@ -35,6 +35,9 @@ class GameState {
             .map(cmd => cmd.id);
 
         this.initializeLeague(this.currentTier);
+
+        const gimmicks = ["none", "fever", "fortress", "badWeather"];
+        this.upcomingGimmick = gimmicks[Math.floor(Math.random() * gimmicks.length)];
     }
 
     initializeLeague(tier) {
@@ -95,6 +98,10 @@ class GameState {
         // Clear events so they regenerate next turn
         this.currentEvents = [];
         this.eventsGeneratedForTurn = false;
+
+        // Set upcoming gimmick
+        const gimmicks = ["none", "fever", "fortress", "badWeather"];
+        this.upcomingGimmick = gimmicks[Math.floor(Math.random() * gimmicks.length)];
         this.hasRestedThisTurn = false; // Reset rest limit
 
         // Update hidden params
