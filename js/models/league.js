@@ -10,12 +10,63 @@ class League {
     initializeLeague(playerTeam) {
         this.teams.push(playerTeam);
 
+        // Tier multipliers
+        let statBonus = 0;
+        let extraRelics = 0;
+        let numMicroCommands = 2; // tier 3 base
+
+        if (this.tier === 2) {
+            statBonus = 8;
+            extraRelics = 1;
+            numMicroCommands = 3;
+        } else if (this.tier === 1) {
+            statBonus = 16;
+            extraRelics = 2;
+            numMicroCommands = 4;
+        }
+
         // Generate 9 CPU teams
         const cpuNames = ["FC Alpha", "Beta United", "Gamma City", "Delta Rovers", "Epsilon Town", "Zeta Athletic", "Eta Wanderers", "Theta Sporting", "Iota Dynamo"];
         for (let i = 0; i < 9; i++) {
             const t = new window.Team(`CPU_${this.tier}_${i}`, cpuNames[i], false);
-            // Give CPU teams random formations and some strength bias based on tier
-            t.formation = "4-4-2";
+
+            // Random Manager
+            const manager = window.MasterData.Managers[Math.floor(Math.random() * window.MasterData.Managers.length)];
+            t.setManager(manager); // This handles setting formation and generating squad to perfectly match it
+
+            // Apply Tier Scaling to Stats
+            if (statBonus > 0) {
+                t.players.forEach(p => {
+                    Object.keys(p.stats).forEach(k => {
+                        p.stats[k] = Math.min(100, p.stats[k] + statBonus);
+                    });
+                });
+            }
+
+            // Apply Extra Relics
+            const availableRelics = window.MasterData.Relics.filter(r => r.name !== manager.initialTrait);
+            for (let j = 0; j < extraRelics; j++) {
+                if (availableRelics.length > 0) {
+                    const rIdx = Math.floor(Math.random() * availableRelics.length);
+                    t.relics.push(availableRelics[rIdx].id);
+                    availableRelics.splice(rIdx, 1);
+                }
+            }
+
+            // Assign MicroCommands
+            const availableCmds = [...window.MasterData.MicroCommands];
+            for(let j = 0; j < numMicroCommands; j++) {
+                if (availableCmds.length > 0) {
+                    const cIdx = Math.floor(Math.random() * availableCmds.length);
+                    t.microCommands.push(availableCmds[cIdx].id);
+                    t.ownedMicroCommands.push(availableCmds[cIdx].id);
+                    availableCmds.splice(cIdx, 1);
+                }
+            }
+            while(t.microCommands.length < 4) {
+                t.microCommands.push(null);
+            }
+
             this.teams.push(t);
         }
 

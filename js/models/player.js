@@ -23,6 +23,7 @@ class Player {
         this.currentStamina = this.stats.stamina;
         this.condition = 100; // 0-100, affects performance
         this.isInjured = false;
+        this.subPositions = [];
     }
 
     // Helper to generate a random player
@@ -64,7 +65,83 @@ class Player {
             role = rolesForPos[Math.floor(Math.random() * rolesForPos.length)];
         }
 
-        return new Player(id, name, position, stats, preference, skills, role);
+        const player = new Player(id, name, position, stats, preference, skills, role);
+        player.assignSubPositions();
+        return player;
+    }
+
+    assignSubPositions() {
+        this.subPositions = [];
+        const { position, role, stats } = this;
+
+        if (position === 'GK') {
+            this.subPositions = [];
+        } else if (position === 'CB') {
+            if (role === 'Ball-Playing') {
+                this.subPositions.push('CDM');
+                if (stats.speed >= 60) this.subPositions.push('SB');
+            } else if (role === 'Stopper' || role === 'Covering') {
+                if (stats.speed >= 65) this.subPositions.push('SB');
+            }
+        } else if (position === 'SB') {
+            if (role === 'Defensive') {
+                this.subPositions.push('CB');
+                if (stats.defense >= 65) this.subPositions.push('CDM');
+            } else if (role === 'Attacking' || role === 'Wing-Back') {
+                this.subPositions.push('WG');
+                if (stats.stamina >= 70) this.subPositions.push('CM');
+            } else if (role === 'Inverted') {
+                this.subPositions.push('CDM', 'CM');
+            }
+        } else if (position === 'CDM') {
+            if (role === 'Anchor') {
+                this.subPositions.push('CB', 'CM');
+            } else if (role === 'Destroyer') {
+                this.subPositions.push('CM');
+                if (stats.speed >= 65) this.subPositions.push('SB');
+            } else if (role === 'Deep-Lying') {
+                this.subPositions.push('CM');
+                if (stats.pass >= 70) this.subPositions.push('CAM');
+            }
+        } else if (position === 'CM') {
+            if (role === 'Box-to-Box') {
+                this.subPositions.push('CDM', 'CAM');
+            } else if (role === 'Advanced-Playmaker') {
+                this.subPositions.push('CAM', 'WG');
+            } else if (role === 'Ball-Winning') {
+                this.subPositions.push('CDM');
+            }
+        } else if (position === 'CAM') {
+            if (role === 'Shadow-Striker') {
+                this.subPositions.push('CF', 'WG');
+            } else if (role === 'Enganche') {
+                this.subPositions.push('CM', 'CF');
+            } else if (role === 'Dynamo') {
+                this.subPositions.push('CM', 'WG');
+            }
+        } else if (position === 'WG') {
+            if (role === 'Classic-Winger' || role === 'Crosser') {
+                this.subPositions.push('SB');
+                if (stats.shoot >= 65) this.subPositions.push('CF');
+            } else if (role === 'Inside-Forward') {
+                this.subPositions.push('CF', 'CAM');
+            } else if (role === 'Wide-Playmaker') {
+                this.subPositions.push('CAM', 'CM');
+            } else if (role === 'Wide-Target-Man' || role === 'Hard-Worker') {
+                this.subPositions.push('CF', 'SB');
+            }
+        } else if (position === 'CF') {
+            if (role === 'Poacher') {
+                this.subPositions.push('WG', 'CAM');
+            } else if (role === 'Target-Man') {
+                this.subPositions.push('WG');
+                if (stats.defense >= 55) this.subPositions.push('CB');
+            } else if (role === 'False-9') {
+                this.subPositions.push('CAM', 'CM');
+            } else if (role === 'Complete') {
+                this.subPositions.push('WG', 'CAM');
+            }
+        }
     }
 
     static randomStat(bonus = 0) {

@@ -168,11 +168,21 @@ class ManagementUI {
                         <div style="display: flex; flex-direction: column; gap: 8px;">
                             ${[0, 1, 2, 3].map(i => {
                                 const cmdId = window.gameState.playerTeam.microCommands[i];
-                                const cmd = cmdId ? window.MasterData.MicroCommands.find(c => c.id === cmdId) : null;
+                                const allCmds = window.MasterData.MicroCommands.filter(c => window.gameState.playerTeam.ownedMicroCommands.includes(c.id));
+                                let optionsHtml = `<option value="">未セット</option>`;
+                                allCmds.forEach(c => {
+                                    const isSelectedElsewhere = window.gameState.playerTeam.microCommands.includes(c.id) && window.gameState.playerTeam.microCommands[i] !== c.id;
+                                    if (!isSelectedElsewhere) {
+                                        optionsHtml += `<option value="${c.id}" ${cmdId === c.id ? 'selected' : ''}>${c.name} (CD:${c.cooldown}s)</option>`;
+                                    }
+                                });
                                 return `
-                                    <div style="background: #222; padding: 10px; border: 1px solid #555; border-radius: 4px; display: flex; justify-content: space-between;">
-                                        <span>${i+1}. ${cmd ? cmd.name : '<span style="color:#777">未セット</span>'}</span>
-                                        <span style="color: #3498db; font-size: 12px;">${cmd ? 'CD: ' + cmd.cooldown + 's' : ''}</span>
+                                    <div style="background: #222; padding: 10px; border: 1px solid #555; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+                                        <span style="margin-right: 10px;">Slot ${i+1}</span>
+                                        <select style="flex: 1; padding: 5px; background: #333; color: white; border: 1px solid #777;"
+                                            onchange="managementUI.updateMicroCommand(${i}, this.value)">
+                                            ${optionsHtml}
+                                        </select>
                                     </div>
                                 `;
                             }).join('')}
@@ -387,9 +397,24 @@ class ManagementUI {
 
                     <h3 style="background: #f39c12; padding: 8px; margin-top: 10px; border-radius: 4px;">セット中コマンド</h3>
                     <div style="display: flex; flex-direction: column; gap: 5px;">
-                        ${team.microCommands.map((cmdId, index) => {
-                            const cmd = window.MasterData.MicroCommands.find(c => c.id === cmdId);
-                            return `<div style="background: #333; padding: 8px; border: 1px solid #f39c12; font-size: 14px;">${index+1}. ${cmd ? cmd.name : 'なし'}</div>`;
+                        ${[0, 1, 2, 3].map(i => {
+                            const cmdId = team.microCommands[i];
+                            const allCmds = window.MasterData.MicroCommands.filter(c => team.ownedMicroCommands.includes(c.id));
+                            let optionsHtml = `<option value="">未セット</option>`;
+                            allCmds.forEach(c => {
+                                const isSelectedElsewhere = team.microCommands.includes(c.id) && team.microCommands[i] !== c.id;
+                                if (!isSelectedElsewhere) {
+                                    optionsHtml += `<option value="${c.id}" ${cmdId === c.id ? 'selected' : ''}>${c.name}</option>`;
+                                }
+                            });
+                            return `
+                                <div style="background: #333; padding: 5px; border: 1px solid #f39c12; font-size: 12px; display: flex;">
+                                    <select style="width: 100%; background: #222; color: white; border: none;"
+                                        onchange="managementUI.updateMicroCommand(${i}, this.value)">
+                                        ${optionsHtml}
+                                    </select>
+                                </div>
+                            `;
                         }).join('')}
                     </div>
 
@@ -414,7 +439,7 @@ class ManagementUI {
         // Draw players on pitch
         // Basic mapping for visual representation (normalized 0-1 coords)
         const posMap = this.getFormationPositions(team.formation);
-        const expectedPositions = window.MasterData.Formations[team.formation] || [];
+        const expectedPositions = window.MasterData.Formations[team.formation]?.slots || [];
         container.innerHTML = '';
 
         team.starting11.forEach((p, idx) => {
@@ -423,8 +448,9 @@ class ManagementUI {
             const top = pos.y * 100;
             const isSelected = this.selectedPlayerIndex === idx;
 
-            const expectedPos = expectedPositions[idx];
-            const isMob = p.position !== expectedPos;
+            const expectedPos = expectedPositions[idx]?.expectedPosStr;
+            const isSubPos = p.position !== expectedPos && p.subPositions && p.subPositions.includes(expectedPos);
+            const isMob = p.position !== expectedPos && !isSubPos;
 
             const pDiv = document.createElement('div');
             pDiv.className = 'pitch-player';
@@ -433,7 +459,7 @@ class ManagementUI {
                 transform: translate(-50%, -50%);
                 width: 45px; height: 50px;
                 background: ${isMob ? '#7f8c8d' : (isSelected ? '#f39c12' : '#34495e')};
-                border: 2px solid ${p.preference === 'ポゼッション' ? '#3498db' : (p.preference === 'カウンター' ? '#e74c3c' : '#2ecc71')};
+                border: 2px solid ${p.preference === 'Possession' ? '#3498db' : (p.preference === 'Counter' ? '#e74c3c' : (p.preference === 'HighPress' ? '#f1c40f' : '#2ecc71'))};
                 border-radius: 5px; color: white;
                 display: flex; flex-direction: column; align-items: center; justify-content: center;
                 font-size: 10px; cursor: pointer; user-select: none;
@@ -467,7 +493,7 @@ class ManagementUI {
                 background: ${isSelected ? '#f39c12' : '#333'};
                 border: 1px solid #555; padding: 8px; font-size: 12px;
                 cursor: pointer; display: flex; justify-content: space-between;
-                border-left: 4px solid ${p.preference === 'ポゼッション' ? '#3498db' : (p.preference === 'カウンター' ? '#e74c3c' : '#2ecc71')};
+                border-left: 4px solid ${p.preference === 'Possession' ? '#3498db' : (p.preference === 'Counter' ? '#e74c3c' : (p.preference === 'HighPress' ? '#f1c40f' : '#2ecc71'))};
             `;
             bDiv.innerHTML = `<span>[${p.position}] ${p.role ? p.role : ''} ${p.name}</span> <span>志向: ${p.preference.substring(0,1)} 疲: ${100-p.condition}</span>`;
             bDiv.onclick = () => this.handlePlayerClick(bIdx, false);
@@ -478,33 +504,62 @@ class ManagementUI {
     }
 
     getFormationPositions(formation) {
-        // Approximate Y (0=top/GK, 1=bottom/FW) and X (0=left, 1=right)
-        if (formation === "4-4-2") {
-            return [
-                {x: 0.5, y: 0.05}, // 0 GK
-                {x: 0.35, y: 0.25}, {x: 0.65, y: 0.25}, // 1,2 CB
-                {x: 0.15, y: 0.25}, {x: 0.85, y: 0.25}, // 3,4 SB
-                {x: 0.35, y: 0.55}, {x: 0.65, y: 0.55}, // 5,6 CM
-                {x: 0.15, y: 0.65}, {x: 0.85, y: 0.65}, // 7,8 WG
-                {x: 0.35, y: 0.85}, {x: 0.65, y: 0.85}  // 9,10 CF
-            ];
-        } else if (formation === "4-3-3") {
-            return [
-                {x: 0.5, y: 0.05}, // GK
-                {x: 0.35, y: 0.25}, {x: 0.65, y: 0.25}, // CBs
-                {x: 0.15, y: 0.25}, {x: 0.85, y: 0.25}, // SBs
-                {x: 0.5, y: 0.45}, // CDM
-                {x: 0.3, y: 0.6}, {x: 0.7, y: 0.6}, // CMs
-                {x: 0.15, y: 0.85}, {x: 0.5, y: 0.85}, {x: 0.85, y: 0.85} // WG, CF, WG
-            ];
-        }
-        // Fallback generic 4-4-2 shape
-        return [
-            {x: 0.5, y: 0.05},
-            {x: 0.35, y: 0.25}, {x: 0.65, y: 0.25}, {x: 0.15, y: 0.25}, {x: 0.85, y: 0.25},
-            {x: 0.35, y: 0.55}, {x: 0.65, y: 0.55}, {x: 0.15, y: 0.65}, {x: 0.85, y: 0.65},
-            {x: 0.35, y: 0.85}, {x: 0.65, y: 0.85}
-        ];
+        const formationsCoords = {
+            "4-4-2": [
+                {x: 0.5, y: 0.05},
+                {x: 0.35, y: 0.25}, {x: 0.65, y: 0.25}, {x: 0.15, y: 0.25}, {x: 0.85, y: 0.25},
+                {x: 0.35, y: 0.55}, {x: 0.65, y: 0.55}, {x: 0.15, y: 0.65}, {x: 0.85, y: 0.65},
+                {x: 0.35, y: 0.85}, {x: 0.65, y: 0.85}
+            ],
+            "4-3-3": [
+                {x: 0.5, y: 0.05},
+                {x: 0.35, y: 0.25}, {x: 0.65, y: 0.25}, {x: 0.15, y: 0.25}, {x: 0.85, y: 0.25},
+                {x: 0.5, y: 0.45}, {x: 0.3, y: 0.6}, {x: 0.7, y: 0.6},
+                {x: 0.15, y: 0.85}, {x: 0.85, y: 0.85}, {x: 0.5, y: 0.9}
+            ],
+            "3-2-4-1": [
+                {x: 0.5, y: 0.05},
+                {x: 0.3, y: 0.25}, {x: 0.5, y: 0.25}, {x: 0.7, y: 0.25},
+                {x: 0.35, y: 0.45}, {x: 0.65, y: 0.45},
+                {x: 0.35, y: 0.65}, {x: 0.65, y: 0.65}, {x: 0.15, y: 0.65}, {x: 0.85, y: 0.65},
+                {x: 0.5, y: 0.9}
+            ],
+            "4-1-4-1": [
+                {x: 0.5, y: 0.05},
+                {x: 0.35, y: 0.25}, {x: 0.65, y: 0.25}, {x: 0.15, y: 0.25}, {x: 0.85, y: 0.25},
+                {x: 0.5, y: 0.45},
+                {x: 0.35, y: 0.65}, {x: 0.65, y: 0.65}, {x: 0.15, y: 0.65}, {x: 0.85, y: 0.65},
+                {x: 0.5, y: 0.9}
+            ],
+            "4-2-3-1": [
+                {x: 0.5, y: 0.05},
+                {x: 0.35, y: 0.25}, {x: 0.65, y: 0.25}, {x: 0.15, y: 0.25}, {x: 0.85, y: 0.25},
+                {x: 0.35, y: 0.45}, {x: 0.65, y: 0.45},
+                {x: 0.5, y: 0.7}, {x: 0.15, y: 0.7}, {x: 0.85, y: 0.7},
+                {x: 0.5, y: 0.9}
+            ],
+            "5-3-2": [
+                {x: 0.5, y: 0.05},
+                {x: 0.35, y: 0.25}, {x: 0.5, y: 0.2}, {x: 0.65, y: 0.25}, {x: 0.15, y: 0.3}, {x: 0.85, y: 0.3},
+                {x: 0.35, y: 0.55}, {x: 0.5, y: 0.5}, {x: 0.65, y: 0.55},
+                {x: 0.35, y: 0.85}, {x: 0.65, y: 0.85}
+            ],
+            "4-3-1-2": [
+                {x: 0.5, y: 0.05},
+                {x: 0.35, y: 0.25}, {x: 0.65, y: 0.25}, {x: 0.15, y: 0.25}, {x: 0.85, y: 0.25},
+                {x: 0.35, y: 0.5}, {x: 0.5, y: 0.45}, {x: 0.65, y: 0.5},
+                {x: 0.5, y: 0.7},
+                {x: 0.35, y: 0.85}, {x: 0.65, y: 0.85}
+            ],
+            "3-5-2": [
+                {x: 0.5, y: 0.05},
+                {x: 0.3, y: 0.25}, {x: 0.5, y: 0.2}, {x: 0.7, y: 0.25},
+                {x: 0.5, y: 0.45}, {x: 0.35, y: 0.6}, {x: 0.65, y: 0.6}, {x: 0.15, y: 0.55}, {x: 0.85, y: 0.55},
+                {x: 0.35, y: 0.85}, {x: 0.65, y: 0.85}
+            ]
+        };
+
+        return formationsCoords[formation] || formationsCoords["4-4-2"];
     }
 
     drawChemistryLinks(canvas, posMap, team) {
@@ -556,7 +611,12 @@ class ManagementUI {
 
         const links = window.ChemistrySystem.getFormationLinks(team.formation);
 
-        links.forEach(([idx1, idx2]) => {
+        links.forEach(({from, to}) => {
+            const expectedPositions = window.MasterData.Formations[team.formation]?.slots || [];
+            const idx1 = expectedPositions.findIndex(s => s.id === from);
+            const idx2 = expectedPositions.findIndex(s => s.id === to);
+
+            if (idx1 === -1 || idx2 === -1) return;
             if (idx1 >= 11 || idx2 >= 11) return;
             const p1 = team.starting11[idx1];
             const p2 = team.starting11[idx2];
@@ -575,9 +635,11 @@ class ManagementUI {
             ctx.beginPath();
             ctx.moveTo(x1, y1);
             ctx.lineTo(x2, y2);
-            ctx.strokeStyle = isMatch ? '#f1c40f' : 'rgba(255, 255, 255, 0.2)';
             ctx.lineWidth = isMatch ? 3 : 1;
+            ctx.strokeStyle = isMatch ? '#f1c40f' : 'rgba(255, 255, 255, 0.2)';
+            ctx.setLineDash(isMatch ? [] : [5, 5]);
             ctx.stroke();
+            ctx.setLineDash([]);
         });
     }
 

@@ -11,7 +11,8 @@ class Team {
         this.manager = null; // Object containing manager info
         this.formation = "4-4-2"; // Current formation string
         this.relics = []; // Array of active relic IDs
-        this.microCommands = []; // Array of selected micro command IDs (max 4)
+        this.ownedMicroCommands = []; // Array of all owned micro command IDs
+        this.microCommands = []; // Array of selected micro command IDs (max 4) // Array of selected micro command IDs (max 4)
 
         // League Stats
         this.points = 0;
@@ -47,7 +48,29 @@ class Team {
 
     setManager(managerData) {
         this.manager = managerData;
-        this.formation = managerData.formations[0]; // default to first formation
+        // randomly choose a formation from the manager's preferred ones
+        this.formation = managerData.formations[Math.floor(Math.random() * managerData.formations.length)];
+
+        // Re-generate squad to perfectly fit the chosen formation
+        this.players = [];
+        this.starting11 = [];
+        this.bench = [];
+
+        const formationData = window.MasterData.Formations[this.formation];
+        const reqPositions = formationData.slots.map(slot => slot.expectedPosStr);
+
+        // Ensure 18 players
+        for (let i = 0; i < 18; i++) {
+            const pos = i < reqPositions.length ? reqPositions[i] : null;
+            const p = window.Player.generateRandom(`${this.id}_${i}`, pos);
+            this.players.push(p);
+
+            if (i < 11) {
+                this.starting11.push(p);
+            } else {
+                this.bench.push(p);
+            }
+        }
 
         // Find and add initial trait/relic if it exists in MasterData
         const initialRelic = window.MasterData.Relics.find(r => r.name === managerData.initialTrait);
