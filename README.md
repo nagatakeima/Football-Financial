@@ -39,6 +39,10 @@
   - ゲーム内の試合ルールやAIの基本概念について。
 - [試合エンジン・コア](docs/10_MatchEngine_Core/07_MatchEngine_Core.md)
   - 2Dマッチエンジン（ボトムアップ型AI、Pitch Matrixなど）の仕組み。
+- [フォーメーション＆可変システム](docs/10_MatchEngine_Core/07_2_Formation_and_Shape.md)
+  - 創発的な陣形可変とセットプレー配置。
+- [チーム戦術＆意思決定アルゴリズム](docs/10_MatchEngine_Core/07_3_TeamTactics.md)
+  - 意思決定プロトコルと構造的相性。
 
 ### 20_AI_Base (ポジション別AIベース)
 - [GKの基本AI](docs/20_AI_Base/08_AI_Base_GK.md)
