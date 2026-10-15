@@ -152,7 +152,7 @@ class MatchScene extends Phaser.Scene {
             }
         }
 
-        // Apply position-specific logic to keep compactness
+        // Apply position-specific logic to keep compactness and Dynamic Structural Shape
         const pos = p.playerData.position;
         if (pos === 'CB' || pos === 'SB' || pos === 'GK') {
             base.x += lineShift;
@@ -167,6 +167,26 @@ class MatchScene extends Phaser.Scene {
             if (!isAttacking) {
                 if (isPlayerTeam && base.x > ballX + 50) base.x = ballX + 50;
                 if (!isPlayerTeam && base.x < ballX - 50) base.x = ballX - 50;
+            }
+        }
+
+        // Structural Shape Shifting (3-2-5 / 5-4-1)
+        if (isAttacking && Math.abs(lineShift) > 50) {
+            // Attacking deeply (Phase C): Create 3-2-5 structure
+            if (pos === 'SB') {
+                base.x += dir * 80; // SB pushes up into forward line
+            }
+            if (pos === 'CDM') {
+                base.x -= dir * 40; // CDM drops between CBs (Salida Lavolpiana / Rest defense)
+            }
+        } else if (!isAttacking && Math.abs(lineShift) > 50) {
+            // Defending deeply (Phase F): Create 5-4-1 structure
+            if (pos === 'CDM') {
+                base.x -= dir * 40; // CDM absorbs into final line (5-back)
+            }
+            if (pos === 'WG') {
+                base.x -= dir * 80; // WGs drop deep into midfield block
+                base.y = base.y < 300 ? 150 : 450; // Tuck in slightly
             }
         }
 
@@ -214,37 +234,53 @@ class MatchScene extends Phaser.Scene {
     }
 
     spawnTeams() {
-        const playerFormationPositions = window.MasterData.Formations[this.playerTeamData.formation] || [];
+        const playerFormationDef = window.MasterData.Formations[this.playerTeamData.formation] || { slots: [] };
         this.playerTeamData.starting11.forEach((player, i) => {
-            const expectedPosStr = playerFormationPositions[i] || player.position;
+            const isGK = (i === 0);
+            const slotDef = playerFormationDef.slots[i] || { expectedPosStr: isGK ? 'GK' : 'CM', offsetX: 0, offsetY: 0, slotId: `p_${i}` };
+            const expectedPosStr = slotDef.expectedPosStr;
             let pos = this.getBasePosition(expectedPosStr, true);
-            let yOffset = (i % 2 === 0 ? -1 : 1) * ((i % 3) * 30);
+            let yOffset = slotDef.offsetY || (i % 2 === 0 ? -1 : 1) * ((i % 3) * 30);
+
             if (expectedPosStr === 'SB' || expectedPosStr === 'WG') pos.y = i % 2 === 0 ? 100 : 500;
             if (expectedPosStr === 'CB' || expectedPosStr === 'CM' || expectedPosStr === 'CDM') pos.y = 300 + yOffset;
+
+            // X positioning adjusted by offsetX
+            if (!isGK) pos.x = 400 - (slotDef.offsetX || 0);
+
             if (player.position !== expectedPosStr) {
                 player.isMob = true;
                 player.dynamicStats = { pass: player.stats.pass / 2, shoot: player.stats.shoot / 2, defense: player.stats.defense / 2, physical: player.stats.physical / 2, speed: player.stats.speed / 2, mental: player.stats.mental / 2, stamina: player.stats.stamina / 2 };
             } else { player.isMob = false; }
             let sprite = this.createPlayerSprite(pos.x, pos.y, 0x3498db, i + 1, true, player);
-            sprite.baseX = pos.x; sprite.baseY = pos.y; sprite.baseOffsetY = (expectedPosStr === 'CB' || expectedPosStr === 'CM' || expectedPosStr === 'CDM' || expectedPosStr === 'CAM' || expectedPosStr === 'CF') ? yOffset : 0;
+            sprite.baseX = pos.x; sprite.baseY = pos.y; sprite.baseOffsetY = yOffset;
             sprite.expectedPosStr = expectedPosStr;
+            sprite.slotId = slotDef.slotId; // For chemistry link evaluation
             this.playerSprites.push(sprite);
         });
 
-        const oppFormationPositions = window.MasterData.Formations[this.opponentTeamData.formation] || [];
+        const oppFormationDef = window.MasterData.Formations[this.opponentTeamData.formation] || { slots: [] };
         this.opponentTeamData.starting11.forEach((player, i) => {
-            const expectedPosStr = oppFormationPositions[i] || player.position;
+            const isGK = (i === 0);
+            const slotDef = oppFormationDef.slots[i] || { expectedPosStr: isGK ? 'GK' : 'CM', offsetX: 0, offsetY: 0, slotId: `o_${i}` };
+            const expectedPosStr = slotDef.expectedPosStr;
             let pos = this.getBasePosition(expectedPosStr, false);
-            let yOffset = (i % 2 === 0 ? -1 : 1) * ((i % 3) * 30);
+            let yOffset = slotDef.offsetY || (i % 2 === 0 ? -1 : 1) * ((i % 3) * 30);
+
             if (expectedPosStr === 'SB' || expectedPosStr === 'WG') pos.y = i % 2 === 0 ? 100 : 500;
             if (expectedPosStr === 'CB' || expectedPosStr === 'CM' || expectedPosStr === 'CDM') pos.y = 300 + yOffset;
+
+            // X positioning adjusted by offsetX (mirrored for opponent)
+            if (!isGK) pos.x = 400 + (slotDef.offsetX || 0);
+
             if (player.position !== expectedPosStr) {
                 player.isMob = true;
                 player.dynamicStats = { pass: player.stats.pass / 2, shoot: player.stats.shoot / 2, defense: player.stats.defense / 2, physical: player.stats.physical / 2, speed: player.stats.speed / 2, mental: player.stats.mental / 2, stamina: player.stats.stamina / 2 };
             } else { player.isMob = false; }
             let sprite = this.createPlayerSprite(pos.x, pos.y, 0xe74c3c, i + 1, false, player);
-            sprite.baseX = pos.x; sprite.baseY = pos.y; sprite.baseOffsetY = (expectedPosStr === 'CB' || expectedPosStr === 'CM' || expectedPosStr === 'CDM' || expectedPosStr === 'CAM' || expectedPosStr === 'CF') ? yOffset : 0;
+            sprite.baseX = pos.x; sprite.baseY = pos.y; sprite.baseOffsetY = yOffset;
             sprite.expectedPosStr = expectedPosStr;
+            sprite.slotId = slotDef.slotId; // For chemistry link evaluation
             this.opponentSprites.push(sprite);
         });
 
@@ -367,10 +403,26 @@ class MatchScene extends Phaser.Scene {
 
     tickMatch() {
         if (this.isSkip) { this.finishMatchInstantly(); return; }
-        this.matchTime += 0.03;
+        this.matchTime += 0.03; // Engine time increment
         const displayMin = Math.floor(this.matchTime);
         const displaySec = Math.floor((this.matchTime % 1) * 60);
         this.timeText.setText(`${displayMin.toString().padStart(2, '0')}:${displaySec.toString().padStart(2, '0')}`);
+
+        // --- Engine Tracking for Gegenpress (Possession tracking) ---
+        // Since matchTime is scaled (0 to 90 representing minutes), we use delta time for the 5-sec rule.
+        // Assuming 1 game minute ~ 1000ms real time in the tick loop (based on +0.03 per tick roughly equating to pace).
+        // Let's track the actual real-world MS or approximate matchTime equivalent (5 seconds = approx 0.08 matchTime units).
+        if (!this.lastPossessionChangeTime) this.lastPossessionChangeTime = 0;
+        if (!this.lastPossessionTeam) this.lastPossessionTeam = null;
+
+        const currentPossessorTeam = this.ball.owner ? this.ball.owner.isPlayerTeam : null;
+        if (currentPossessorTeam !== null && currentPossessorTeam !== this.lastPossessionTeam) {
+            this.lastPossessionTeam = currentPossessorTeam;
+            this.lastPossessionChangeTime = this.time.now; // Use Phaser time.now for real-world MS
+        }
+
+        // Expose to evaluateActions logic
+        this.timeSinceLastPossessionChange = this.time.now - this.lastPossessionChangeTime;
 
         this.commandSlots.forEach(slot => {
             if (slot.currentCd > 0) {
@@ -552,6 +604,25 @@ class MatchScene extends Phaser.Scene {
         const currentThreat = this.calculateThreat(p.x, p.y, p.isPlayerTeam);
         const staminaFactor = Math.max(0.3, p.playerData.currentStamina / 100);
 
+        // --- Tactical Risk Thresholds (from 07_3_TeamTactics.md) ---
+        let riskThreshold = 50; // default
+        if (tactic === 'Possession') riskThreshold = 75;
+        if (tactic === 'HighPress') riskThreshold = 40;
+        if (tactic === 'Retreat') riskThreshold = 85;
+
+        // --- Chemistry & Dynamic Shape (from 07_2_Formation_and_Shape.md) ---
+        const teamData = p.isPlayerTeam ? this.playerTeamData : this.opponentTeamData;
+        const formationDef = window.MasterData.Formations[teamData.formation];
+        let linkedMates = [];
+        if (formationDef && formationDef.chemistryLinks && p.slotId) {
+            const links = formationDef.chemistryLinks.filter(l => l.from === p.slotId || l.to === p.slotId);
+            const linkedSlotIds = links.map(l => l.from === p.slotId ? l.to : l.from);
+            const teammates = p.isPlayerTeam ? this.playerSprites : this.opponentSprites;
+            linkedMates = teammates.filter(t => linkedSlotIds.includes(t.slotId));
+        }
+
+        let coverTargetId = null;
+
         if (hasBall) {
             const goalX = p.isPlayerTeam ? 800 : 0;
             const distToGoal = Phaser.Math.Distance.Between(p.x, p.y, goalX, 300);
@@ -571,8 +642,16 @@ class MatchScene extends Phaser.Scene {
                 const isForward = p.isPlayerTeam ? mate.x > p.x : mate.x < p.x;
                 if (!isForward) { passScore += 25; passScore -= passRisk * 0.5; }
 
+                // Risk threshold filter: penalize risky passes if threshold is high
+                if (passRisk > (100 - riskThreshold)) {
+                    passScore -= 50; // Heavy penalty for breaking risk protocol
+                }
+
                 if (tactic === 'Possession' && passRisk < 30) passScore += 20;
-                if (tactic === 'Counter' && mateThreat > currentThreat) passScore += 30;
+                if (tactic === 'Possession' && linkedMates.includes(mate)) passScore += 15; // Bonus for passing to linked players in possession
+                if (tactic === 'Counter' && mateThreat > currentThreat) passScore += 40;
+                if (tactic === 'HighPress' && isForward) passScore += 20; // Directness
+
                 if (passScore > bestPassScore) { bestPassScore = passScore; bestPassTarget = mate; }
             });
             actionScores.Pass = bestPassScore; context.bestPassTarget = bestPassTarget;
@@ -581,23 +660,50 @@ class MatchScene extends Phaser.Scene {
             const dribbleTargetX = p.x + dir * 50;
             actionScores.Dribble = this.calculateThreat(dribbleTargetX, p.y, p.isPlayerTeam) - this.calculatePassRisk(p.x, p.y, dribbleTargetX, p.y, p.isPlayerTeam);
             if (pos === 'WG' || role === 'Ball-Playing') actionScores.Dribble += 20;
+            if (tactic === 'Retreat') actionScores.Dribble -= 20; // Discourage risky dribbles in retreat
 
-            if (pitchZone.third === 'Defensive' && this.calculatePassRisk(p.x, p.y, p.x + 10, p.y, p.isPlayerTeam) > 50) actionScores.Clear = 75;
-            actionScores.Keep = 10;
+            if (pitchZone.third === 'Defensive' && this.calculatePassRisk(p.x, p.y, p.x + 10, p.y, p.isPlayerTeam) > (100 - riskThreshold)) actionScores.Clear = 80;
+            actionScores.Keep = tactic === 'Possession' ? 30 : 10;
         } else if (isAttacking) {
             const dir = p.isPlayerTeam ? 1 : -1;
             const forwardX = p.x + dir * 80;
             let laneRisk = this.ball.owner && this.ball.owner.isPlayerTeam === p.isPlayerTeam ? this.calculatePassRisk(this.ball.owner.x, this.ball.owner.y, forwardX, p.y, p.isPlayerTeam) : 100;
+
+            // Tempo Switch / Penetration trigger condition
+            let isPenetrationPhase = false;
+            if (this.ball.owner && this.ball.owner.isPlayerTeam === p.isPlayerTeam) {
+                const ownerZone = this.getPitchZone(this.ball.owner.x, this.ball.owner.y, p.isPlayerTeam);
+                // Penetration Trigger: If ball is in enemy half-spaces and NOT in our defensive third
+                const inEnemyHalf = p.isPlayerTeam ? this.ball.owner.x > 400 : this.ball.owner.x < 400;
+                if (inEnemyHalf && ownerZone.lane.includes('Half-space') && ownerZone.third !== 'Defensive') {
+                    isPenetrationPhase = true; // Trigger!
+                }
+            }
+
             actionScores.RunIntoSpace = this.calculateThreat(forwardX, p.y, p.isPlayerTeam) - (laneRisk * 0.5);
             if (pos === 'WG' || pos === 'CF' || role === 'Attacking') actionScores.RunIntoSpace += 30;
+            if (isPenetrationPhase) actionScores.RunIntoSpace += 50; // Explode into space
+            if (tactic === 'Counter') actionScores.RunIntoSpace += 40; // Counter-attack sprint
 
             if (this.ball.owner && this.ball.owner.isPlayerTeam === p.isPlayerTeam) {
                 const distToBall = Phaser.Math.Distance.Between(p.x, p.y, this.ball.owner.x, this.ball.owner.y);
                 if (distToBall > 100 && distToBall < 250) {
                     actionScores.Support = 80 - this.calculatePassRisk(this.ball.owner.x, this.ball.owner.y, p.x, p.y, p.isPlayerTeam);
+                    if (tactic === 'Possession') actionScores.Support += 30;
                 }
             }
-            actionScores.HoldPosition = 40;
+            actionScores.HoldPosition = tactic === 'Retreat' && pitchZone.third === 'Defensive' ? 80 : 40;
+
+            // Slot Swap (Rotation) evaluation
+            if (tactic === 'Possession' && pitchZone.third === 'Attacking' && linkedMates.length > 0) {
+                // If a linked mate is making a forward run, try to cover their slot
+                const activeMate = linkedMates.find(m => m.currentAction === 'RunIntoSpace');
+                if (activeMate) {
+                    actionScores.Cover = 60; // Temporarily swap base positioning
+                    coverTargetId = activeMate.slotId;
+                }
+            }
+
         } else {
             const teammates = p.isPlayerTeam ? this.playerSprites : this.opponentSprites;
             let closestDist = Infinity; let closestMate = null;
@@ -611,20 +717,47 @@ class MatchScene extends Phaser.Scene {
             const distToBall = Phaser.Math.Distance.Between(p.x, p.y, this.ball.x, this.ball.y);
 
             actionScores.Press = ballThreat * 1.2 - (distToBall / 5);
-            if (tactic === 'HighPress') actionScores.Press += 40;
+
+            // 5-second Storming Rule for Gegenpress
+            const timeSinceLost = this.timeSinceLastPossessionChange || 0; // Requires engine tracking
+            if (tactic === 'HighPress') {
+                if (timeSinceLost < 5000) { // Under 5 seconds
+                    actionScores.Press += 80; // Swarm
+                } else {
+                    actionScores.Press += 40;
+                }
+            }
             if (isFirstDefender && distToBall < 300) actionScores.Press += 100;
+
+            // High Press tactical instruction: vertical slide
+            // If the 1st defender is pressing in the attacking third, midfielders step up
+            if (tactic === 'HighPress' && !isFirstDefender && pitchZone.third === 'Attacking') {
+                 if (pos === 'CM' || pos === 'CAM' || pos === 'WG') {
+                     actionScores.Press += 60; // Push up to close passing lanes (vertical slide)
+                 }
+            }
 
             actionScores.Mark = 50;
             const goalX = p.isPlayerTeam ? 0 : 800;
             const distToOwnGoal = Phaser.Math.Distance.Between(p.x, p.y, goalX, 300);
 
-            if (Phaser.Math.Distance.Between(this.ball.x, this.ball.y, goalX, 300) < distToOwnGoal) {
+            if (tactic === 'Retreat') {
+                actionScores.Retreat = 120; // Force retreat
+                actionScores.Delay = 80;
+                actionScores.Press -= 30; // Discourage breaking the block
+            } else if (Phaser.Math.Distance.Between(this.ball.x, this.ball.y, goalX, 300) < distToOwnGoal) {
                 actionScores.Retreat = 100;
                 if (isFirstDefender && distToBall < 100) actionScores.Press += 50;
             } else {
                 actionScores.Retreat = 50 - (distToOwnGoal / 10);
             }
+
             if (pos === 'CB' || pos === 'SB') { actionScores.Retreat += 30; actionScores.Delay += 20; }
+
+            // Dynamic shape: 5-back forming for CDM when Retreating deep
+            if (pos === 'CDM' && pitchZone.third === 'Defensive' && actionScores.Retreat > 80) {
+                actionScores.Cover += 50; // Absorb into defensive line
+            }
         }
 
         for (let key in actionScores) {
@@ -911,23 +1044,11 @@ class MatchScene extends Phaser.Scene {
             }
 
             if (interceptor) {
-                // Base trap chance is very high (95%+)
-                let trapChance = 95 + (interceptor.playerData.dynamicStats.mental / 20) + (interceptor.playerData.dynamicStats.pass / 20);
-
-                // Pressure from enemies reduces trap chance
-                const enemies = interceptor.isPlayerTeam ? this.opponentSprites : this.playerSprites;
-                const closestEnemyDist = enemies.reduce((min, e) => Math.min(min, Phaser.Math.Distance.Between(interceptor.x, interceptor.y, e.x, e.y)), Infinity);
-
-                if (closestEnemyDist < 40) trapChance -= 15; // High pressure
-                else if (closestEnemyDist < 80) trapChance -= 5; // Mild pressure
-
-                if (this.ballSpeed > 18) trapChance -= 10;
-                if (this.isHighBall) trapChance -= 10;
-                if (this.currentGimmick === 'badWeather') trapChance -= 15;
-                if (interceptor.playerData.position === 'GK') trapChance += 20;
-
-                // Cap maximum chance
-                trapChance = Math.min(100, trapChance);
+                let trapChance = (interceptor.playerData.dynamicStats.mental * 0.5) + (interceptor.playerData.dynamicStats.pass * 0.5);
+                if (this.ballSpeed > 15) trapChance -= 10;
+                if (this.isHighBall) trapChance -= 15;
+                if (this.currentGimmick === 'badWeather') trapChance -= 20;
+                if (interceptor.playerData.position === 'GK') trapChance += 30;
 
                 if (Math.random() * 100 > trapChance && this.ballSpeed > 5) {
                     this.showActionText(interceptor, "トラップ:失敗", "#e74c3c");
