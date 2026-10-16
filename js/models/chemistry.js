@@ -9,7 +9,7 @@ class ChemistrySystem {
         // Fallback for others - simple chain
         const links = [];
         for(let i=0; i<10; i++) {
-            links.push([i, i+1]);
+            links.push({from: String(i), to: String(i+1)});
         }
         return links;
     }
