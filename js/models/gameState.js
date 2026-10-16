@@ -33,6 +33,7 @@ class GameState {
             .sort(() => 0.5 - Math.random())
             .slice(0, 4)
             .map(cmd => cmd.id);
+        this.playerTeam.ownedMicroCommands = [...this.playerTeam.microCommands];
 
         this.initializeLeague(this.currentTier);
 

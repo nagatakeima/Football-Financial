@@ -25,6 +25,12 @@ class ManagementUI {
         `;
     }
 
+    updateMicroCommand(slotIndex, cmdId) {
+        if (!window.gameState.playerTeam) return;
+        window.gameState.playerTeam.microCommands[slotIndex] = cmdId ? Number(cmdId) : null;
+        this.showDashboard();
+    }
+
     updateTopBar() {
         if (!window.gameState.playerTeam) return;
         this.topBar.style.display = 'flex';
@@ -125,7 +131,10 @@ class ManagementUI {
 
         // Generate random upcoming gimmicks for flavor/mechanics
         const weathers = ['晴れ', '雨 (スリップ増加)', '雪 (スタミナ消費増)'];
-        const weather = weathers[Math.floor(Math.random() * weathers.length)];
+        let weather = '晴れ';
+        if (window.gameState.upcomingGimmick === 'badWeather') weather = '悪天候 (パス・トラップ精度低下)';
+        if (window.gameState.upcomingGimmick === 'fever') weather = '熱狂 (全選手能力微増・スタミナ減)';
+        if (window.gameState.upcomingGimmick === 'fortress') weather = '要塞 (アウェー不利)';
 
         const opponentTactic = opponent.manager ? opponent.manager.preference : 'バランス';
 
@@ -460,12 +469,15 @@ class ManagementUI {
                 width: 45px; height: 50px;
                 background: ${isMob ? '#7f8c8d' : (isSelected ? '#f39c12' : '#34495e')};
                 border: 2px solid ${p.preference === 'Possession' ? '#3498db' : (p.preference === 'Counter' ? '#e74c3c' : (p.preference === 'HighPress' ? '#f1c40f' : '#2ecc71'))};
-                border-radius: 5px; color: white;
+                border-radius: 5px; color: ${isSubPos ? '#76d7c4' : 'white'};
                 display: flex; flex-direction: column; align-items: center; justify-content: center;
                 font-size: 10px; cursor: pointer; user-select: none;
                 z-index: 2; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
                 ${isMob ? 'opacity: 0.8;' : ''}
             `;
+
+            let skillNames = p.skills.map(sId => window.MasterData.PlayerSkills.find(s => s.id === sId)?.name).filter(n=>n).join(', ');
+            pDiv.title = `${p.name}\n[${p.position}${p.subPositions.length > 0 ? ' / '+p.subPositions.join(',') : ''}] ${p.role}\nPass:${p.stats.pass} Def:${p.stats.defense} Spd:${p.stats.speed}\nSkills: ${skillNames || 'なし'}`;
 
             let roleText = p.role || '';
             if (isMob) {
@@ -844,7 +856,7 @@ class ManagementUI {
                 totalApCost += cost;
             } else if (cat === 'shop') {
                 const unownedRelics = window.MasterData.Relics.filter(r => !window.gameState.playerTeam.relics.includes(r.id));
-                const unownedCmds = window.MasterData.MicroCommands.filter(c => !window.gameState.playerTeam.microCommands.includes(c.id));
+                const unownedCmds = window.MasterData.MicroCommands.filter(c => !window.gameState.playerTeam.ownedMicroCommands.includes(c.id));
 
                 const isRelic = Math.random() > 0.5 && unownedRelics.length > 0;
 
@@ -935,13 +947,13 @@ class ManagementUI {
                 window.gameState.playerTeam.relics.push(evt.item.id);
                 alert(`宝物「${evt.item.name}」を獲得しました！`);
             } else if (evt.itemType === 'microCommand') {
-                if (window.gameState.playerTeam.microCommands.length < 4) {
-                     window.gameState.playerTeam.microCommands.push(evt.item.id);
-                } else {
-                     // MVP logic: just add it, UI only shows first 4 or allows swapping (if implemented)
-                     // To keep it simple, replace the last one
-                     window.gameState.playerTeam.microCommands[3] = evt.item.id;
-                     alert(`コマンドスロットが一杯のため、一番右のコマンドと入れ替えました。`);
+                window.gameState.playerTeam.ownedMicroCommands.push(evt.item.id);
+                // Also add to active if slot is empty
+                for (let i = 0; i < 4; i++) {
+                    if (!window.gameState.playerTeam.microCommands[i]) {
+                        window.gameState.playerTeam.microCommands[i] = evt.item.id;
+                        break;
+                    }
                 }
                 alert(`戦術コマンド「${evt.item.name}」を獲得しました！`);
             }
