@@ -25,6 +25,14 @@ class ManagementUI {
         `;
     }
 
+    updateMicroCommand(slotIndex, cmdId, fromScreen) {
+        if (!window.gameState.playerTeam) return;
+        window.gameState.playerTeam.microCommands[slotIndex] = cmdId ? Number(cmdId) : null;
+        if (fromScreen === 'squad') this.showSquad();
+        else if (fromScreen === 'prematch') this.showPreMatch();
+        else this.showDashboard();
+    }
+
     updateTopBar() {
         if (!window.gameState.playerTeam) return;
         this.topBar.style.display = 'flex';
@@ -125,7 +133,10 @@ class ManagementUI {
 
         // Generate random upcoming gimmicks for flavor/mechanics
         const weathers = ['晴れ', '雨 (スリップ増加)', '雪 (スタミナ消費増)'];
-        const weather = weathers[Math.floor(Math.random() * weathers.length)];
+        let weather = '晴れ';
+        if (window.gameState.upcomingGimmick === 'badWeather') weather = '悪天候 (パス・トラップ精度低下)';
+        if (window.gameState.upcomingGimmick === 'fever') weather = '熱狂 (全選手能力微増・スタミナ減)';
+        if (window.gameState.upcomingGimmick === 'fortress') weather = '要塞 (アウェー不利)';
 
         const opponentTactic = opponent.manager ? opponent.manager.preference : 'バランス';
 
@@ -180,7 +191,7 @@ class ManagementUI {
                                     <div style="background: #222; padding: 10px; border: 1px solid #555; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
                                         <span style="margin-right: 10px;">Slot ${i+1}</span>
                                         <select style="flex: 1; padding: 5px; background: #333; color: white; border: 1px solid #777;"
-                                            onchange="managementUI.updateMicroCommand(${i}, this.value)">
+                                            onchange="managementUI.updateMicroCommand(${i}, this.value, 'prematch')">
                                             ${optionsHtml}
                                         </select>
                                     </div>
@@ -410,7 +421,7 @@ class ManagementUI {
                             return `
                                 <div style="background: #333; padding: 5px; border: 1px solid #f39c12; font-size: 12px; display: flex;">
                                     <select style="width: 100%; background: #222; color: white; border: none;"
-                                        onchange="managementUI.updateMicroCommand(${i}, this.value)">
+                                        onchange="managementUI.updateMicroCommand(${i}, this.value, 'squad')">
                                         ${optionsHtml}
                                     </select>
                                 </div>
@@ -460,12 +471,15 @@ class ManagementUI {
                 width: 45px; height: 50px;
                 background: ${isMob ? '#7f8c8d' : (isSelected ? '#f39c12' : '#34495e')};
                 border: 2px solid ${p.preference === 'Possession' ? '#3498db' : (p.preference === 'Counter' ? '#e74c3c' : (p.preference === 'HighPress' ? '#f1c40f' : '#2ecc71'))};
-                border-radius: 5px; color: white;
+                border-radius: 5px; color: ${isSubPos ? '#76d7c4' : 'white'};
                 display: flex; flex-direction: column; align-items: center; justify-content: center;
                 font-size: 10px; cursor: pointer; user-select: none;
                 z-index: 2; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
                 ${isMob ? 'opacity: 0.8;' : ''}
             `;
+
+            let skillNames = p.skills.map(sId => window.MasterData.PlayerSkills.find(s => s.id === sId)?.name).filter(n=>n).join(', ');
+            pDiv.title = `${p.name}\n[${p.position}${p.subPositions.length > 0 ? ' / '+p.subPositions.join(',') : ''}] ${p.role}\nPass:${p.stats.pass} Def:${p.stats.defense} Spd:${p.stats.speed}\nSkills: ${skillNames || 'なし'}`;
 
             let roleText = p.role || '';
             if (isMob) {
@@ -473,7 +487,7 @@ class ManagementUI {
             }
 
             pDiv.innerHTML = `
-                <span style="font-weight: bold;">${isMob ? '⚠️ ' : ''}${p.position}</span>
+                <span style="font-weight: bold;">${isMob ? '⚠️ ' : ''}${p.position}${isSubPos ? '*' : ''}</span>
                 <span style="font-size: 7px; color: #f1c40f;">${roleText}</span>
                 <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40px;">${p.name.substring(0,4)}</span>
                 <span style="font-size: 8px;">疲${100 - p.condition}</span>
@@ -495,7 +509,7 @@ class ManagementUI {
                 cursor: pointer; display: flex; justify-content: space-between;
                 border-left: 4px solid ${p.preference === 'Possession' ? '#3498db' : (p.preference === 'Counter' ? '#e74c3c' : (p.preference === 'HighPress' ? '#f1c40f' : '#2ecc71'))};
             `;
-            bDiv.innerHTML = `<span>[${p.position}] ${p.role ? p.role : ''} ${p.name}</span> <span>志向: ${p.preference.substring(0,1)} 疲: ${100-p.condition}</span>`;
+            bDiv.innerHTML = `<span>[${p.position}${p.subPositions.length > 0 ? '/サブ:' + p.subPositions.join(',') : ''}] ${p.role ? p.role : ''} ${p.name}</span> <span>志向: ${p.preference.substring(0,1)} 疲: ${100-p.condition}</span>`;
             bDiv.onclick = () => this.handlePlayerClick(bIdx, false);
             benchContainer.appendChild(bDiv);
         });
@@ -751,7 +765,7 @@ class ManagementUI {
         if (e.type === 'scout') {
             detailHtml += `
                 <p style="color: #27ae60; font-weight: bold;">選手: ${e.player.name}</p>
-                <p>ポジション: ${e.player.position}</p>
+                <p>メイン適性: ${e.player.position} / サブ適性: ${e.player.subPositions.join(', ')}</p><p>役割(ロール): ${e.player.role}</p><p>所持スキル: ${e.player.skills.map(sId => window.MasterData.PlayerSkills.find(s => s.id === sId)?.name).filter(n=>n).join(', ') || 'なし'}</p>
                 <p>戦術志向: ${e.player.preference}</p>
                 <p>スタミナ: ${e.player.stats.stamina} / スピード: ${e.player.stats.speed}</p>
             `;
@@ -844,7 +858,7 @@ class ManagementUI {
                 totalApCost += cost;
             } else if (cat === 'shop') {
                 const unownedRelics = window.MasterData.Relics.filter(r => !window.gameState.playerTeam.relics.includes(r.id));
-                const unownedCmds = window.MasterData.MicroCommands.filter(c => !window.gameState.playerTeam.microCommands.includes(c.id));
+                const unownedCmds = window.MasterData.MicroCommands.filter(c => !window.gameState.playerTeam.ownedMicroCommands.includes(c.id));
 
                 const isRelic = Math.random() > 0.5 && unownedRelics.length > 0;
 
@@ -935,13 +949,13 @@ class ManagementUI {
                 window.gameState.playerTeam.relics.push(evt.item.id);
                 alert(`宝物「${evt.item.name}」を獲得しました！`);
             } else if (evt.itemType === 'microCommand') {
-                if (window.gameState.playerTeam.microCommands.length < 4) {
-                     window.gameState.playerTeam.microCommands.push(evt.item.id);
-                } else {
-                     // MVP logic: just add it, UI only shows first 4 or allows swapping (if implemented)
-                     // To keep it simple, replace the last one
-                     window.gameState.playerTeam.microCommands[3] = evt.item.id;
-                     alert(`コマンドスロットが一杯のため、一番右のコマンドと入れ替えました。`);
+                window.gameState.playerTeam.ownedMicroCommands.push(evt.item.id);
+                // Also add to active if slot is empty
+                for (let i = 0; i < 4; i++) {
+                    if (!window.gameState.playerTeam.microCommands[i]) {
+                        window.gameState.playerTeam.microCommands[i] = evt.item.id;
+                        break;
+                    }
                 }
                 alert(`戦術コマンド「${evt.item.name}」を獲得しました！`);
             }

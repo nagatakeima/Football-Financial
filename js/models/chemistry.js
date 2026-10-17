@@ -27,8 +27,9 @@ class ChemistrySystem {
 
         // Calculate preference matches
         links.forEach(({from, to}) => {
-            const idx1 = team.starting11.findIndex(p => p.slotId && p.slotId.includes(from) || p.expectedPosStr === from);
-            const idx2 = team.starting11.findIndex(p => p.slotId && p.slotId.includes(to) || p.expectedPosStr === to);
+            const slots = window.MasterData.Formations[team.formation]?.slots || [];
+            const idx1 = slots.findIndex(s => s.id === from);
+            const idx2 = slots.findIndex(s => s.id === to);
 
             if (idx1 === -1 || idx2 === -1) return;
             if (idx1 >= team.starting11.length || idx2 >= team.starting11.length) return;
@@ -107,8 +108,9 @@ class ChemistrySystem {
 
         // Skill: 司令塔 (Playmaker - ID: 7) - boost surrounding players pass
         links.forEach(({from, to}) => {
-            const idx1 = team.starting11.findIndex(p => p.slotId && p.slotId.includes(from) || p.expectedPosStr === from);
-            const idx2 = team.starting11.findIndex(p => p.slotId && p.slotId.includes(to) || p.expectedPosStr === to);
+            const slots = window.MasterData.Formations[team.formation]?.slots || [];
+            const idx1 = slots.findIndex(s => s.id === from);
+            const idx2 = slots.findIndex(s => s.id === to);
 
             if (idx1 === -1 || idx2 === -1) return;
             if (idx1 >= team.starting11.length || idx2 >= team.starting11.length) return;

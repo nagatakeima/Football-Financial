@@ -29,10 +29,9 @@ class GameState {
         this.currentTier = 3;
 
         // Give player some random micro commands to start (e.g., 4 commands)
-        this.playerTeam.microCommands = window.MasterData.MicroCommands
-            .sort(() => 0.5 - Math.random())
-            .slice(0, 4)
-            .map(cmd => cmd.id);
+        const randomCmds = window.MasterData.MicroCommands.sort(() => 0.5 - Math.random()).slice(0, 6).map(c => c.id);
+        this.playerTeam.ownedMicroCommands = [...randomCmds];
+        this.playerTeam.microCommands = randomCmds.slice(0, 4);
 
         this.initializeLeague(this.currentTier);
 

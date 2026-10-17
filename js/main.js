@@ -542,7 +542,11 @@ class MatchScene extends Phaser.Scene {
 
         if (this.matchState === 'playing') {
             this.simulateAction();
-            this.checkBallOut();
+            if (this.setPieceCooldown && this.setPieceCooldown > 0) {
+                this.setPieceCooldown--;
+            } else {
+                this.checkBallOut();
+            }
         }
 
         if (this.matchTime >= 90) {
@@ -596,6 +600,13 @@ class MatchScene extends Phaser.Scene {
         this.matchState = 'setpiece';
         this.currentSetPieceType = type;
         this.kickoffTimer = 30;
+        this.setPieceCooldown = 30; // 30 frames cooldown for checkBallOut
+
+        // Offset to prevent infinite out of bounds
+        if (x <= 5) x = 20;
+        else if (x >= 795) x = 780;
+        if (y <= 60) y = 75;
+        else if (y >= 540) y = 525;
 
         this.ball.x = x; this.ball.y = y; this.ball.z = 0; this.ballSpeed = 0; this.ballTarget = null; this.ball.owner = null;
 
@@ -607,18 +618,22 @@ class MatchScene extends Phaser.Scene {
 
         if (taker) {
             let offsetX = 0; let offsetY = 0;
-            if (x < 20) offsetX = 15; else if (x > 780) offsetX = -15;
-            if (y < 20) offsetY = 15; else if (y > 580) offsetY = -15;
+            if (x < 30) offsetX = 15; else if (x > 770) offsetX = -15;
+            if (y < 80) offsetY = 15; else if (y > 520) offsetY = -15;
             taker.x = x + offsetX; taker.y = y + offsetY;
             this.ball.owner = taker;
-            this.ball.cooldown = 5;
+            this.ball.cooldown = 30; // Also protect ball
             this.lastTouchedByPlayerTeam = taker.isPlayerTeam;
         }
 
-        [...this.playerSprites, ...this.opponentSprites].forEach(p => {
+        [...this.playerSprites, ...this.opponentSprites].forEach((p, idx) => {
              if (p !== taker && Phaser.Math.Distance.Between(p.x, p.y, x, y) < 80) {
-                 let angle = Phaser.Math.Angle.Between(x, y, p.x, p.y);
-                 p.x = x + Math.cos(angle) * 80; p.y = y + Math.sin(angle) * 80;
+                 let angle = Phaser.Math.Angle.Between(x, y, 400, 300); // Towards center instead of pushing outwards
+                 angle += (idx - 5) * 0.15; // Point 5: Disperse to prevent stacking
+                 p.x = x + Math.cos(angle) * 90; p.y = y + Math.sin(angle) * 90;
+                 // Clamp to keep them inside after pushing
+                 p.x = Phaser.Math.Clamp(p.x, 15, 785);
+                 p.y = Phaser.Math.Clamp(p.y, 65, 535);
              }
         });
     }
@@ -688,6 +703,20 @@ class MatchScene extends Phaser.Scene {
                 const mateThreat = this.calculateThreat(mate.x, mate.y, p.isPlayerTeam);
                 const passRisk = this.calculatePassRisk(p.x, p.y, mate.x, mate.y, p.isPlayerTeam);
                 let passScore = mateThreat * 1.2 - passRisk * 1.5;
+
+                // Check for enemies near pass target
+                let enemiesNearMate = 0;
+                const enemies = p.isPlayerTeam ? this.opponentSprites : this.playerSprites;
+                enemies.forEach(e => {
+                    if (Phaser.Math.Distance.Between(mate.x, mate.y, e.x, e.y) < 60) enemiesNearMate++;
+                });
+
+                // Heavily penalize passing to marked teammates
+                if (enemiesNearMate > 0) passScore -= (enemiesNearMate * 50);
+
+                // Reward passing to teammates in space or backwards if under pressure
+                const dist = Phaser.Math.Distance.Between(p.x, p.y, mate.x, mate.y);
+                if (dist > 100 && enemiesNearMate === 0) passScore += 30;
 
                 // BACKPASS WEIGHTING: Encourage backpasses to reduce forward clustering
                 const isForward = p.isPlayerTeam ? mate.x > p.x : mate.x < p.x;
@@ -893,17 +922,26 @@ class MatchScene extends Phaser.Scene {
 
             let forceX = 0; let forceY = 0;
 
-            if (p.aiTickTimer >= p.mentalTickRate || hasBall) {
+            // Maintain target coordinates for a minimum time to avoid chattering
+            if (p.targetMaintainTimer === undefined) p.targetMaintainTimer = 0;
+            if (p.targetMaintainTimer > 0 && !hasBall) p.targetMaintainTimer--;
+
+            let targetX = p.x; let targetY = p.y;
+            if ((p.aiTickTimer >= p.mentalTickRate && p.targetMaintainTimer <= 0) || hasBall) {
                 p.aiTickTimer = 0;
+                if (!hasBall) p.targetMaintainTimer = Phaser.Math.Between(15, 20); // Hold decision for 15-20 frames
+
                 const context = { tactic, isAttacking, hasBall };
                 const evaluation = this.evaluateActions(p, context);
-                const bestAction = evaluation.action;
+                let bestAction = evaluation.action;
                 p.currentAction = bestAction;
                 p.lastEvaluation = { bestPassTarget: context.bestPassTarget, targetLineX: evaluation.targetLineX };
-
-                let targetX = p.x; let targetY = p.y;
                 const dir = p.isPlayerTeam ? 1 : -1;
                 const base = this.getDynamicBasePosition(p, p.isPlayerTeam, isAttacking);
+
+                if (p.chasingLooseBall && !this.ball.owner) {
+                    bestAction = 'ChaseLooseBall';
+                }
 
                 switch (bestAction) {
                     case 'HoldPosition':
@@ -963,11 +1001,23 @@ class MatchScene extends Phaser.Scene {
                     case 'Cover':
                         targetX = base.x - (dir * 50); targetY = Phaser.Math.Linear(base.y, this.ball.y, 0.4);
                         break;
+                    case 'ChaseLooseBall':
+                        // Predict ball pos
+                        let predX = this.ball.x + (Math.cos(this.ball.angle || 0) * this.ballSpeed * 5);
+                        let predY = this.ball.y + (Math.sin(this.ball.angle || 0) * this.ballSpeed * 5);
+                        targetX = Phaser.Math.Clamp(predX, 5, 795); targetY = Phaser.Math.Clamp(predY, 60, 540);
+                        break;
                     default:
                         targetX = p.x; targetY = p.y;
                 }
 
-                forceX = targetX - p.x; forceY = targetY - p.y;
+                p.cachedTargetX = targetX; p.cachedTargetY = targetY;
+            } else {
+                if (p.cachedTargetX !== undefined) { targetX = p.cachedTargetX; targetY = p.cachedTargetY; }
+                else { targetX = p.x; targetY = p.y; }
+            }
+
+            forceX = targetX - p.x; forceY = targetY - p.y;
 
                 let sepForceX = 0; let sepForceY = 0;
                 const allPlayers = [...this.playerSprites, ...this.opponentSprites];
@@ -1076,6 +1126,17 @@ class MatchScene extends Phaser.Scene {
 
         if (!this.ball.owner) {
             const allPlayers = [...this.playerSprites, ...this.opponentSprites];
+
+            // Loose ball chasing logic
+            let closestPlayers = [...allPlayers].sort((a,b) => Phaser.Math.Distance.Between(a.x, a.y, this.ball.x, this.ball.y) - Phaser.Math.Distance.Between(b.x, b.y, this.ball.x, this.ball.y));
+            // Let the closest 2 players from each team break formation to chase
+            let pTeamChasers = 0; let oTeamChasers = 0;
+            closestPlayers.forEach(p => {
+                if (p.isPlayerTeam && pTeamChasers < 2 && p.playerData.position !== 'GK') { p.chasingLooseBall = true; pTeamChasers++; }
+                else if (!p.isPlayerTeam && oTeamChasers < 2 && p.playerData.position !== 'GK') { p.chasingLooseBall = true; oTeamChasers++; }
+                else { p.chasingLooseBall = false; }
+            });
+
             let interceptor = null;
             for (let p of allPlayers) {
                 const bDist = Phaser.Math.Distance.Between(p.x, p.y, this.ball.x, this.ball.y);
@@ -1363,38 +1424,55 @@ class MatchScene extends Phaser.Scene {
     resetPositions() {
         const isPlayerKickoff = (this.score.player + this.score.opponent) % 2 === 0;
         let kickOffTeam = isPlayerKickoff ? this.playerSprites : this.opponentSprites;
-        let forwards = kickOffTeam.filter(p => p.playerData.position === 'CF' || p.playerData.position === 'WG');
+        let forwards = kickOffTeam.filter(p => p.playerData.position === 'CF' || p.playerData.position === 'WG' || p.expectedPosStr === 'CF' || p.expectedPosStr === 'WG');
         if (forwards.length < 2) forwards = kickOffTeam.slice(0, 2);
         let striker = forwards[0]; let support = forwards[1];
 
-        this.playerSprites.forEach(p => {
-            if (p.baseX) { p.x = p.baseX; p.y = p.baseY; }
-            else { p.x = Phaser.Math.Between(50, 350); p.y = Phaser.Math.Between(50, 550); }
+        this.playerSprites.forEach((p, idx) => {
+            const isGK = idx === 0;
+            const slotDef = window.MasterData.Formations[this.playerTeamData.formation]?.slots[idx] || {};
+            const tier = slotDef.baseMatrix ? slotDef.baseMatrix.tier : 'Middle';
+            const offX = slotDef.offsetX || 0;
+            const offY = slotDef.offsetY || 0;
 
-            // All players must be in their own half initially
+            if (isGK) { p.x = 50; }
+            else if (tier === 'Defensive' || p.playerData.position === 'CB' || p.playerData.position === 'SB') { p.x = 160 + offX; }
+            else if (tier === 'Middle' || p.playerData.position === 'CDM' || p.playerData.position === 'CM' || p.playerData.position === 'SH') { p.x = 280 + offX; }
+            else { p.x = isPlayerKickoff ? 360 + offX : 340 + offX; }
+
+            p.y = 300 + offY;
+
+            // Enforce bounds
             if (p.x > 395) p.x = 395;
+            if (p.y < 65) p.y = 65; if (p.y > 535) p.y = 535;
 
             if (isPlayerKickoff) {
-                // If taking kickoff, keep outside center circle except for striker/support
                 if (p !== striker && p !== support && Phaser.Math.Distance.Between(p.x, p.y, 400, 300) < 75) p.x = 320;
             } else {
-                // If defending kickoff, ALL players must be outside center circle
                 if (Phaser.Math.Distance.Between(p.x, p.y, 400, 300) < 75) p.x = 320;
             }
         });
 
-        this.opponentSprites.forEach(p => {
-            if (p.baseX) { p.x = p.baseX; p.y = p.baseY; }
-            else { p.x = Phaser.Math.Between(450, 750); p.y = Phaser.Math.Between(50, 550); }
+        this.opponentSprites.forEach((p, idx) => {
+            const isGK = idx === 0;
+            const slotDef = window.MasterData.Formations[this.opponentTeamData.formation]?.slots[idx] || {};
+            const tier = slotDef.baseMatrix ? slotDef.baseMatrix.tier : 'Middle';
+            const offX = slotDef.offsetX || 0;
+            const offY = slotDef.offsetY || 0;
 
-            // All players must be in their own half initially
+            if (isGK) { p.x = 750; }
+            else if (tier === 'Defensive' || p.playerData.position === 'CB' || p.playerData.position === 'SB') { p.x = 640 - offX; }
+            else if (tier === 'Middle' || p.playerData.position === 'CDM' || p.playerData.position === 'CM' || p.playerData.position === 'SH') { p.x = 520 - offX; }
+            else { p.x = !isPlayerKickoff ? 440 - offX : 460 - offX; }
+
+            p.y = 300 + offY;
+
             if (p.x < 405) p.x = 405;
+            if (p.y < 65) p.y = 65; if (p.y > 535) p.y = 535;
 
             if (!isPlayerKickoff) {
-                // If taking kickoff, keep outside center circle except for striker/support
                 if (p !== striker && p !== support && Phaser.Math.Distance.Between(p.x, p.y, 400, 300) < 75) p.x = 480;
             } else {
-                // If defending kickoff, ALL players must be outside center circle
                 if (Phaser.Math.Distance.Between(p.x, p.y, 400, 300) < 75) p.x = 480;
             }
         });
