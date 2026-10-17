@@ -78,9 +78,9 @@ const MasterData = {
         { id: 5, name: "レーザーパス", category: "pass", effectType: "SUCCESS_RATE_UP", target: "pass", value: 15, condition: "always", allowedPositions: ["CDM","CM","CAM"], description: "グラウンダーパスの弾速UP" },
         { id: 6, name: "方向付けトラップ", category: "pass", effectType: "SUCCESS_RATE_UP", target: "trap", value: 20, condition: "always", allowedPositions: ["CB","SB","CDM","CM","CAM","WG","CF"], description: "トラップ直後のパス・シュート成功率UP" },
         { id: 7, name: "プレス耐性トラップ", category: "pass", effectType: "SUCCESS_RATE_UP", target: "trap", value: 25, condition: "underPressure", allowedPositions: ["CM","CAM","WG","CF"], description: "プレッシャー下でのトラップ成功率UP" },
-        { id: 8, name: "ロングスロワー", category: "pass", effectType: "RANGE_UP", target: "throwIn", value: 100, condition: "always", allowedPositions: ["SB","WB","CB"], description: "スローインの飛距離UP" },
-        { id: 9, name: "アーリークロッサー", category: "pass", effectType: "SUCCESS_RATE_UP", target: "cross", value: 20, condition: "always", allowedPositions: ["SB","WB","WG"], description: "クロス成功率UP" },
-        { id: 10, name: "ピンポイントクロス", category: "pass", effectType: "SUCCESS_RATE_UP", target: "cross", value: 25, condition: "attackingThird", allowedPositions: ["SB","WB","WG"], description: "敵陣深くでのクロス成功率UP" },
+        { id: 8, name: "ロングスロワー", category: "pass", effectType: "RANGE_UP", target: "throwIn", value: 100, condition: "always", allowedPositions: ["SB","WG","CB"], description: "スローインの飛距離UP" },
+        { id: 9, name: "アーリークロッサー", category: "pass", effectType: "SUCCESS_RATE_UP", target: "cross", value: 20, condition: "always", allowedPositions: ["SB","WG","WG"], description: "クロス成功率UP" },
+        { id: 10, name: "ピンポイントクロス", category: "pass", effectType: "SUCCESS_RATE_UP", target: "cross", value: 25, condition: "attackingThird", allowedPositions: ["SB","WG","WG"], description: "敵陣深くでのクロス成功率UP" },
 
         // 【2. シュート＆フィニッシュ系 (shoot)】
         { id: 11, name: "コントロールカーブ", category: "shoot", effectType: "SUCCESS_RATE_UP", target: "shoot", value: 20, condition: "penaltyAreaOut", allowedPositions: ["CAM","WG","CF"], description: "ペナルティエリア外からのカーブシュート成功率UP" },
@@ -96,7 +96,7 @@ const MasterData = {
 
         // 【3. ドリブル＆移動系 (dribble)】
         { id: 21, name: "ラインブレイカー", category: "dribble", effectType: "SUCCESS_RATE_UP", target: "runBehind", value: 25, condition: "always", allowedPositions: ["CAM","WG","CF"], description: "裏抜けのタイミングと成功率UP" },
-        { id: 22, name: "スピードスター", category: "dribble", effectType: "SUCCESS_RATE_UP", target: "dribble", value: 20, condition: "always", allowedPositions: ["SB","WB","WG","CF"], description: "ドリブル時の突破率UP" },
+        { id: 22, name: "スピードスター", category: "dribble", effectType: "SUCCESS_RATE_UP", target: "dribble", value: 20, condition: "always", allowedPositions: ["SB","WG","WG","CF"], description: "ドリブル時の突破率UP" },
         { id: 23, name: "ダブルタッチ", category: "dribble", effectType: "SUCCESS_RATE_UP", target: "dribble", value: 30, condition: "1vs1", allowedPositions: ["CAM","WG"], description: "1vs1でのドリブル突破率大幅UP" },
         { id: 24, name: "ターンマイスター", category: "dribble", effectType: "SUCCESS_RATE_UP", target: "turn", value: 25, condition: "underPressure", allowedPositions: ["CM","CAM","CF"], description: "プレッシャー下でのターン成功率UP" },
         { id: 25, name: "デコイランナー", category: "dribble", effectType: "ACTION_WEIGHT_UP", target: "runIntoSpace", value: 50, condition: "attackingThird", allowedPositions: ["CAM","WG","CF"], description: "おとりとなるフリーランニングの頻度UP" },
@@ -114,7 +114,7 @@ const MasterData = {
         { id: 35, name: "シュートブロッカー", category: "defense", effectType: "SUCCESS_RATE_UP", target: "block", value: 30, condition: "penaltyAreaIn", allowedPositions: ["CB","CDM"], description: "シュートブロック成功率UP" },
         { id: 36, name: "カバーリングの名手", category: "defense", effectType: "ACTION_WEIGHT_UP", target: "cover", value: 50, condition: "always", allowedPositions: ["CB","SB"], description: "味方の裏をカバーする動きの頻度UP" },
         { id: 37, name: "クリーンファイター", category: "defense", effectType: "SUCCESS_RATE_UP", target: "tackle", value: 15, condition: "penaltyAreaIn", allowedPositions: ["CB","SB"], description: "ペナルティエリア内でのファウル率激減" },
-        { id: 38, name: "マリーシア", category: "defense", effectType: "SUCCESS_RATE_UP", target: "foulMもら", value: 30, condition: "always", allowedPositions: ["CAM","WG","CF"], description: "ファウルを貰う確率UP" },
+        { id: 38, name: "マリーシア", category: "defense", effectType: "SUCCESS_RATE_UP", target: "drawFoul", value: 30, condition: "always", allowedPositions: ["CAM","WG","CF"], description: "ファウルを貰う確率UP" },
         { id: 39, name: "チェイシング", category: "defense", effectType: "ACTION_WEIGHT_UP", target: "press", value: 40, condition: "always", allowedPositions: ["CAM","WG","CF"], description: "前線からのプレス頻度と成功率UP" },
         { id: 40, name: "マンマーカー", category: "defense", effectType: "SUCCESS_RATE_UP", target: "mark", value: 25, condition: "always", allowedPositions: ["CB","CDM"], description: "マンマーク時の対応力UP" },
 
@@ -143,14 +143,14 @@ const MasterData = {
         { id: 60, name: "冷静沈着", category: "mental", effectType: "STAT_UP_CONDITIONAL", target: "pass", value: 20, condition: "underPressure", allowedPositions: ["CDM","CM","CAM"], description: "プレッシャー下でパス精度が落ちない" },
 
         // 【7. 連携・スタミナ・マネジメント系 (management)】
-        { id: 61, name: "ダイナモ", category: "management", effectType: "STAMINA_REDUCE", target: "self", value: 50, condition: "always", allowedPositions: ["SB","WB","CDM","CM"], description: "試合中のスタミナ消費が半減" },
+        { id: 61, name: "ダイナモ", category: "management", effectType: "STAMINA_REDUCE", target: "self", value: 50, condition: "always", allowedPositions: ["SB","WG","CDM","CM"], description: "試合中のスタミナ消費が半減" },
         { id: 62, name: "鉄人", category: "management", effectType: "PASSIVE_EFFECT", target: "injuryRisk", value: -90, condition: "always", allowedPositions: ["CB","SB","CDM","CM","CAM","WG","CF"], description: "怪我のリスクが激減" },
         { id: 63, name: "司令塔", category: "management", effectType: "PASSIVE_EFFECT", target: "linkPassBoost", value: 5, condition: "always", allowedPositions: ["CDM","CM","CAM"], description: "周囲の連携リンク選手のパス値+5" },
         { id: 64, name: "キャプテンシー", category: "management", effectType: "PASSIVE_EFFECT", target: "teamMental", value: 10, condition: "always", allowedPositions: ["CB","CDM","CM"], description: "味方全体のメンタル低下を防ぐ" },
         { id: 65, name: "ムードメーカー", category: "management", effectType: "PASSIVE_EFFECT", target: "teamMorale", value: 5, condition: "always", allowedPositions: ["CB","SB","CDM","CM","CAM","WG","CF","GK"], description: "試合後にチーム士気が追加で回復" },
         { id: 66, name: "人気選手", category: "management", effectType: "PASSIVE_EFFECT", target: "fundsBoost", value: 10000, condition: "always", allowedPositions: ["CB","SB","CDM","CM","CAM","WG","CF","GK"], description: "試合後の獲得資金が増加" },
         { id: 67, name: "ベテランの経験", category: "management", effectType: "PASSIVE_EFFECT", target: "expBoost", value: 20, condition: "always", allowedPositions: ["CB","CDM","CM","GK"], description: "若手選手の成長（隠しパラメータ）を促進" },
-        { id: 68, name: "ハードワーカー", category: "management", effectType: "STAT_UP", target: "stamina", value: 15, condition: "always", allowedPositions: ["SB","WB","CM","WG"], description: "スタミナ最大値UP" },
+        { id: 68, name: "ハードワーカー", category: "management", effectType: "STAT_UP", target: "stamina", value: 15, condition: "always", allowedPositions: ["SB","WG","CM","WG"], description: "スタミナ最大値UP" },
         { id: 69, name: "ユーティリティ", category: "management", effectType: "PASSIVE_EFFECT", target: "subPosPenalty", value: -50, condition: "always", allowedPositions: ["CB","SB","CDM","CM","CAM","WG"], description: "サブ適性ポジションでのペナルティ半減" },
         { id: 70, name: "リカバリー能力", category: "management", effectType: "PASSIVE_EFFECT", target: "conditionRecovery", value: 10, condition: "always", allowedPositions: ["CB","SB","CDM","CM","CAM","WG","CF"], description: "試合後のコンディション回復量UP" },
         { id: 71, name: "闘将", category: "management", effectType: "PASSIVE_EFFECT", target: "teamPhysical", value: 5, condition: "always", allowedPositions: ["CB","CDM"], description: "味方全体のフィジカル+5" },

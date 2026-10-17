@@ -164,7 +164,7 @@ class Player {
             const skillDef = window.MasterData.PlayerSkills.find(s => s.id === skillId);
             if (!skillDef) return;
 
-            if (skillDef.effectType === effectType && (skillDef.target === target || skillDef.target === 'all')) {
+            if (skillDef.effectType === effectType && skillDef.target === target) {
                 if (skillDef.condition === 'always' || conditions.includes(skillDef.condition)) {
                     totalValue += skillDef.value;
                     activeSkillNames.push(skillDef.name);

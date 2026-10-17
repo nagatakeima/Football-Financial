@@ -101,11 +101,7 @@ class ChemistrySystem {
             });
 
             // Special composite stat ups (like pass_shoot)
-            // Re-apply Player Skills PassMaster hardcode as generic fallback failed because effect is SUCCESS_RATE_UP for pass
-            const passMaster = window.Player.getSkillEffectFor(p, "SUCCESS_RATE_UP", "pass", []);
-            if (passMaster.value > 0) {
-                 p.dynamicStats.pass = Math.min(100, p.dynamicStats.pass + passMaster.value);
-            }
+
             const passShootUp = window.Player.getSkillEffectFor(p, "STAT_UP", "pass_shoot", []);
             if (passShootUp.value > 0) {
                  p.dynamicStats.pass = Math.min(100, p.dynamicStats.pass + passShootUp.value);

@@ -20,7 +20,7 @@ if (!window.MasterData.Formations) {
 eval(fs.readFileSync('js/models/player.js', 'utf8'));
 eval(fs.readFileSync('js/models/chemistry.js', 'utf8'));
 
-const p1 = { stats: { pass: 50, speed: 50, defense: 50 }, preference: 'A', skills: [61, 1, 63] }; // Dynamo, PassMaster, Playmaker
+const p1 = { stats: { pass: 50, speed: 50, defense: 50 }, preference: 'A', skills: [61, 73, 63] }; // Dynamo, PassMaster, Playmaker
 const p2 = { stats: { pass: 50, speed: 50, defense: 50 }, preference: 'A', skills: [62] }; // Iron Man
 
 // Add padding because formation links goes to 10
@@ -41,6 +41,6 @@ const team = {
 window.ChemistrySystem.calculateTeamChemistry(team);
 
 if (p1.staminaConsumptionRate === 0.5) console.log("Dynamo passed");
-if (p1.dynamicStats.pass >= 65) console.log("PassMaster passed");
+if (p1.dynamicStats.pass >= 55) console.log("KamiNoKo passed");
 if (p2.injuryRiskMultiplier <= 0.11) console.log("IronMan passed");
 if (p2.dynamicStats.pass > p2.stats.pass) console.log("Playmaker passed");
