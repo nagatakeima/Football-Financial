@@ -10,8 +10,8 @@ global.document = {
 };
 
 // Load dependencies
-eval(fs.readFileSync('js/models/player.js', 'utf8'));
 eval(fs.readFileSync('js/models/masterData.js', 'utf8'));
+eval(fs.readFileSync('js/models/player.js', 'utf8'));
 eval(fs.readFileSync('js/models/team.js', 'utf8'));
 eval(fs.readFileSync('js/models/league.js', 'utf8'));
 eval(fs.readFileSync('js/models/gameState.js', 'utf8'));
@@ -87,6 +87,37 @@ if (mainJsStr.includes('this.setPieceCooldown = 30;')) {
     simFailed = true;
 }
 
+
+// Test 5: p.preference is defined
+let prefMissing = false;
+window.gameState.playerTeam.players.forEach(p => {
+    if (p.preference === undefined) prefMissing = true;
+});
+if (prefMissing) {
+    console.log("FAIL: p.preference is undefined for some players.");
+    simFailed = true;
+} else {
+    console.log("PASS: p.preference is defined.");
+}
+
+// Test 6: const bestAction redefined correctly
+if (mainJsStr.includes('const bestAction = evaluation.action;')) {
+    console.log("FAIL: bestAction is still declared as const.");
+    simFailed = true;
+} else if (mainJsStr.includes('let bestAction = evaluation.action;')) {
+    console.log("PASS: bestAction is correctly declared as let.");
+} else {
+    console.log("FAIL: bestAction declaration not found properly.");
+    simFailed = true;
+}
+
+// Test 7: targetX scope leak (ensure targetX/targetY are declared before aiTickTimer block)
+if (mainJsStr.includes('let targetX = p.x; let targetY = p.y;\n            if ((p.aiTickTimer >=')) {
+    console.log("PASS: targetX scope is safe.");
+} else {
+    console.log("FAIL: targetX scope leak detected.");
+    simFailed = true;
+}
 
 if (simFailed) {
     console.log("--- Tests FAILED ---");

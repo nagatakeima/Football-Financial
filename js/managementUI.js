@@ -25,10 +25,12 @@ class ManagementUI {
         `;
     }
 
-    updateMicroCommand(slotIndex, cmdId) {
+    updateMicroCommand(slotIndex, cmdId, fromScreen) {
         if (!window.gameState.playerTeam) return;
         window.gameState.playerTeam.microCommands[slotIndex] = cmdId ? Number(cmdId) : null;
-        this.showDashboard();
+        if (fromScreen === 'squad') this.showSquad();
+        else if (fromScreen === 'prematch') this.showPreMatch();
+        else this.showDashboard();
     }
 
     updateTopBar() {
@@ -189,7 +191,7 @@ class ManagementUI {
                                     <div style="background: #222; padding: 10px; border: 1px solid #555; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
                                         <span style="margin-right: 10px;">Slot ${i+1}</span>
                                         <select style="flex: 1; padding: 5px; background: #333; color: white; border: 1px solid #777;"
-                                            onchange="managementUI.updateMicroCommand(${i}, this.value)">
+                                            onchange="managementUI.updateMicroCommand(${i}, this.value, 'prematch')">
                                             ${optionsHtml}
                                         </select>
                                     </div>
@@ -419,7 +421,7 @@ class ManagementUI {
                             return `
                                 <div style="background: #333; padding: 5px; border: 1px solid #f39c12; font-size: 12px; display: flex;">
                                     <select style="width: 100%; background: #222; color: white; border: none;"
-                                        onchange="managementUI.updateMicroCommand(${i}, this.value)">
+                                        onchange="managementUI.updateMicroCommand(${i}, this.value, 'squad')">
                                         ${optionsHtml}
                                     </select>
                                 </div>
@@ -485,7 +487,7 @@ class ManagementUI {
             }
 
             pDiv.innerHTML = `
-                <span style="font-weight: bold;">${isMob ? '⚠️ ' : ''}${p.position}</span>
+                <span style="font-weight: bold;">${isMob ? '⚠️ ' : ''}${p.position}${isSubPos ? '*' : ''}</span>
                 <span style="font-size: 7px; color: #f1c40f;">${roleText}</span>
                 <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40px;">${p.name.substring(0,4)}</span>
                 <span style="font-size: 8px;">疲${100 - p.condition}</span>
@@ -507,7 +509,7 @@ class ManagementUI {
                 cursor: pointer; display: flex; justify-content: space-between;
                 border-left: 4px solid ${p.preference === 'Possession' ? '#3498db' : (p.preference === 'Counter' ? '#e74c3c' : (p.preference === 'HighPress' ? '#f1c40f' : '#2ecc71'))};
             `;
-            bDiv.innerHTML = `<span>[${p.position}] ${p.role ? p.role : ''} ${p.name}</span> <span>志向: ${p.preference.substring(0,1)} 疲: ${100-p.condition}</span>`;
+            bDiv.innerHTML = `<span>[${p.position}${p.subPositions.length > 0 ? '/サブ:' + p.subPositions.join(',') : ''}] ${p.role ? p.role : ''} ${p.name}</span> <span>志向: ${p.preference.substring(0,1)} 疲: ${100-p.condition}</span>`;
             bDiv.onclick = () => this.handlePlayerClick(bIdx, false);
             benchContainer.appendChild(bDiv);
         });
@@ -763,7 +765,7 @@ class ManagementUI {
         if (e.type === 'scout') {
             detailHtml += `
                 <p style="color: #27ae60; font-weight: bold;">選手: ${e.player.name}</p>
-                <p>ポジション: ${e.player.position}</p>
+                <p>メイン適性: ${e.player.position} / サブ適性: ${e.player.subPositions.join(', ')}</p><p>役割(ロール): ${e.player.role}</p><p>所持スキル: ${e.player.skills.map(sId => window.MasterData.PlayerSkills.find(s => s.id === sId)?.name).filter(n=>n).join(', ') || 'なし'}</p>
                 <p>戦術志向: ${e.player.preference}</p>
                 <p>スタミナ: ${e.player.stats.stamina} / スピード: ${e.player.stats.speed}</p>
             `;

@@ -626,9 +626,10 @@ class MatchScene extends Phaser.Scene {
             this.lastTouchedByPlayerTeam = taker.isPlayerTeam;
         }
 
-        [...this.playerSprites, ...this.opponentSprites].forEach(p => {
+        [...this.playerSprites, ...this.opponentSprites].forEach((p, idx) => {
              if (p !== taker && Phaser.Math.Distance.Between(p.x, p.y, x, y) < 80) {
                  let angle = Phaser.Math.Angle.Between(x, y, 400, 300); // Towards center instead of pushing outwards
+                 angle += (idx - 5) * 0.15; // Point 5: Disperse to prevent stacking
                  p.x = x + Math.cos(angle) * 90; p.y = y + Math.sin(angle) * 90;
                  // Clamp to keep them inside after pushing
                  p.x = Phaser.Math.Clamp(p.x, 15, 785);
@@ -925,17 +926,16 @@ class MatchScene extends Phaser.Scene {
             if (p.targetMaintainTimer === undefined) p.targetMaintainTimer = 0;
             if (p.targetMaintainTimer > 0 && !hasBall) p.targetMaintainTimer--;
 
+            let targetX = p.x; let targetY = p.y;
             if ((p.aiTickTimer >= p.mentalTickRate && p.targetMaintainTimer <= 0) || hasBall) {
                 p.aiTickTimer = 0;
                 if (!hasBall) p.targetMaintainTimer = Phaser.Math.Between(15, 20); // Hold decision for 15-20 frames
 
                 const context = { tactic, isAttacking, hasBall };
                 const evaluation = this.evaluateActions(p, context);
-                const bestAction = evaluation.action;
+                let bestAction = evaluation.action;
                 p.currentAction = bestAction;
                 p.lastEvaluation = { bestPassTarget: context.bestPassTarget, targetLineX: evaluation.targetLineX };
-
-                let targetX = p.x; let targetY = p.y;
                 const dir = p.isPlayerTeam ? 1 : -1;
                 const base = this.getDynamicBasePosition(p, p.isPlayerTeam, isAttacking);
 
@@ -1438,7 +1438,7 @@ class MatchScene extends Phaser.Scene {
             if (isGK) { p.x = 50; }
             else if (tier === 'Defensive' || p.playerData.position === 'CB' || p.playerData.position === 'SB') { p.x = 160 + offX; }
             else if (tier === 'Middle' || p.playerData.position === 'CDM' || p.playerData.position === 'CM' || p.playerData.position === 'SH') { p.x = 280 + offX; }
-            else { p.x = isPlayerKickoff ? 360 : 340; }
+            else { p.x = isPlayerKickoff ? 360 + offX : 340 + offX; }
 
             p.y = 300 + offY;
 
@@ -1463,7 +1463,7 @@ class MatchScene extends Phaser.Scene {
             if (isGK) { p.x = 750; }
             else if (tier === 'Defensive' || p.playerData.position === 'CB' || p.playerData.position === 'SB') { p.x = 640 - offX; }
             else if (tier === 'Middle' || p.playerData.position === 'CDM' || p.playerData.position === 'CM' || p.playerData.position === 'SH') { p.x = 520 - offX; }
-            else { p.x = !isPlayerKickoff ? 440 : 460; }
+            else { p.x = !isPlayerKickoff ? 440 - offX : 460 - offX; }
 
             p.y = 300 + offY;
 

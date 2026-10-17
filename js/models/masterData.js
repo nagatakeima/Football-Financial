@@ -1,3 +1,11 @@
+const TacticalPreferences = {
+    POSSESSION: 'Possession',
+    COUNTER: 'Counter',
+    HIGH_PRESS: 'HighPress',
+    RETREAT: 'Retreat'
+};
+window.TacticalPreferences = TacticalPreferences;
+
 const MasterData = {
     "Managers": [
         {
@@ -2048,4 +2056,4 @@ const MasterData = {
 
 // Expose globally or export if using modules
 window.MasterData = MasterData;
-window.TacticalPreferences = MasterData.TacticalPreferences || [];
+// Preserving window.TacticalPreferences
