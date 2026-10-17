@@ -50,12 +50,18 @@ class Player {
         };
 
         // Assign 1-2 random skills
-        const numSkills = Math.floor(Math.random() * 2) + 1;
+        const numSkills = Math.floor(Math.random() * 3) + 1; // 1 to 3 skills
         const skills = [];
-        for (let i = 0; i < numSkills; i++) {
-            const randomSkillId = window.MasterData.PlayerSkills[Math.floor(Math.random() * window.MasterData.PlayerSkills.length)].id;
-            if (!skills.includes(randomSkillId)) {
-                skills.push(randomSkillId);
+
+        // Filter skills by allowedPositions
+        const allowedSkills = window.MasterData.PlayerSkills.filter(s => s.allowedPositions.includes(position));
+
+        if (allowedSkills.length > 0) {
+            for (let i = 0; i < numSkills; i++) {
+                const randomSkill = allowedSkills[Math.floor(Math.random() * allowedSkills.length)];
+                if (!skills.includes(randomSkill.id)) {
+                    skills.push(randomSkill.id);
+                }
             }
         }
 
@@ -142,6 +148,31 @@ class Player {
                 this.subPositions.push('WG', 'CAM');
             }
         }
+    }
+    // Generic skill parser
+    static getSkillEffectFor(playerObj, effectType, target, activeConditions) {
+        let totalValue = 0;
+        let activeSkillNames = [];
+
+        if (!playerObj || !playerObj.skills || !Array.isArray(playerObj.skills)) {
+            return { value: totalValue, names: activeSkillNames };
+        }
+
+        const conditions = Array.isArray(activeConditions) ? activeConditions : [activeConditions];
+
+        playerObj.skills.forEach(skillId => {
+            const skillDef = window.MasterData.PlayerSkills.find(s => s.id === skillId);
+            if (!skillDef) return;
+
+            if (skillDef.effectType === effectType && (skillDef.target === target || skillDef.target === 'all')) {
+                if (skillDef.condition === 'always' || conditions.includes(skillDef.condition)) {
+                    totalValue += skillDef.value;
+                    activeSkillNames.push(skillDef.name);
+                }
+            }
+        });
+
+        return { value: totalValue, names: activeSkillNames };
     }
 
     static randomStat(bonus = 0) {

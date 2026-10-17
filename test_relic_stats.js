@@ -24,6 +24,7 @@ if (!window.MasterData.Formations) {
     };
 }
 
+eval(fs.readFileSync('js/models/player.js', 'utf8'));
 eval(fs.readFileSync('js/models/chemistry.js', 'utf8'));
 
 const p1 = { stats: { pass: 30, speed: 50 }, preference: 'A', skills: [] };

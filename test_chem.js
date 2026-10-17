@@ -18,6 +18,7 @@ if (!window.MasterData.Formations) {
     };
 }
 
+eval(fs.readFileSync('js/models/player.js', 'utf8'));
 eval(fs.readFileSync('js/models/chemistry.js', 'utf8'));
 
 const formations = ["4-4-2", "4-3-3", "3-2-4-1", "4-1-4-1", "4-2-3-1", "5-3-2", "4-3-1-2", "3-5-2"];
