@@ -426,12 +426,10 @@ class MatchScene extends Phaser.Scene {
         this.activeBuff = { target: slot.data.target, value: slot.data.value, actionType: slot.data.actionType, duration: 5 };
 
         if (slot.data.actionType === 'substitute') {
-            const benchPlayer = this.playerTeamData.bench[0];
+            const benchPlayer = this.playerTeamData.bench.find(p => p.skills.includes(52)) || this.playerTeamData.bench[0];
             if (benchPlayer) {
                 if (!benchPlayer.dynamicStats) benchPlayer.dynamicStats = { ...benchPlayer.stats };
-                if (false) {
-                    Object.keys(benchPlayer.dynamicStats).forEach(k => benchPlayer.dynamicStats[k] = Math.min(100, benchPlayer.dynamicStats[k] + 15));
-                }
+                benchPlayer.isSubbedIn = true;
                 const worstPitch = this.playerSprites.sort((a,b) => a.playerData.condition - b.playerData.condition)[0];
                 if (worstPitch) { worstPitch.playerData = benchPlayer; worstPitch.setStrokeStyle(2, 0xf1c40f); }
             }
@@ -504,7 +502,7 @@ class MatchScene extends Phaser.Scene {
 
         if (this.currentGimmick === 'fever' && this.matchTime < 45) {
              this.opponentSprites.forEach(p => {
-                  if (Phaser.Math.Distance.Between(p.x, p.y, this.ball.x, this.ball.y) < (20 + window.Player.getSkillEffectFor(p.playerData, "RANGE_UP", "tackle", this.getActiveConditions(p)).value)) {
+                  if (Phaser.Math.Distance.Between(p.x, p.y, this.ball.x, this.ball.y) < 200) {
                       const angle = Phaser.Math.Angle.Between(p.x, p.y, this.ball.x, this.ball.y);
                       p.x += Math.cos(angle) * 1.2; p.y += Math.sin(angle) * 1.2;
                   }
@@ -696,8 +694,8 @@ class MatchScene extends Phaser.Scene {
         if (p.playerData.isSubbedIn) conditions.push('sub');
 
         // Assume overall strength logic exists or fallback to underdog condition if team rating < opp rating
-        const playerRating = this.playerTeamData ? this.playerTeamData.getOverallRating ? this.playerTeamData.getOverallRating() : 50 : 50;
-        const oppRating = this.opponentTeamData ? this.opponentTeamData.getOverallRating ? this.opponentTeamData.getOverallRating() : 50 : 50;
+        const playerRating = this.playerTeamData ? this.playerTeamData.getOverallStrength ? this.playerTeamData.getOverallStrength() : 50 : 50;
+        const oppRating = this.opponentTeamData ? this.opponentTeamData.getOverallStrength ? this.opponentTeamData.getOverallStrength() : 50 : 50;
         if (p.isPlayerTeam && playerRating < oppRating) conditions.push('underdog');
         if (!p.isPlayerTeam && oppRating < playerRating) conditions.push('underdog');
 
@@ -1265,6 +1263,11 @@ class MatchScene extends Phaser.Scene {
                     trapChance += trapSkill.value;
                     if (Phaser.Math.Between(0, 100) < 50) this.showActionText(interceptor, trapSkill.names[0], "#f1c40f");
                 }
+                const interceptSkill = window.Player.getSkillEffectFor(interceptor.playerData, "SUCCESS_RATE_UP", "intercept", activeConditions);
+                if (interceptSkill.value > 0) {
+                    trapChance += interceptSkill.value;
+                    if (Phaser.Math.Between(0, 100) < 50) this.showActionText(interceptor, interceptSkill.names[0], "#f1c40f");
+                }
                 if (this.isHighBall) trapChance -= 15;
                 if (this.currentGimmick === 'badWeather') trapChance -= 20;
                 if (interceptor.playerData.position === 'GK') trapChance += 30;
@@ -1293,7 +1296,12 @@ class MatchScene extends Phaser.Scene {
 
             const enemies = this.ball.owner.isPlayerTeam ? this.opponentSprites : this.playerSprites;
             // Only engage duel if an enemy is very close, AND neither player is already stunned
-            const tacklers = enemies.filter(p => Phaser.Math.Distance.Between(p.x, p.y, this.ball.x, this.ball.y) < 20 && p.stunTimer <= 0 && this.ball.owner.stunTimer <= 0);
+            const tacklers = enemies.filter(p => {
+                let range = 20;
+                const rangeSkill = window.Player.getSkillEffectFor(p.playerData, "RANGE_UP", "tackle", this.getActiveConditions(p));
+                if (rangeSkill.value > 0) range += rangeSkill.value;
+                return Phaser.Math.Distance.Between(p.x, p.y, this.ball.x, this.ball.y) < range && p.stunTimer <= 0 && this.ball.owner.stunTimer <= 0;
+            });
 
             if (tacklers.length > 0) {
                 let tackler = tacklers[0];
@@ -1306,6 +1314,13 @@ class MatchScene extends Phaser.Scene {
                 if (tackleSkill.value > 0) {
                     tackleStat += tackleSkill.value;
                     if (Phaser.Math.Between(0, 100) < 50) this.showActionText(tackler, tackleSkill.names[0], "#f1c40f");
+                }
+
+                const dribblerConditions = this.getActiveConditions(this.ball.owner);
+                const dribbleSkill = window.Player.getSkillEffectFor(this.ball.owner.playerData, "SUCCESS_RATE_UP", "dribble", dribblerConditions);
+                if (dribbleSkill.value > 0) {
+                    dribbleStat += dribbleSkill.value;
+                    if (Phaser.Math.Between(0, 100) < 50) this.showActionText(this.ball.owner, dribbleSkill.names[0], "#f1c40f");
                 }
 
                 if (Math.random() * 100 < tackleStat - (dribbleStat / 2)) {
@@ -1396,6 +1411,13 @@ class MatchScene extends Phaser.Scene {
                     let shootStat = this.getEffectiveStat(this.ball.owner, 'shoot', activeConditions);
                     if (isPlayer && this.activeBuff && (this.activeBuff.target === 'shoot' || this.activeBuff.target === 'header')) shootStat += this.activeBuff.value;
                     const shootSkill = window.Player.getSkillEffectFor(this.ball.owner.playerData, "SUCCESS_RATE_UP", "shoot", activeConditions);
+                    if (this.isHighBall || (this.activeBuff && this.activeBuff.target === 'header')) {
+                        const headerSkill = window.Player.getSkillEffectFor(this.ball.owner.playerData, "SUCCESS_RATE_UP", "header", activeConditions);
+                        if (headerSkill.value > 0) {
+                            shootStat += headerSkill.value;
+                            if (Phaser.Math.Between(0, 100) < 50) this.showActionText(this.ball.owner, headerSkill.names[0], "#f1c40f");
+                        }
+                    }
                     if (this.activeBuff && this.activeBuff.actionType === 'runBehind') {
                         const runBehindSkill = window.Player.getSkillEffectFor(this.ball.owner.playerData, "SUCCESS_RATE_UP", "runBehind", activeConditions);
                         if (runBehindSkill.value > 0) {
@@ -1501,6 +1523,19 @@ class MatchScene extends Phaser.Scene {
                     if (passSkill.value > 0) {
                         effectivePassStat += passSkill.value;
                         if (Phaser.Math.Between(0, 100) < 50) this.showActionText(this.ball.owner, passSkill.names[0], "#f1c40f");
+                    }
+
+                    let passType = 'pass';
+                    if (this.ball.owner.currentAction === 'Through Pass') passType = 'throughPass';
+                    else if (isLongBall) passType = 'longPass';
+                    else if (this.ball.owner.currentAction === 'Cross' || this.ball.owner.y < 160 || this.ball.owner.y > 440) passType = 'cross';
+
+                    if (passType !== 'pass') {
+                         const subPassSkill = window.Player.getSkillEffectFor(this.ball.owner.playerData, "SUCCESS_RATE_UP", passType, activeConditions);
+                         if (subPassSkill.value > 0) {
+                              effectivePassStat += subPassSkill.value;
+                              if (Phaser.Math.Between(0, 100) < 50) this.showActionText(this.ball.owner, subPassSkill.names[0], "#f1c40f");
+                         }
                     }
                     if (this.currentGimmick === 'badWeather') { effectivePassStat -= 20; if (isLongBall) effectivePassStat += 30; }
 
