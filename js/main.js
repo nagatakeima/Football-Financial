@@ -504,7 +504,7 @@ class MatchScene extends Phaser.Scene {
 
         if (this.currentGimmick === 'fever' && this.matchTime < 45) {
              this.opponentSprites.forEach(p => {
-                  if (Phaser.Math.Distance.Between(p.x, p.y, this.ball.x, this.ball.y) < 200) {
+                  if (Phaser.Math.Distance.Between(p.x, p.y, this.ball.x, this.ball.y)  < 200) {
                       const angle = Phaser.Math.Angle.Between(p.x, p.y, this.ball.x, this.ball.y);
                       p.x += Math.cos(angle) * 1.2; p.y += Math.sin(angle) * 1.2;
                   }
@@ -661,6 +661,78 @@ class MatchScene extends Phaser.Scene {
             }
         });
         return Math.min(100, risk);
+    }
+
+
+    getEffectiveStat(p, statName, activeConditions) {
+        let baseStat = p.playerData.dynamicStats[statName] || 50;
+
+        const condSkill = window.Player.getSkillEffectFor(p.playerData, "STAT_UP_CONDITIONAL", statName, activeConditions);
+        if (condSkill.value !== 0) baseStat += condSkill.value;
+
+        const condSkillAll = window.Player.getSkillEffectFor(p.playerData, "STAT_UP_CONDITIONAL", "all", activeConditions);
+        if (condSkillAll.value !== 0) baseStat += condSkillAll.value;
+
+        return Math.min(100, Math.max(1, baseStat));
+    }
+
+    getActiveConditions(p) {
+        const conditions = ['always'];
+
+        // Match Context
+        const timeElapsed = this.matchTime / 90;
+        if (this.matchTime >= 65) conditions.push('lateGame');
+        if (this.matchTime <= 25) conditions.push('earlyGame');
+
+        if (this.currentGimmick === 'badWeather') conditions.push('badWeather');
+
+        const myScore = p.isPlayerTeam ? this.score.player : this.score.opponent;
+        const enemyScore = p.isPlayerTeam ? this.score.opponent : this.score.player;
+
+        if (myScore < enemyScore) conditions.push('behind');
+        if (myScore > enemyScore && this.matchTime >= 65) conditions.push('leadLateGame');
+
+        if (p.playerData.isSubbedIn) conditions.push('sub');
+
+        const playerRating = this.playerTeamData ? this.playerTeamData.getOverallStrength ? this.playerTeamData.getOverallStrength() : 50 : 50;
+        const oppRating = this.opponentTeamData ? this.opponentTeamData.getOverallStrength ? this.opponentTeamData.getOverallStrength() : 50 : 50;
+        if (p.isPlayerTeam && playerRating < oppRating) conditions.push('underdog');
+        if (!p.isPlayerTeam && oppRating < playerRating) conditions.push('underdog');
+
+        // Positional Context
+        if (p.x > 533) {
+            conditions.push(p.isPlayerTeam ? 'attackingThird' : 'defensiveThird');
+        } else if (p.x < 266) {
+            conditions.push(!p.isPlayerTeam ? 'attackingThird' : 'defensiveThird');
+        }
+
+        // Penalty Area
+        const isPlayerPenaltyArea = (p.x < 150 && p.y > 150 && p.y < 450);
+        const isOpponentPenaltyArea = (p.x > 650 && p.y > 150 && p.y < 450);
+
+        if (p.isPlayerTeam && isOpponentPenaltyArea) conditions.push('penaltyAreaIn');
+        else if (!p.isPlayerTeam && isPlayerPenaltyArea) conditions.push('penaltyAreaIn');
+        else conditions.push('penaltyAreaOut');
+
+        // Pressure Context
+        let pressureCount = 0;
+        const enemies = p.isPlayerTeam ? this.opponentSprites : this.playerSprites;
+        enemies.forEach(e => {
+            if (Phaser.Math.Distance.Between(p.x, p.y, e.x, e.y) < 60) pressureCount++;
+        });
+        if (pressureCount >= 2) conditions.push('underPressure');
+
+        // Player state context
+        if (p.playerData.condition < 40) conditions.push('tired');
+
+        // 1vs1 Context (GK proximity)
+        const enemies2 = p.isPlayerTeam ? this.opponentSprites : this.playerSprites;
+        const enemyGK = enemies2.find(e => e.playerData.position === 'GK');
+        if (enemyGK && Phaser.Math.Distance.Between(p.x, p.y, enemyGK.x, enemyGK.y) < 150) {
+            conditions.push('1vs1');
+        }
+
+        return conditions;
     }
 
     evaluateActions(p, context) {
@@ -1041,9 +1113,8 @@ class MatchScene extends Phaser.Scene {
                 }
 
                 p.lastForceX = totalForceX; p.lastForceY = totalForceY;
-            }
 
-            let totalForceX = p.lastForceX; let totalForceY = p.lastForceY;
+            totalForceX = p.lastForceX; totalForceY = p.lastForceY;
             let totalMagnitude = Math.sqrt(totalForceX*totalForceX + totalForceY*totalForceY);
 
             if (totalMagnitude > 0) {
@@ -1142,6 +1213,11 @@ class MatchScene extends Phaser.Scene {
                 const bDist = Phaser.Math.Distance.Between(p.x, p.y, this.ball.x, this.ball.y);
                 let interceptRadius = 20;
                 if (this.activeBuff && this.activeBuff.target === 'intercept' && p.isPlayerTeam) interceptRadius += 20;
+                const activeConditions = this.getActiveConditions(p);
+                const interceptRangeSkill = window.Player.getSkillEffectFor(p.playerData, "RANGE_UP", "intercept", activeConditions);
+                if (interceptRangeSkill.value > 0) interceptRadius += interceptRangeSkill.value;
+                const trapRangeSkill = window.Player.getSkillEffectFor(p.playerData, "RANGE_UP", "trap", activeConditions);
+                if (trapRangeSkill.value > 0) interceptRadius += trapRangeSkill.value;
                 let zLimit = 15;
                 if (p.playerData.position === 'GK') {
                     const isPlayerSidePA = p.isPlayerTeam && p.x < 160 && p.y > 150 && p.y < 450;
@@ -1152,8 +1228,19 @@ class MatchScene extends Phaser.Scene {
             }
 
             if (interceptor) {
-                let trapChance = (interceptor.playerData.dynamicStats.mental * 0.5) + (interceptor.playerData.dynamicStats.pass * 0.5);
+                const activeConditions = this.getActiveConditions(interceptor);
+                let trapChance = (this.getEffectiveStat(interceptor, 'mental', activeConditions) * 0.5) + (this.getEffectiveStat(interceptor, 'pass', activeConditions) * 0.5);
                 if (this.ballSpeed > 15) trapChance -= 10;
+                const trapSkill = window.Player.getSkillEffectFor(interceptor.playerData, "SUCCESS_RATE_UP", "trap", activeConditions);
+                if (trapSkill.value > 0) {
+                    trapChance += trapSkill.value;
+                    if (Phaser.Math.Between(0, 100) < 50) this.showActionText(interceptor, trapSkill.names[0], "#f1c40f");
+                }
+                const interceptSkill = window.Player.getSkillEffectFor(interceptor.playerData, "SUCCESS_RATE_UP", "intercept", activeConditions);
+                if (interceptSkill.value > 0) {
+                    trapChance += interceptSkill.value;
+                    if (Phaser.Math.Between(0, 100) < 50) this.showActionText(interceptor, interceptSkill.names[0], "#f1c40f");
+                }
                 if (this.isHighBall) trapChance -= 15;
                 if (this.currentGimmick === 'badWeather') trapChance -= 20;
                 if (interceptor.playerData.position === 'GK') trapChance += 30;
@@ -1182,14 +1269,37 @@ class MatchScene extends Phaser.Scene {
 
             const enemies = this.ball.owner.isPlayerTeam ? this.opponentSprites : this.playerSprites;
             // Only engage duel if an enemy is very close, AND neither player is already stunned
-            const tacklers = enemies.filter(p => Phaser.Math.Distance.Between(p.x, p.y, this.ball.x, this.ball.y) < 20 && p.stunTimer <= 0 && this.ball.owner.stunTimer <= 0);
+            const tacklers = enemies.filter(p => {
+                let range = 20;
+                const rangeSkill = window.Player.getSkillEffectFor(p.playerData, "RANGE_UP", "tackle", this.getActiveConditions(p));
+                if (rangeSkill.value > 0) range += rangeSkill.value;
+                return Phaser.Math.Distance.Between(p.x, p.y, this.ball.x, this.ball.y) < range && p.stunTimer <= 0 && this.ball.owner.stunTimer <= 0;
+            });
 
             if (tacklers.length > 0) {
                 let tackler = tacklers[0];
-                let tackleStat = tackler.playerData.stats.defense;
-                let dribbleStat = this.ball.owner.playerData.stats.dribble;
+                const activeConditions = this.getActiveConditions(tackler);
+                let tackleStat = this.getEffectiveStat(tackler, 'defense', activeConditions);
+                let dribbleStat = this.getEffectiveStat(this.ball.owner, 'speed', this.getActiveConditions(this.ball.owner));
+
                 if (this.activeBuff && this.activeBuff.target === 'tackle' && tackler.isPlayerTeam) tackleStat += this.activeBuff.value;
                 if (this.activeBuff && this.activeBuff.target === 'dribble' && this.ball.owner.isPlayerTeam) dribbleStat += this.activeBuff.value;
+
+                const tackleSkill = window.Player.getSkillEffectFor(tackler.playerData, "SUCCESS_RATE_UP", "tackle", activeConditions);
+                if (tackleSkill.value > 0) {
+                    tackleStat += tackleSkill.value;
+                    if (Phaser.Math.Between(0, 100) < 50) this.showActionText(tackler, tackleSkill.names[0], "#f1c40f");
+                }
+                const dribblerConditions = this.getActiveConditions(this.ball.owner);
+                const dribbleSkill = window.Player.getSkillEffectFor(this.ball.owner.playerData, "SUCCESS_RATE_UP", "dribble", dribblerConditions);
+                if (dribbleSkill.value > 0) {
+                    dribbleStat += dribbleSkill.value;
+                    if (Phaser.Math.Between(0, 100) < 50) this.showActionText(this.ball.owner, dribbleSkill.names[0], "#f1c40f");
+                }
+
+                const drawFoulSkill = window.Player.getSkillEffectFor(this.ball.owner.playerData, "SUCCESS_RATE_UP", "drawFoul", dribblerConditions);
+                let foulChance = (tackleStat / 3);
+                if (drawFoulSkill.value > 0) foulChance += drawFoulSkill.value;
 
                 if (Math.random() * 100 < tackleStat - (dribbleStat / 2)) {
                     // Tackle Success! FW loses the ball.
@@ -1215,7 +1325,7 @@ class MatchScene extends Phaser.Scene {
 
                     const flash = this.add.circle(this.ball.x, this.ball.y, 15, 0xe74c3c, 0.6);
                     this.tweens.add({ targets: flash, alpha: 0, duration: 200, onComplete: () => flash.destroy() });
-                } else if (Math.random() * 100 < (tackleStat / 3)) {
+                } else if (Math.random() * 100 < foulChance) {
                     this.showActionText(tackler, "ファウル", "#e74c3c");
                     this.ball.owner = null; this.ballSpeed = 0;
                     const isPK = (this.ball.y > 150 && this.ball.y < 450) && ((tackler.isPlayerTeam && this.ball.x < 160) || (!tackler.isPlayerTeam && this.ball.x > 640));
@@ -1270,12 +1380,31 @@ class MatchScene extends Phaser.Scene {
                 const targetGoalX = isPlayer ? 800 : 0;
 
                 if (forceShoot || currentAction === 'Shoot') {
-                    let shootStat = this.ball.owner.playerData.dynamicStats.shoot;
+                    const activeConditions = this.getActiveConditions(this.ball.owner);
+                    let shootStat = this.getEffectiveStat(this.ball.owner, 'shoot', activeConditions);
                     if (isPlayer && this.activeBuff && (this.activeBuff.target === 'shoot' || this.activeBuff.target === 'header')) shootStat += this.activeBuff.value;
-                    if (this.activeBuff && this.activeBuff.actionType === 'runBehind' && this.ball.owner.playerData.skills.includes(1)) { shootStat += 20; this.showActionText(this.ball.owner, "ラインブレイカー+", "#f1c40f"); }
+
+                    const shootSkill = window.Player.getSkillEffectFor(this.ball.owner.playerData, "SUCCESS_RATE_UP", "shoot", activeConditions);
+                    if (shootSkill.value > 0) {
+                        shootStat += shootSkill.value;
+                        if (Phaser.Math.Between(0, 100) < 50) this.showActionText(this.ball.owner, shootSkill.names[0], "#f1c40f");
+                    }
+                    if (this.isHighBall || (this.activeBuff && this.activeBuff.target === 'header')) {
+                        const headerSkill = window.Player.getSkillEffectFor(this.ball.owner.playerData, "SUCCESS_RATE_UP", "header", activeConditions);
+                        if (headerSkill.value > 0) {
+                            shootStat += headerSkill.value;
+                            if (Phaser.Math.Between(0, 100) < 50) this.showActionText(this.ball.owner, headerSkill.names[0], "#f1c40f");
+                        }
+                    }
+                    if (this.activeBuff && this.activeBuff.actionType === 'runBehind') {
+                        const runBehindSkill = window.Player.getSkillEffectFor(this.ball.owner.playerData, "SUCCESS_RATE_UP", "runBehind", activeConditions);
+                        if (runBehindSkill.value > 0) {
+                            shootStat += runBehindSkill.value;
+                            if (Phaser.Math.Between(0, 100) < 50) this.showActionText(this.ball.owner, runBehindSkill.names[0], "#f1c40f");
+                        }
+                    }
+
                     const isBehind = isPlayer ? scoreDiff < 0 : scoreDiff > 0;
-                    if (isBehind && this.ball.owner.playerData.skills.includes(9)) { shootStat += 20; this.showActionText(this.ball.owner, "逆境の獅子+", "#f1c40f"); }
-                    if (this.activeBuff && this.activeBuff.target === 'header' && this.ball.owner.playerData.skills.includes(3)) { shootStat += 15; this.showActionText(this.ball.owner, "エアバトラー", "#f1c40f"); }
 
                     const oppTeamStats = isPlayer ? this.opponentTeamData.getOverallStrength() : this.playerTeamData.getOverallStrength();
                     this.createKickEffect(this.ball.x, this.ball.y);
@@ -1287,6 +1416,16 @@ class MatchScene extends Phaser.Scene {
 
                     this.ball.cooldown = 5;
 
+                    const defendingTeamForSave = isPlayer ? this.opponentSprites : this.playerSprites;
+                    const defendingGKForSave = defendingTeamForSave.find(p => p.playerData.position === 'GK');
+                    if (defendingGKForSave) {
+                        const gkConditions = this.getActiveConditions(defendingGKForSave);
+                        const saveSkill = window.Player.getSkillEffectFor(defendingGKForSave.playerData, "SUCCESS_RATE_UP", "gkSave", gkConditions);
+                        if (saveSkill.value > 0) {
+                             shootStat -= saveSkill.value;
+                        }
+                    }
+
                     if (Math.random() * 100 < shootStat - (oppTeamStats / 2) + 20) {
                         this.showActionText(kicker, "シュート:成功", "#3498db");
                         this.ballTarget = {x: isPlayer ? 850 : -50, y: Phaser.Math.Between(265, 335)};
@@ -1295,7 +1434,14 @@ class MatchScene extends Phaser.Scene {
                             this.showActionText(kicker, "シュート:失敗", "#e74c3c");
                             const defendingTeam = isPlayer ? this.opponentSprites : this.playerSprites;
                             const defendingGK = defendingTeam.find(p => p.playerData.position === 'GK');
-                            if (defendingGK) this.showActionText(defendingGK, "セーブ:成功", "#f1c40f");
+                            if (defendingGK) {
+                                const gkConditions = this.getActiveConditions(defendingGK);
+                                const saveSkill = window.Player.getSkillEffectFor(defendingGK.playerData, "SUCCESS_RATE_UP", "gkSave", gkConditions);
+                                if (saveSkill.value > 0 && Phaser.Math.Between(0, 100) < 50) {
+                                    this.showActionText(defendingGK, saveSkill.names[0], "#f1c40f");
+                                }
+                                this.showActionText(defendingGK, "セーブ:成功", "#f1c40f");
+                            }
                             this.ballTarget = {x: isPlayer ? 780 : 20, y: 300}; this.ballSpeed = 10; this.ball.cooldown = 5;
                         } else {
                             this.showActionText(kicker, "シュート:失敗", "#e74c3c");
@@ -1344,10 +1490,31 @@ class MatchScene extends Phaser.Scene {
                         return;
                     }
 
-                    let passStat = this.ball.owner.playerData.dynamicStats.pass;
+                    const activeConditions = this.getActiveConditions(this.ball.owner);
+                    let passStat = this.getEffectiveStat(this.ball.owner, 'pass', activeConditions);
                     if (isPlayer && this.activeBuff && this.activeBuff.target === 'pass') passStat += this.activeBuff.value;
                     const staminaFactor2 = Math.max(0.3, this.ball.owner.playerData.currentStamina / 100);
                     let effectivePassStat = passStat * staminaFactor2;
+
+                    const passSkill = window.Player.getSkillEffectFor(this.ball.owner.playerData, "SUCCESS_RATE_UP", "pass", activeConditions);
+                    if (passSkill.value > 0) {
+                        effectivePassStat += passSkill.value;
+                        if (Phaser.Math.Between(0, 100) < 50) this.showActionText(this.ball.owner, passSkill.names[0], "#f1c40f");
+                    }
+
+                    let passType = 'pass';
+                    if (this.ball.owner.currentAction === 'Through Pass') passType = 'throughPass';
+                    else if (isLongBall) passType = 'longPass';
+                    else if (this.ball.owner.currentAction === 'Cross' || this.ball.owner.y < 160 || this.ball.owner.y > 440) passType = 'cross';
+
+                    if (passType !== 'pass') {
+                         const subPassSkill = window.Player.getSkillEffectFor(this.ball.owner.playerData, "SUCCESS_RATE_UP", passType, activeConditions);
+                         if (subPassSkill.value > 0) {
+                              effectivePassStat += subPassSkill.value;
+                              if (Phaser.Math.Between(0, 100) < 50) this.showActionText(this.ball.owner, subPassSkill.names[0], "#f1c40f");
+                         }
+                    }
+
                     if (this.currentGimmick === 'badWeather') { effectivePassStat -= 20; if (isLongBall) effectivePassStat += 30; }
 
                     if (Math.random() * 100 > effectivePassStat) {

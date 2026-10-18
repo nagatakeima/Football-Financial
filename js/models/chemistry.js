@@ -85,25 +85,45 @@ class ChemistrySystem {
             p.staminaConsumptionRate = 1.0;
             p.injuryRiskMultiplier = 1.0;
 
-            p.skills.forEach(skillId => {
-                switch(skillId) {
-                    case 2: // ダイナモ (Dynamo)
-                        p.staminaConsumptionRate = 0.5;
-                        break;
-                    case 4: // パスマスター (Pass Master)
-                        p.dynamicStats.pass = Math.min(100, p.dynamicStats.pass + 15);
-                        break;
-                    case 5: // ハードタッカー (Hard Tackler)
-                        p.dynamicStats.defense = Math.min(100, p.dynamicStats.defense + 15);
-                        break;
-                    case 6: // スピードスター (Speedster)
-                        p.dynamicStats.speed = Math.min(100, p.dynamicStats.speed + 15);
-                        break;
-                    case 8: // 鉄人 (Iron Man)
-                        p.injuryRiskMultiplier = 0.1; // 10% normal risk
-                        break;
+            // Use generic skill parser
+            const statUpEffects = window.Player.getSkillEffectFor(p, "STAT_UP", "all", []);
+            if (statUpEffects.value > 0) {
+                Object.keys(p.dynamicStats).forEach(k => {
+                    p.dynamicStats[k] = Math.min(100, p.dynamicStats[k] + statUpEffects.value);
+                });
+            }
+
+            Object.keys(p.dynamicStats).forEach(k => {
+                const specificStatUp = window.Player.getSkillEffectFor(p, "STAT_UP", k, []);
+                if (specificStatUp.value > 0) {
+                     p.dynamicStats[k] = Math.min(100, p.dynamicStats[k] + specificStatUp.value);
                 }
             });
+
+            // Special composite stat ups (like pass_shoot)
+
+            const passShootUp = window.Player.getSkillEffectFor(p, "STAT_UP", "pass_shoot", []);
+            if (passShootUp.value > 0) {
+                 p.dynamicStats.pass = Math.min(100, p.dynamicStats.pass + passShootUp.value);
+                 p.dynamicStats.shoot = Math.min(100, p.dynamicStats.shoot + passShootUp.value);
+            }
+            const passSpeedUp = window.Player.getSkillEffectFor(p, "STAT_UP", "pass_speed", []);
+            if (passSpeedUp.value > 0) {
+                 p.dynamicStats.pass = Math.min(100, p.dynamicStats.pass + passSpeedUp.value);
+                 p.dynamicStats.speed = Math.min(100, p.dynamicStats.speed + passSpeedUp.value);
+            }
+
+            const staminaReduceEffects = window.Player.getSkillEffectFor(p, "STAMINA_REDUCE", "self", []);
+            if (staminaReduceEffects.value > 0) {
+                 // value is % reduction (e.g., 50 -> 0.5 rate)
+                 p.staminaConsumptionRate = Math.max(0.1, 1.0 - (staminaReduceEffects.value / 100));
+            }
+
+            const injuryRiskEffects = window.Player.getSkillEffectFor(p, "PASSIVE_EFFECT", "injuryRisk", []);
+            if (injuryRiskEffects.value < 0) {
+                 // value is negative % (e.g., -90)
+                 p.injuryRiskMultiplier = Math.max(0.01, 1.0 + (injuryRiskEffects.value / 100));
+            }
         });
 
         // Skill: 司令塔 (Playmaker - ID: 7) - boost surrounding players pass
@@ -117,11 +137,14 @@ class ChemistrySystem {
             const p1 = team.starting11[idx1];
             const p2 = team.starting11[idx2];
 
-            if (p1.skills.includes(7)) {
-                p2.dynamicStats.pass = Math.min(100, p2.dynamicStats.pass + 5);
+            const p1LinkBoost = window.Player.getSkillEffectFor(p1, "PASSIVE_EFFECT", "linkPassBoost", []);
+            if (p1LinkBoost.value > 0) {
+                p2.dynamicStats.pass = Math.min(100, p2.dynamicStats.pass + p1LinkBoost.value);
             }
-            if (p2.skills.includes(7)) {
-                p1.dynamicStats.pass = Math.min(100, p1.dynamicStats.pass + 5);
+
+            const p2LinkBoost = window.Player.getSkillEffectFor(p2, "PASSIVE_EFFECT", "linkPassBoost", []);
+            if (p2LinkBoost.value > 0) {
+                p1.dynamicStats.pass = Math.min(100, p1.dynamicStats.pass + p2LinkBoost.value);
             }
         });
 
