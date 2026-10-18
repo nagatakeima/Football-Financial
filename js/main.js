@@ -984,21 +984,6 @@ class MatchScene extends Phaser.Scene {
             }
         }
 
-        for (let key in actionScores) {
-            actionScores[key] *= staminaFactor;
-            actionScores[key] += Math.random() * (10 + (1 - staminaFactor) * 20);
-        }
-
-        let targetLineX = null;
-        if (!isAttacking && !hasBall && (pos === 'CB' || pos === 'SB')) {
-            const myTeam = p.isPlayerTeam ? this.playerSprites : this.opponentSprites;
-            const cbs = myTeam.filter(mate => mate.playerData.position === 'CB');
-            if (cbs.length > 0) targetLineX = cbs.sort((a,b) => p.isPlayerTeam ? a.x - b.x : b.x - a.x)[0].x;
-        }
-
-        let bestAction = 'HoldPosition'; let maxScore = -Infinity;
-        const validActions = hasBall ? ['Keep', 'Dribble', 'Pass', 'Shoot', 'Clear'] : (isAttacking ? ['Support', 'RunIntoSpace', 'HoldPosition'] : ['Press', 'Mark', 'Cover', 'Delay', 'Retreat']);
-
 
         // Role-based Action Evaluation Bias (Phase 3 - DF/GK)
         if (!p.playerData.isMob) {
@@ -1087,6 +1072,23 @@ class MatchScene extends Phaser.Scene {
                 }
             });
         }
+
+        for (let key in actionScores) {
+            actionScores[key] *= staminaFactor;
+            actionScores[key] += Math.random() * (10 + (1 - staminaFactor) * 20);
+        }
+
+        let targetLineX = null;
+        if (!isAttacking && !hasBall && (pos === 'CB' || pos === 'SB')) {
+            const myTeam = p.isPlayerTeam ? this.playerSprites : this.opponentSprites;
+            const cbs = myTeam.filter(mate => mate.playerData.position === 'CB');
+            if (cbs.length > 0) targetLineX = cbs.sort((a,b) => p.isPlayerTeam ? a.x - b.x : b.x - a.x)[0].x;
+        }
+
+        let bestAction = 'HoldPosition'; let maxScore = -Infinity;
+        const validActions = hasBall ? ['Keep', 'Dribble', 'Pass', 'Shoot', 'Clear'] : (isAttacking ? ['Support', 'RunIntoSpace', 'HoldPosition'] : ['Press', 'Mark', 'Cover', 'Delay', 'Retreat']);
+
+
 
         const activeConditions = this.getActiveConditions(p);
 
@@ -1300,7 +1302,7 @@ class MatchScene extends Phaser.Scene {
                         break;
                     case 'Press':
                     case 'Clear':
-                        if (this.ball.owner && bestAction === 'Press') {
+                        if (this.ball.owner && p.currentAction === 'Press') {
                             // Phase 3: 1st Defender Cover Shadow arc approach
                             const bx = this.ball.x; const by = this.ball.y;
                             let angleToBall = Phaser.Math.Angle.Between(p.x, p.y, bx, by);
