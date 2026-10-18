@@ -50,11 +50,20 @@ matchScene.opponentTeamData = { formation: "4-4-2" };
 matchScene.ball = { x: 400, y: 300 };
 matchScene.getBasePosition = () => ({ x: 200, y: 300 });
 
+// Mock dependencies for evaluateActions
+matchScene.getPitchZone = () => ({ tier: 'Middle', lane: 'Center' });
+matchScene.calculateThreat = () => 50;
+matchScene.calculatePassRisk = () => 30;
+matchScene.getActiveConditions = () => [];
+matchScene.playerSprites = [];
+matchScene.opponentSprites = [];
+
 let passed = true;
 
 const pSB = {
+    x: 200, y: 100,
     isPlayerTeam: true,
-    playerData: { isMob: false, position: 'SB', role: 'Inverted' },
+    playerData: { isMob: false, position: 'SB', role: 'Inverted', currentStamina: 100 },
     expectedPosStr: 'SB'
 };
 const basePosSB = matchScene.getDynamicBasePosition(pSB, true, true);
@@ -64,14 +73,23 @@ if (basePosSB.y !== 220 && basePosSB.y !== 380) {
 }
 
 const pCF = {
+    x: 400, y: 300,
     isPlayerTeam: true,
-    playerData: { isMob: false, position: 'CF', role: 'False-9' },
+    playerData: { isMob: false, position: 'CF', role: 'False-9', currentStamina: 100 },
     expectedPosStr: 'CF'
 };
 const basePosCF_Normal = matchScene.getDynamicBasePosition({ ...pCF, playerData: { isMob: false, position: 'CF', role: 'Poacher' } }, true, true);
 const basePosCF_F9 = matchScene.getDynamicBasePosition(pCF, true, true);
 if (basePosCF_F9.x >= basePosCF_Normal.x) {
     console.error("Test 2 Failed: False-9 did not drop deeper than Poacher.");
+    passed = false;
+}
+
+// Test 3: evaluateActions doesn't crash and returns appropriate biases
+const contextData = { tactic: 'Possession', isAttacking: true, hasBall: false };
+const evalResult = matchScene.evaluateActions(pCF, contextData);
+if (!evalResult.action || typeof evalResult.score !== 'number') {
+    console.error("Test 3 Failed: evaluateActions returned invalid format.");
     passed = false;
 }
 
