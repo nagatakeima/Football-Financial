@@ -265,7 +265,11 @@ class ManagementUI {
             newPlayer.id = `poached_${Date.now()}`; // Ensure unique ID
 
             team.players.push(newPlayer);
-            team.bench.push(newPlayer); // Put in bench by default since we only remove from wherever they were
+            if (team.starting11.length < 11) {
+                team.starting11.push(newPlayer);
+            } else {
+                team.bench.push(newPlayer);
+            }
 
             alert(`${newPlayer.name} を引き抜きました！`);
 
@@ -1146,12 +1150,21 @@ class ManagementUI {
                 eventObj.flavorText = '「監督、有望な選手を見つけました。チームの補強にいかがですか？」';
 
                 // Choice 1: Standard Buy
-                eventObj.choices.push({
-                    desc: `資金¥${Math.floor(100000 * costMultiplier).toLocaleString()}で選手を獲得`,
-                    fundCost: Math.floor(100000 * costMultiplier),
-                    tradeCount: 0,
-                    rewardRarity: 'N'
-                });
+                if (currentSquadSize >= 18) {
+                    eventObj.choices.push({
+                        desc: `資金¥${Math.floor(100000 * costMultiplier).toLocaleString()} ＋ 選手1人放出で選手を獲得`,
+                        fundCost: Math.floor(100000 * costMultiplier),
+                        tradeCount: 1,
+                        rewardRarity: 'N'
+                    });
+                } else {
+                    eventObj.choices.push({
+                        desc: `資金¥${Math.floor(100000 * costMultiplier).toLocaleString()}で選手を獲得`,
+                        fundCost: Math.floor(100000 * costMultiplier),
+                        tradeCount: 0,
+                        rewardRarity: 'N'
+                    });
+                }
 
                 // Choice 2: Trade 1
                 // Only allow trade if currentSquadSize - tradeCount + 1 >= 11
