@@ -683,25 +683,287 @@ class MatchScene extends Phaser.Scene {
         let team = isPlayerTeam ? this.playerSprites : this.opponentSprites;
         let taker = team.sort((a,b) => Phaser.Math.Distance.Between(a.x, a.y, x, y) - Phaser.Math.Distance.Between(b.x, b.y, x, y))[0];
 
+        if (type === 'Goal Kick') {
+            taker = team.find(p => p.playerData.position === 'GK') || taker;
+            x = isPlayerTeam ? 35 : 765;
+            y = 300;
+        } else if (type === 'Corner Kick') {
+            taker = team.filter(p => p.playerData.position !== 'GK').sort((a,b) => b.playerData.stats.pass - a.playerData.stats.pass)[0] || taker;
+        } else if (type === 'Free Kick' || type === 'Indirect Free Kick') {
+            taker = team.filter(p => p.playerData.position !== 'GK').sort((a,b) => (b.playerData.stats.pass + b.playerData.stats.shoot) - (a.playerData.stats.pass + a.playerData.stats.shoot))[0] || taker;
+        } else if (type === 'Penalty Kick') {
+            taker = team.filter(p => p.playerData.position !== 'GK').sort((a,b) => (b.playerData.stats.shoot + b.playerData.stats.mental) - (a.playerData.stats.shoot + a.playerData.stats.mental))[0] || taker;
+            x = isPlayerTeam ? 685 : 115;
+            y = 300;
+        }
+
+        this.ball.x = x; this.ball.y = y;
+
         if (taker) {
             let offsetX = 0; let offsetY = 0;
-            if (x < 30) offsetX = 15; else if (x > 770) offsetX = -15;
-            if (y < 80) offsetY = 15; else if (y > 520) offsetY = -15;
+            // Only apply offsets if not PK or Goal Kick
+            if (type !== 'Penalty Kick' && type !== 'Goal Kick') {
+                if (x < 30) offsetX = 15; else if (x > 770) offsetX = -15;
+                if (y < 80) offsetY = 15; else if (y > 520) offsetY = -15;
+            }
             taker.x = x + offsetX; taker.y = y + offsetY;
             this.ball.owner = taker;
             this.ball.cooldown = 30; // Also protect ball
             this.lastTouchedByPlayerTeam = taker.isPlayerTeam;
         }
 
+        // Retrieve tactical preferences for dynamic positioning safely
+        const atkTeamData = isPlayerTeam ? this.playerTeamData : this.opponentTeamData;
+        const defTeamData = isPlayerTeam ? this.opponentTeamData : this.playerTeamData;
+
+        let atkManager = atkTeamData && atkTeamData.manager ? atkTeamData.manager : (atkTeamData ? window.MasterData.Managers.find(m => m.id === atkTeamData.managerId) : null);
+        let defManager = defTeamData && defTeamData.manager ? defTeamData.manager : (defTeamData ? window.MasterData.Managers.find(m => m.id === defTeamData.managerId) : null);
+
+        const attackingTactic = atkManager ? atkManager.preference : 'Possession';
+        const defendingTactic = defManager ? defManager.preference : 'Possession';
+
+        // Sort outfield players by specific stats to assign dynamic roles
+        const atkOutfield = team.filter(p => p.playerData.position !== 'GK' && p !== taker);
+        const defOutfield = (isPlayerTeam ? this.opponentSprites : this.playerSprites).filter(p => p.playerData.position !== 'GK');
+
+        if (type === 'Goal Kick') {
+            const dir = isPlayerTeam ? 1 : -1;
+            const ownGoalX = isPlayerTeam ? 15 : 785;
+
+            // Attacking Team (Possession vs Others)
+            if (attackingTactic === 'Possession') {
+                atkOutfield.forEach(p => {
+                    if (p.playerData.position === 'CB') {
+                        p.x = ownGoalX + dir * 45;
+                        p.y = p.y < 300 ? 200 : 400;
+                    } else if (p.playerData.position === 'SB') {
+                        p.x = ownGoalX + dir * 205;
+                        p.y = p.y < 300 ? 85 : 515;
+                    } else if (p.playerData.position === 'CDM' || p.playerData.position === 'CM') {
+                        p.x = ownGoalX + dir * 165;
+                        p.y = 300 + (Math.random() * 40 - 20);
+                    } else {
+                        // Push others slightly higher
+                        p.x = ownGoalX + dir * 300;
+                    }
+                });
+            } else { // Counter / Retreat / HighPress
+                // Target man logic
+                let targetMan = atkOutfield.sort((a,b) => b.playerData.stats.physical - a.playerData.stats.physical)[0];
+                let targetX = 400 - dir * 20; // Middle third
+                let targetY = 300;
+                if (targetMan) {
+                    targetMan.x = targetX;
+                    targetMan.y = targetY;
+                }
+
+                // Overload around target man
+                atkOutfield.forEach((p, i) => {
+                    if (p !== targetMan) {
+                        if (p.playerData.position === 'CB' || p.playerData.position === 'SB') {
+                            p.x = ownGoalX + dir * 250; // Push DF line up
+                        } else {
+                            p.x = targetX + dir * (Math.random() * 40 - 20);
+                            p.y = targetY + (Math.random() * 100 - 50);
+                        }
+                    }
+                });
+            }
+
+            // Defending team falls back somewhat
+            defOutfield.forEach(p => {
+                p.x = 400 + dir * 50; // Wait near midfield
+                p.y = 300 + (Math.random() * 200 - 100); // Disperse vertically
+            });
+
+        } else if (type === 'Corner Kick') {
+            const dir = isPlayerTeam ? 1 : -1;
+            const enemyGoalX = isPlayerTeam ? 785 : 15;
+            const isTopSide = y < 300;
+            const nearY = isTopSide ? 210 : 390;
+            const farY = isTopSide ? 390 : 210;
+            const centerY = 300;
+            const vitalX = enemyGoalX - dir * 190;
+            const halfWayX = 400;
+
+            // Attackers (Taker is already set)
+            // 1. Short corner support
+            let atkSortedForShort = [...atkOutfield].sort((a,b) => (b.playerData.stats.pass + b.playerData.stats.speed) - (a.playerData.stats.pass + a.playerData.stats.speed));
+            let shortCornerSupport = atkSortedForShort.shift();
+            if (shortCornerSupport) {
+                shortCornerSupport.x = x - dir * 70;
+                shortCornerSupport.y = isTopSide ? y + 20 : y - 20;
+            }
+
+            // 2. PA Targets (4-5)
+            let atkSortedForPA = [...atkSortedForShort].sort((a,b) => (b.playerData.stats.physical + b.playerData.stats.shoot) - (a.playerData.stats.physical + a.playerData.stats.shoot));
+            let paTargets = atkSortedForPA.splice(0, 5); // Take top 5
+            const paSpots = [
+                {x: enemyGoalX - dir * 60, y: nearY}, // Near
+                {x: enemyGoalX - dir * 90, y: centerY}, // Center
+                {x: enemyGoalX - dir * 60, y: farY}, // Far
+                {x: enemyGoalX - dir * 30, y: centerY}, // GK Front
+                {x: enemyGoalX - dir * 120, y: centerY} // Penalty Spot
+            ];
+            paTargets.forEach((p, i) => {
+                if (paSpots[i]) {
+                    p.x = paSpots[i].x; p.y = paSpots[i].y;
+                }
+            });
+
+            // 3. Counter care (top 2 speed)
+            let atkSortedForSpeed = [...atkSortedForPA].sort((a,b) => b.playerData.stats.speed - a.playerData.stats.speed);
+            let counterCare1 = atkSortedForSpeed.shift();
+            let counterCare2 = atkSortedForSpeed.shift();
+            if (counterCare1) { counterCare1.x = halfWayX; counterCare1.y = 220; }
+            if (counterCare2) { counterCare2.x = halfWayX; counterCare2.y = 380; }
+
+            // 4. Vital Area (the rest)
+            atkSortedForSpeed.forEach((p, i) => {
+                p.x = vitalX;
+                p.y = 250 + (i * 100);
+            });
+
+
+            // Defenders
+            // 1. Stone (near post)
+            let defSortedForStone = [...defOutfield].sort((a,b) => b.playerData.stats.defense - a.playerData.stats.defense);
+            let stone = defSortedForStone.shift();
+            if (stone) {
+                stone.x = enemyGoalX - dir * 30;
+                stone.y = isTopSide ? 240 : 360;
+            }
+
+            // 2. Zone Core (top 2 physical)
+            let defSortedForZone = [...defSortedForStone].sort((a,b) => b.playerData.stats.physical - a.playerData.stats.physical);
+            let zone1 = defSortedForZone.shift();
+            let zone2 = defSortedForZone.shift();
+            if (zone1) { zone1.x = enemyGoalX - dir * 45; zone1.y = 280; }
+            if (zone2) { zone2.x = enemyGoalX - dir * 45; zone2.y = 320; }
+
+            // 3. Counter Origin (highest speed)
+            let defSortedForCounter = [...defSortedForZone].sort((a,b) => b.playerData.stats.speed - a.playerData.stats.speed);
+            let counterOrigin = defSortedForCounter.shift();
+            if (counterOrigin) {
+                counterOrigin.x = halfWayX + dir * 20;
+                counterOrigin.y = 300;
+            }
+
+            // 4. Man-markers for PA Targets & Vital Area
+            // Map markers to PA targets directly
+            defSortedForCounter.forEach((p, i) => {
+                if (i < paTargets.length) {
+                    // Mark attacker tightly (slightly towards own goal)
+                    p.x = paTargets[i].x + dir * 15;
+                    p.y = paTargets[i].y;
+                } else {
+                    // Vital Area cover
+                    p.x = enemyGoalX - dir * 170;
+                    p.y = 250 + ((i - paTargets.length) * 100);
+                }
+            });
+
+        } else if (type === 'Free Kick' && (isPlayerTeam ? x > 500 : x < 300)) {
+            // Near Goal Direct Free Kick
+            const dir = isPlayerTeam ? 1 : -1;
+            const enemyGoalX = isPlayerTeam ? 785 : 15;
+
+            // Wall
+            let wallCount = 4;
+            if (Math.abs(y - 300) > 100) wallCount = 3;
+            if (Phaser.Math.Distance.Between(x, y, enemyGoalX, 300) < 150) wallCount = 5;
+
+            let defSortedForWall = [...defOutfield].sort((a,b) => b.playerData.stats.physical - a.playerData.stats.physical);
+            let wallPlayers = defSortedForWall.splice(0, wallCount);
+
+            // Wall Positioning
+            let angleToGoal = Phaser.Math.Angle.Between(x, y, enemyGoalX, 300);
+            let wallCenterX = x + Math.cos(angleToGoal) * 90;
+            let wallCenterY = y + Math.sin(angleToGoal) * 90;
+
+            wallPlayers.forEach((p, i) => {
+                let offsetAngle = angleToGoal + Math.PI/2;
+                let offsetDist = (i - (wallCount-1)/2) * 25;
+                p.x = wallCenterX + Math.cos(offsetAngle) * offsetDist;
+                p.y = wallCenterY + Math.sin(offsetAngle) * offsetDist;
+            });
+
+            // Mark remaining attackers
+            atkOutfield.forEach((atkP, i) => {
+                atkP.x = enemyGoalX - dir * (90 + Math.random() * 60);
+                atkP.y = 300 + (Math.random() * 160 - 80);
+
+                if (i < defSortedForWall.length) {
+                    let defP = defSortedForWall[i];
+                    defP.x = atkP.x - dir * 15;
+                    defP.y = atkP.y;
+                }
+            });
+
+        } else if (type === 'Throw In') {
+            const dir = isPlayerTeam ? 1 : -1;
+            // Attackers overload
+            let nearestAtk = [...atkOutfield].sort((a,b) => Phaser.Math.Distance.Between(a.x, a.y, x, y) - Phaser.Math.Distance.Between(b.x, b.y, x, y));
+            nearestAtk.slice(0, 3).forEach((p, i) => {
+                p.x = x + dir * (30 + i * 20);
+                p.y = y + (y < 300 ? 40 : -40) + i * 15;
+            });
+
+            // Defenders mark
+            let nearestDef = [...defOutfield].sort((a,b) => Phaser.Math.Distance.Between(a.x, a.y, x, y) - Phaser.Math.Distance.Between(b.x, b.y, x, y));
+            nearestDef.slice(0, 3).forEach((p, i) => {
+                let targetAtk = nearestAtk[i];
+                p.x = targetAtk.x + dir * 15;
+                p.y = targetAtk.y;
+            });
+
+        } else if (type === 'Penalty Kick') {
+            const dir = isPlayerTeam ? 1 : -1;
+            const enemyGoalX = isPlayerTeam ? 785 : 15;
+            // All players out of box (beyond 150px penalty area line)
+            [...atkOutfield, ...defOutfield].forEach(p => {
+                p.x = enemyGoalX - dir * 185;
+                p.y = 300 + (Math.random() * 200 - 100);
+            });
+            // GK is already in goal by default positioning logic, but let's enforce
+            let defGK = (isPlayerTeam ? this.opponentSprites : this.playerSprites).find(p => p.playerData.position === 'GK');
+            if (defGK) { defGK.x = enemyGoalX; defGK.y = 300; }
+
+        } else {
+            // Default dispersion for other minor set pieces (midfield free kick, indirect)
+            [...this.playerSprites, ...this.opponentSprites].forEach((p, idx) => {
+                 if (p !== taker && Phaser.Math.Distance.Between(p.x, p.y, x, y) < 80) {
+                     let angle = Phaser.Math.Angle.Between(x, y, 400, 300); // Towards center instead of pushing outwards
+                     angle += (idx - 5) * 0.15; // Point 5: Disperse to prevent stacking
+                     p.x = x + Math.cos(angle) * 90; p.y = y + Math.sin(angle) * 90;
+                 }
+            });
+        }
+
+        // Global Constraints & Validation
+        if (taker) {
+            taker.cachedTargetX = taker.x;
+            taker.cachedTargetY = taker.y;
+        }
+
         [...this.playerSprites, ...this.opponentSprites].forEach((p, idx) => {
-             if (p !== taker && Phaser.Math.Distance.Between(p.x, p.y, x, y) < 80) {
-                 let angle = Phaser.Math.Angle.Between(x, y, 400, 300); // Towards center instead of pushing outwards
-                 angle += (idx - 5) * 0.15; // Point 5: Disperse to prevent stacking
-                 p.x = x + Math.cos(angle) * 90; p.y = y + Math.sin(angle) * 90;
-                 // Clamp to keep them inside after pushing
-                 p.x = Phaser.Math.Clamp(p.x, 15, 785);
-                 p.y = Phaser.Math.Clamp(p.y, 65, 535);
-             }
+            if (p !== taker) {
+                // Minimum distance enforcement to prevent 0-second tackles (defending team only)
+                let distToBall = Phaser.Math.Distance.Between(p.x, p.y, x, y);
+                if (p.isPlayerTeam !== isPlayerTeam && distToBall < 85) {
+                    let angle = Phaser.Math.Angle.Between(x, y, 400, 300) + (idx - 5) * 0.1;
+                    p.x = x + Math.cos(angle) * 90;
+                    p.y = y + Math.sin(angle) * 90;
+                }
+
+                // Keep inside bounds
+                p.x = Phaser.Math.Clamp(p.x, 15, 785);
+                p.y = Phaser.Math.Clamp(p.y, 65, 535);
+
+                // Cache Target for Set Piece waiting phase
+                p.cachedTargetX = p.x;
+                p.cachedTargetY = p.y;
+            }
         });
     }
 
@@ -1659,8 +1921,13 @@ class MatchScene extends Phaser.Scene {
                     currentAction = 'Pass';
                 }
                 // Cannot shoot directly from throw-ins or indirect free kicks (Offside)
-                if (this.currentSetPieceType === 'Throw In' || this.currentSetPieceType === 'Offside') {
+                if (this.currentSetPieceType === 'Throw In' || this.currentSetPieceType === 'Offside' || this.currentSetPieceType === 'Indirect Free Kick') {
                     if (currentAction === 'Shoot' || forceShoot) { currentAction = 'Pass'; forceShoot = false; }
+                }
+                // Penalty Kicks MUST be shot
+                if (this.currentSetPieceType === 'Penalty Kick') {
+                    currentAction = 'Shoot';
+                    forceShoot = true;
                 }
             }
 
