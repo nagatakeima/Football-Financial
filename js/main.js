@@ -616,10 +616,71 @@ class MatchScene extends Phaser.Scene {
             }
         }
 
+        // ハーフタイム処理
+        if (this.matchTime >= 45 && this.matchTime < 46 && !this.halftimeDone && this.matchState === 'playing') {
+            this.matchState = 'halftime';
+            this.showHalftimeUI();
+        }
+
         if (this.matchTime >= 90) {
             this.logicTimer.remove();
             this.endMatch(this.score.player, this.score.opponent);
         }
+    }
+
+    showHalftimeUI() {
+        if (this.isSkip) {
+            // スキップ中はUIを表示せず即座に後半へ
+            this.halftimeDone = true;
+            this.matchState = 'playing';
+            this.resetPositions();
+            return;
+        }
+
+        // Pause logic timer while waiting for user interaction
+        this.logicTimer.paused = true;
+
+        const uiContainer = document.getElementById('ui-layer');
+        if (!uiContainer) return;
+
+        const halftimeDiv = document.createElement('div');
+        halftimeDiv.id = 'halftime-modal';
+        halftimeDiv.className = 'modal-overlay';
+
+        let html = `
+            <div class="modal-content halftime-content">
+                <h2>ハーフタイム</h2>
+                <div class="score-display">${this.playerTeamData.name} ${this.score.player} - ${this.score.opponent} ${this.opponentTeamData.name}</div>
+                <div class="substitution-section">
+                    <h3>スタメン (残りスタミナ)</h3>
+                    <div class="player-grid">
+        `;
+
+        this.playerTeamData.starting11.forEach((p, i) => {
+            html += `<div class="player-card">
+                <span class="pos">${p.position}</span> ${p.name} <br>
+                <span class="stamina">Sta: ${Math.floor(p.currentStamina)}</span>
+            </div>`;
+        });
+
+        html += `
+                    </div>
+                </div>
+                <button id="btn-start-second-half" class="action-btn" style="background: #3498db; color: #fff; padding: 10px 20px; font-size: 18px; border: none; cursor: pointer;">後半キックオフ</button>
+            </div>
+        `;
+
+        halftimeDiv.innerHTML = html;
+        uiContainer.appendChild(halftimeDiv);
+
+        document.getElementById('btn-start-second-half').addEventListener('click', () => {
+            halftimeDiv.remove();
+            this.halftimeDone = true;
+            this.matchState = 'kickoff';
+            this.kickoffTimer = 20;
+            this.resetPositions();
+            this.logicTimer.paused = false;
+        });
     }
 
     checkBallOut() {

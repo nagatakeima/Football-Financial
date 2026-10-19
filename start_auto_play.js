@@ -5,7 +5,7 @@ const delay = ms => new Promise(res => setTimeout(res, ms));
     try {
         const browser = await puppeteer.launch({ args: ['--no-sandbox'] });
         const page = await browser.newPage();
-        await page.goto('http://localhost:3000');
+        await page.goto('http://localhost:3000/index.html');
 
         console.log("Navigated to game.");
         await page.waitForSelector('.menu-box button');
@@ -13,7 +13,15 @@ const delay = ms => new Promise(res => setTimeout(res, ms));
         console.log("Clicking Manager...");
         const buttons = await page.$$('.menu-box button');
         if (buttons.length > 0) {
-            await buttons[0].click(); // Select first manager
+            await buttons[0].click(); // New Dive
+            await delay(500);
+
+            const nextBtns = await page.$$('.menu-box button');
+            if(nextBtns.length > 0) await nextBtns[0].click(); // Select manager
+            await delay(500);
+
+            const startBtns = await page.$$('.menu-box button');
+            if(startBtns.length > 0) await startBtns[0].click(); // Go to match (dashboard)
         }
 
         await page.waitForSelector('.top-bar .team-info');
@@ -40,7 +48,7 @@ const delay = ms => new Promise(res => setTimeout(res, ms));
         const startMatchBtns = await page.$$('.menu-box button');
         for (let b of startMatchBtns) {
             const text = await b.evaluate(el => el.textContent);
-            if (text.includes('試合開始')) {
+            if (text.includes('KICK OFF')) {
                 await b.click();
                 break;
             }

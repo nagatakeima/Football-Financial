@@ -10,14 +10,22 @@ const delay = ms => new Promise(res => setTimeout(res, ms));
         // Output console logs from the page
         page.on('console', msg => console.log('PAGE LOG:', msg.text()));
 
-        await page.goto('http://localhost:3000');
+        await page.goto('http://localhost:3000/index.html');
         console.log("Navigated to game.");
         await page.waitForSelector('.menu-box button');
 
         // Select Manager
         const buttons = await page.$$('.menu-box button');
         if (buttons.length > 0) {
-            await buttons[0].click();
+            await buttons[0].click(); // New Dive
+            await delay(500);
+
+            const nextBtns = await page.$$('.menu-box button');
+            if(nextBtns.length > 0) await nextBtns[0].click(); // Select manager
+            await delay(500);
+
+            const startBtns = await page.$$('.menu-box button');
+            if(startBtns.length > 0) await startBtns[0].click(); // Go to match (dashboard)
         }
         await page.waitForSelector('.top-bar .team-info');
         console.log("In Dashboard. Starting 5 loops...");
@@ -51,7 +59,17 @@ const delay = ms => new Promise(res => setTimeout(res, ms));
             dashButtons = await page.$$('.menu-box button');
             for (let b of dashButtons) {
                 const text = await b.evaluate(el => el.textContent);
-                if (text.includes('試合開始')) {
+                if (text.includes('試合へ進む')) {
+                    await b.click();
+                    break;
+                }
+            }
+            await delay(500);
+
+            const kickoffBtns = await page.$$('.menu-box button');
+            for (let b of kickoffBtns) {
+                const text = await b.evaluate(el => el.textContent);
+                if (text.includes('KICK OFF')) {
                     await b.click();
                     break;
                 }
@@ -61,9 +79,7 @@ const delay = ms => new Promise(res => setTimeout(res, ms));
 
             // Skip match
             await delay(500);
-            const skipBtns = await page.$$('text'); // Phaser text objects are rendered in canvas, need eval
             await page.evaluate(() => {
-                // Find skip button in Phaser scene and click it
                 const scene = window.game.scene.keys.MatchScene;
                 if(scene && scene.isSkip !== undefined) {
                     scene.isSkip = true;
@@ -73,6 +89,20 @@ const delay = ms => new Promise(res => setTimeout(res, ms));
 
             // wait for match end UI
             await delay(1000);
+
+            // Check if Halftime UI appeared instead of match end
+            const isHalftime = await page.evaluate(() => {
+                return document.getElementById('halftime-modal') !== null;
+            });
+            if (isHalftime) {
+                console.log('Skipping halftime modal...');
+                await page.evaluate(() => {
+                    const btn = document.getElementById('btn-start-second-half');
+                    if (btn) btn.click();
+                });
+                await delay(1000); // wait for match to finish after halftime
+            }
+
             const closeBtns = await page.$$('.menu-box button');
             if (closeBtns.length > 0) {
                 await closeBtns[0].click();
