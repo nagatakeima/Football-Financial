@@ -683,26 +683,44 @@ class MatchScene extends Phaser.Scene {
         let team = isPlayerTeam ? this.playerSprites : this.opponentSprites;
         let taker = team.sort((a,b) => Phaser.Math.Distance.Between(a.x, a.y, x, y) - Phaser.Math.Distance.Between(b.x, b.y, x, y))[0];
 
-        if (type === 'Corner Kick') {
+        if (type === 'Goal Kick') {
+            taker = team.find(p => p.playerData.position === 'GK') || taker;
+            x = isPlayerTeam ? 35 : 765;
+            y = 300;
+        } else if (type === 'Corner Kick') {
             taker = team.filter(p => p.playerData.position !== 'GK').sort((a,b) => b.playerData.stats.pass - a.playerData.stats.pass)[0] || taker;
+        } else if (type === 'Free Kick' || type === 'Indirect Free Kick') {
+            taker = team.filter(p => p.playerData.position !== 'GK').sort((a,b) => (b.playerData.stats.pass + b.playerData.stats.shoot) - (a.playerData.stats.pass + a.playerData.stats.shoot))[0] || taker;
+        } else if (type === 'Penalty Kick') {
+            taker = team.filter(p => p.playerData.position !== 'GK').sort((a,b) => (b.playerData.stats.shoot + b.playerData.stats.mental) - (a.playerData.stats.shoot + a.playerData.stats.mental))[0] || taker;
+            x = isPlayerTeam ? 685 : 115;
+            y = 300;
         }
+
+        this.ball.x = x; this.ball.y = y;
 
         if (taker) {
             let offsetX = 0; let offsetY = 0;
-            if (x < 30) offsetX = 15; else if (x > 770) offsetX = -15;
-            if (y < 80) offsetY = 15; else if (y > 520) offsetY = -15;
+            // Only apply offsets if not PK or Goal Kick
+            if (type !== 'Penalty Kick' && type !== 'Goal Kick') {
+                if (x < 30) offsetX = 15; else if (x > 770) offsetX = -15;
+                if (y < 80) offsetY = 15; else if (y > 520) offsetY = -15;
+            }
             taker.x = x + offsetX; taker.y = y + offsetY;
             this.ball.owner = taker;
             this.ball.cooldown = 30; // Also protect ball
             this.lastTouchedByPlayerTeam = taker.isPlayerTeam;
         }
 
-        // Retrieve tactical preferences for dynamic positioning
-        const attackingTeamManager = isPlayerTeam ? window.MasterData.Managers.find(m => m.id === window.gameState.playerTeam.managerId) : window.MasterData.Managers.find(m => m.id === managementUI.getNextOpponent().managerId);
-        const attackingTactic = attackingTeamManager ? attackingTeamManager.preference : (isPlayerTeam ? window.gameState.playerTeam.tactics : managementUI.getNextOpponent().tactics);
+        // Retrieve tactical preferences for dynamic positioning safely
+        const atkTeamData = isPlayerTeam ? this.playerTeamData : this.opponentTeamData;
+        const defTeamData = isPlayerTeam ? this.opponentTeamData : this.playerTeamData;
 
-        const defendingTeamManager = !isPlayerTeam ? window.MasterData.Managers.find(m => m.id === window.gameState.playerTeam.managerId) : window.MasterData.Managers.find(m => m.id === managementUI.getNextOpponent().managerId);
-        const defendingTactic = defendingTeamManager ? defendingTeamManager.preference : (!isPlayerTeam ? window.gameState.playerTeam.tactics : managementUI.getNextOpponent().tactics);
+        let atkManager = atkTeamData && atkTeamData.manager ? atkTeamData.manager : (atkTeamData ? window.MasterData.Managers.find(m => m.id === atkTeamData.managerId) : null);
+        let defManager = defTeamData && defTeamData.manager ? defTeamData.manager : (defTeamData ? window.MasterData.Managers.find(m => m.id === defTeamData.managerId) : null);
+
+        const attackingTactic = atkManager ? atkManager.preference : 'Possession';
+        const defendingTactic = defManager ? defManager.preference : 'Possession';
 
         // Sort outfield players by specific stats to assign dynamic roles
         const atkOutfield = team.filter(p => p.playerData.position !== 'GK' && p !== taker);
@@ -902,9 +920,9 @@ class MatchScene extends Phaser.Scene {
         } else if (type === 'Penalty Kick') {
             const dir = isPlayerTeam ? 1 : -1;
             const enemyGoalX = isPlayerTeam ? 785 : 15;
-            // All players out of box
+            // All players out of box (beyond 150px penalty area line)
             [...atkOutfield, ...defOutfield].forEach(p => {
-                p.x = enemyGoalX - dir * 170;
+                p.x = enemyGoalX - dir * 185;
                 p.y = 300 + (Math.random() * 200 - 100);
             });
             // GK is already in goal by default positioning logic, but let's enforce
@@ -923,14 +941,19 @@ class MatchScene extends Phaser.Scene {
         }
 
         // Global Constraints & Validation
-        [...this.playerSprites, ...this.opponentSprites].forEach(p => {
+        if (taker) {
+            taker.cachedTargetX = taker.x;
+            taker.cachedTargetY = taker.y;
+        }
+
+        [...this.playerSprites, ...this.opponentSprites].forEach((p, idx) => {
             if (p !== taker) {
-                // Minimum distance enforcement to prevent 0-second tackles
+                // Minimum distance enforcement to prevent 0-second tackles (defending team only)
                 let distToBall = Phaser.Math.Distance.Between(p.x, p.y, x, y);
-                if (distToBall < 80) {
-                    let angle = Phaser.Math.Angle.Between(x, y, p.x, p.y);
-                    p.x = x + Math.cos(angle) * 80;
-                    p.y = y + Math.sin(angle) * 80;
+                if (p.isPlayerTeam !== isPlayerTeam && distToBall < 85) {
+                    let angle = Phaser.Math.Angle.Between(x, y, 400, 300) + (idx - 5) * 0.1;
+                    p.x = x + Math.cos(angle) * 90;
+                    p.y = y + Math.sin(angle) * 90;
                 }
 
                 // Keep inside bounds
@@ -1898,8 +1921,13 @@ class MatchScene extends Phaser.Scene {
                     currentAction = 'Pass';
                 }
                 // Cannot shoot directly from throw-ins or indirect free kicks (Offside)
-                if (this.currentSetPieceType === 'Throw In' || this.currentSetPieceType === 'Offside') {
+                if (this.currentSetPieceType === 'Throw In' || this.currentSetPieceType === 'Offside' || this.currentSetPieceType === 'Indirect Free Kick') {
                     if (currentAction === 'Shoot' || forceShoot) { currentAction = 'Pass'; forceShoot = false; }
+                }
+                // Penalty Kicks MUST be shot
+                if (this.currentSetPieceType === 'Penalty Kick') {
+                    currentAction = 'Shoot';
+                    forceShoot = true;
                 }
             }
 
