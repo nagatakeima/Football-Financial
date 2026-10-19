@@ -79,8 +79,8 @@ const MasterData = {
         { id: 6, name: "方向付けトラップ", category: "pass", effectType: "SUCCESS_RATE_UP", target: "trap", value: 20, condition: "always", allowedPositions: ["CB","SB","CDM","CM","CAM","WG","CF"], description: "トラップ直後のパス・シュート成功率UP" },
         { id: 7, name: "プレス耐性トラップ", category: "pass", effectType: "SUCCESS_RATE_UP", target: "trap", value: 25, condition: "underPressure", allowedPositions: ["CM","CAM","WG","CF"], description: "プレッシャー下でのトラップ成功率UP" },
         { id: 8, name: "ロングスロワー", category: "pass", effectType: "RANGE_UP", target: "throwIn", value: 100, condition: "always", allowedPositions: ["SB","WG","CB"], description: "スローインの飛距離UP" },
-        { id: 9, name: "アーリークロッサー", category: "pass", effectType: "SUCCESS_RATE_UP", target: "cross", value: 20, condition: "always", allowedPositions: ["SB","WG","WG"], description: "クロス成功率UP" },
-        { id: 10, name: "ピンポイントクロス", category: "pass", effectType: "SUCCESS_RATE_UP", target: "cross", value: 25, condition: "attackingThird", allowedPositions: ["SB","WG","WG"], description: "敵陣深くでのクロス成功率UP" },
+        { id: 9, name: "アーリークロッサー", category: "pass", effectType: "SUCCESS_RATE_UP", target: "cross", value: 20, condition: "always", allowedPositions: ["SB","CAM","WG"], description: "クロス成功率UP" },
+        { id: 10, name: "ピンポイントクロス", category: "pass", effectType: "SUCCESS_RATE_UP", target: "cross", value: 25, condition: "attackingThird", allowedPositions: ["SB","CAM","WG"], description: "敵陣深くでのクロス成功率UP" },
 
         // 【2. シュート＆フィニッシュ系 (shoot)】
         { id: 11, name: "コントロールカーブ", category: "shoot", effectType: "SUCCESS_RATE_UP", target: "shoot", value: 20, condition: "penaltyAreaOut", allowedPositions: ["CAM","WG","CF"], description: "ペナルティエリア外からのカーブシュート成功率UP" },

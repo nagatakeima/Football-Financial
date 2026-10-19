@@ -507,7 +507,11 @@ class ManagementUI {
             `;
             this.uiContent.innerHTML = html;
         } else {
-            this.showDashboard();
+            if (window.gameState.pendingVictoryReward) {
+                this.showVictoryReward();
+            } else {
+                this.showDashboard();
+            }
         }
     }
 
