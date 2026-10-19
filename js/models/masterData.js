@@ -170,66 +170,152 @@ const MasterData = {
             "name": "スパイクの改造",
             "effectType": "STAT_UP",
             "target": "speed",
-            "value": 10
+            "value": 10,
+            "description": "【効果】チーム全員のスピードが10上昇する"
         },
         {
             "id": 2,
             "name": "最新戦術ボード",
             "effectType": "CD_REDUCTION",
-            "value": 0.1
+            "value": 0.1,
+            "description": "【効果】戦術コマンドのクールダウン時間が10%短縮される"
         },
         {
             "id": 3,
             "name": "大口スポンサー",
             "effectType": "FUNDS_UP",
-            "value": 100000
+            "value": 100000,
+            "description": "【効果】毎試合後の獲得資金が+¥100,000される"
         },
         {
             "id": 4,
             "name": "医療スタッフ拡充",
             "effectType": "CONDITION_RECOVERY",
-            "value": 10
+            "value": 10,
+            "description": "【効果】毎試合後のコンディション回復量が+10される"
         },
         {
             "id": 5,
             "name": "地元ファンの声援",
             "effectType": "ALL_STAT_UP",
-            "value": 5
+            "value": 5,
+            "description": "【効果】チーム全員の全ステータスが5上昇する"
         },
         {
             "id": 6,
             "name": "ハードプレスの哲学",
             "effectType": "CHEMISTRY_BOOST",
             "targetPref": "HighPress",
-            "multiplier": 1.5
+            "multiplier": 1.5,
+            "description": "【効果】ハイプレス志向の選手間のケミストリー効果が1.5倍になる"
         },
         {
             "id": 7,
             "name": "ポゼッションの哲学",
             "effectType": "CHEMISTRY_BOOST",
             "targetPref": "Possession",
-            "multiplier": 1.5
+            "multiplier": 1.5,
+            "description": "【効果】ポゼッション志向の選手間のケミストリー効果が1.5倍になる"
         },
         {
             "id": 8,
             "name": "カウンターの哲学",
             "effectType": "CHEMISTRY_BOOST",
             "targetPref": "Counter",
-            "multiplier": 1.5
+            "multiplier": 1.5,
+            "description": "【効果】カウンター志向の選手間のケミストリー効果が1.5倍になる"
         },
         {
             "id": 9,
             "name": "堅守の哲学",
             "effectType": "CHEMISTRY_BOOST",
             "targetPref": "Retreat",
-            "multiplier": 1.5
+            "multiplier": 1.5,
+            "description": "【効果】リトリート志向の選手間のケミストリー効果が1.5倍になる"
         },
         {
             "id": 10,
             "name": "ベテランの統率",
             "effectType": "LOW_STAT_BOOST",
             "threshold": 40,
-            "value": 10
+            "value": 10,
+            "description": "【効果】ステータスが40以下の能力値に+10のボーナスを与える"
+        },
+        {
+            "id": 11,
+            "name": "マッサージチェア",
+            "effectType": "CONDITION_RECOVERY",
+            "value": 20,
+            "description": "【効果】毎試合後のコンディション回復量が+20される"
+        },
+        {
+            "id": 12,
+            "name": "名物オーナー",
+            "effectType": "FUNDS_UP",
+            "value": 200000,
+            "description": "【効果】毎試合後の獲得資金が+¥200,000される"
+        },
+        {
+            "id": 13,
+            "name": "黄金のスパイク",
+            "effectType": "STAT_UP",
+            "target": "shoot",
+            "value": 15,
+            "description": "【効果】チーム全員のシュートが15上昇する"
+        },
+        {
+            "id": 14,
+            "name": "インテリジェントグラス",
+            "effectType": "STAT_UP",
+            "target": "mental",
+            "value": 15,
+            "description": "【効果】チーム全員のメンタルが15上昇する"
+        },
+        {
+            "id": 15,
+            "name": "鋼の肉体",
+            "effectType": "STAT_UP",
+            "target": "physical",
+            "value": 15,
+            "description": "【効果】チーム全員のフィジカルが15上昇する"
+        },
+        {
+            "id": 16,
+            "name": "精密コンパス",
+            "effectType": "STAT_UP",
+            "target": "pass",
+            "value": 15,
+            "description": "【効果】チーム全員のパスが15上昇する"
+        },
+        {
+            "id": 17,
+            "name": "鉄壁の盾",
+            "effectType": "STAT_UP",
+            "target": "defense",
+            "value": 15,
+            "description": "【効果】チーム全員のディフェンスが15上昇する"
+        },
+        {
+            "id": 18,
+            "name": "無尽蔵の肺",
+            "effectType": "STAT_UP",
+            "target": "stamina",
+            "value": 15,
+            "description": "【効果】チーム全員のスタミナが15上昇する"
+        },
+        {
+            "id": 19,
+            "name": "覚醒のルーン",
+            "effectType": "ALL_STAT_UP",
+            "value": 10,
+            "description": "【効果】チーム全員の全ステータスが10上昇する"
+        },
+        {
+            "id": 20,
+            "name": "魔法の戦術盤",
+            "effectType": "CD_REDUCTION",
+            "value": 0.2,
+            "description": "【効果】戦術コマンドのクールダウン時間が20%短縮される"
         }
     ],
     "MicroCommands": [

@@ -2296,7 +2296,12 @@ class MatchScene extends Phaser.Scene {
             window.gameState.processPostMatch(playerScore, oppScore);
             document.getElementById('ui-content').style.display = 'flex';
             document.querySelector('header.top-bar').style.display = 'flex';
-            managementUI.showDashboard();
+
+            if (window.gameState.pendingVictoryReward) {
+                managementUI.showVictoryReward();
+            } else {
+                managementUI.showDashboard();
+            }
             this.scene.stop();
         });
     }

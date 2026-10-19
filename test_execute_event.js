@@ -11,9 +11,12 @@ const context = {
                 {
                     id: 'test_event',
                     type: 'scout',
-                    apCost: 10,
-                    fundCost: 1000,
-                    player: { name: 'Test Player' }
+                    choices: [
+                        {
+                            fundCost: 1000,
+                            desc: 'テスト選択肢'
+                        }
+                    ]
                 }
             ],
             playerTeam: {
@@ -45,7 +48,7 @@ vm.runInContext(`
     ui.showDashboard = () => {};
     ui.showEvents = () => {};
     ui.updateTopBar = () => {};
-    ui.executeEvent('test_event');
+    ui.executeEvent('test_event', 0);
 `, context);
 
 if (context.window.gameState.ap === 0 && context.window.gameState.funds === 0 && context.alertCalled) {

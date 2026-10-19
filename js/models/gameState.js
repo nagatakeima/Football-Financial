@@ -62,8 +62,21 @@ class GameState {
         this.ap = Math.min(this.ap + 5, 10); // cap at 10 for now
 
         let matchFunds = 100000;
+        this.pendingVictoryReward = false;
+        this.lastOpponentStarting11 = null;
+
         if (homeScore > awayScore && isHome || awayScore > homeScore && !isHome) {
             matchFunds += 50000; // Win bonus
+            this.pendingVictoryReward = true;
+            const opponentTeam = isHome ? playerMatch.away : playerMatch.home;
+            // clone the players to avoid modifying the original team's players accidentally
+            this.lastOpponentStarting11 = opponentTeam.starting11.map(p => {
+                const clone = Object.assign(Object.create(Object.getPrototypeOf(p)), p);
+                clone.stats = { ...p.stats };
+                clone.skills = [...p.skills];
+                clone.subPositions = [...p.subPositions];
+                return clone;
+            });
         } else if (homeScore === awayScore) {
             matchFunds += 20000; // Draw bonus
         }
