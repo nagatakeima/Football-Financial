@@ -48,6 +48,9 @@ class MatchScene extends Phaser.Scene {
         });
 
         this.createMatchUI();
+        this.firstHalfStoppage = Math.floor(Math.random() * 3) + 1; // 1-3 mins
+        this.secondHalfStoppage = Math.floor(Math.random() * 5) + 1; // 1-5 mins
+        this.inStoppageTime = false;
     }
 
 
@@ -434,6 +437,52 @@ class MatchScene extends Phaser.Scene {
         this.speedButtons = [speed1x, speed2x];
         this.setSpeed(1, this.speedButtons);
         this.createCommandUI();
+
+        // Add Substitution / Tactics Button
+        const subBtnBg = this.add.rectangle(720, 500, 140, 40, 0x3498db).setInteractive().setDepth(100);
+        subBtnBg.setStrokeStyle(2, 0x2980b9);
+        this.subBtnText = this.add.text(720, 500, '🔄 交代・戦術', { fontSize: '14px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5).setDepth(101);
+
+        subBtnBg.on('pointerdown', () => {
+            if (this.matchState === 'playing') {
+                this.openSubstitutionUI('match');
+            }
+        });
+
+        // Add Real-Time Tactic Toggles
+        this.realTimeTactic = 'Balance';
+
+        const tacticY = 500;
+        const tacticBtnWidth = 80;
+        const startX = 400 - (tacticBtnWidth * 1.5) - 30; // Center offset slightly to the left of commands
+
+        const createTacticBtn = (x, text, tacticValue, color, icon) => {
+            const bg = this.add.rectangle(x, tacticY, tacticBtnWidth, 40, 0x222222).setInteractive().setDepth(100);
+            bg.setStrokeStyle(2, 0x555555);
+            const label = this.add.text(x, tacticY, `${icon} ${text}`, { fontSize: '12px', fill: '#fff' }).setOrigin(0.5).setDepth(101);
+
+            bg.on('pointerdown', () => {
+                this.tacticButtons.forEach(btn => {
+                    btn.bg.setFillStyle(0x222222);
+                    btn.bg.setStrokeStyle(2, 0x555555);
+                });
+                bg.setFillStyle(color);
+                bg.setStrokeStyle(2, 0xffffff);
+                this.realTimeTactic = tacticValue;
+            });
+
+            return { bg, label, value: tacticValue };
+        };
+
+        this.tacticButtons = [];
+        this.tacticButtons.push(createTacticBtn(100, 'バランス', 'Balance', 0x34495e, '⚖️'));
+        this.tacticButtons.push(createTacticBtn(190, '猛攻', 'Attack', 0xc0392b, '🔥'));
+        this.tacticButtons.push(createTacticBtn(280, '全員守備', 'Defend', 0x27ae60, '🛡️'));
+
+        // Default select Balance
+        this.tacticButtons[0].bg.setFillStyle(0x34495e);
+        this.tacticButtons[0].bg.setStrokeStyle(2, 0xffffff);
+
     }
 
     showActionText(sprite, text, color) {
@@ -524,7 +573,20 @@ class MatchScene extends Phaser.Scene {
         this.matchTime += 0.03; // Engine time increment
         const displayMin = Math.floor(this.matchTime);
         const displaySec = Math.floor((this.matchTime % 1) * 60);
-        this.timeText.setText(`${displayMin.toString().padStart(2, '0')}:${displaySec.toString().padStart(2, '0')}`);
+
+        if (this.inStoppageTime) {
+            const baseMin = this.halftimeDone ? 90 : 45;
+            const extraMin = displayMin - baseMin;
+            this.timeText.setText(`${baseMin}+${extraMin}'${displaySec.toString().padStart(2, '0')}`);
+            this.timeText.setFill('#e74c3c');
+        } else {
+            this.timeText.setText(`${displayMin.toString().padStart(2, '0')}:${displaySec.toString().padStart(2, '0')}`);
+            this.timeText.setFill('#f1c40f');
+        }
+
+        if (this.subBtnText && this.substitutionsLeft !== undefined) {
+            this.subBtnText.setText(`🔄 交代・戦術 (枠:${this.substitutionsLeft})`);
+        }
 
         // --- Engine Tracking for Gegenpress (Possession tracking) ---
         // Since matchTime is scaled (0 to 90 representing minutes), we use delta time for the 5-sec rule.
@@ -617,70 +679,188 @@ class MatchScene extends Phaser.Scene {
         }
 
         // ハーフタイム処理
-        if (this.matchTime >= 45 && this.matchTime < 46 && !this.halftimeDone && this.matchState === 'playing') {
-            this.matchState = 'halftime';
-            this.showHalftimeUI();
+        if (this.matchTime >= 45 && !this.halftimeDone && this.matchState === 'playing') {
+            const isAttackingThird = this.ball.y > 60 && this.ball.y < 540 && ((this.ball.x > 533 && this.ball.owner && this.ball.owner.isPlayerTeam) || (this.ball.x < 266 && this.ball.owner && !this.ball.owner.isPlayerTeam));
+
+            if (this.matchTime >= 45 + this.firstHalfStoppage && !isAttackingThird) {
+                this.inStoppageTime = false;
+                this.matchState = 'halftime';
+                this.showHalftimeUI();
+            } else {
+                this.inStoppageTime = true;
+            }
         }
 
-        if (this.matchTime >= 90) {
-            this.logicTimer.remove();
-            this.endMatch(this.score.player, this.score.opponent);
+        if (this.matchTime >= 90 && this.matchState === 'playing') {
+            const isAttackingThird = this.ball.y > 60 && this.ball.y < 540 && ((this.ball.x > 533 && this.ball.owner && this.ball.owner.isPlayerTeam) || (this.ball.x < 266 && this.ball.owner && !this.ball.owner.isPlayerTeam));
+
+            if (this.matchTime >= 90 + this.secondHalfStoppage && !isAttackingThird) {
+                this.inStoppageTime = false;
+                this.logicTimer.remove();
+                this.endMatch(this.score.player, this.score.opponent);
+            } else {
+                this.inStoppageTime = true;
+            }
         }
     }
 
     showHalftimeUI() {
         if (this.isSkip) {
-            // スキップ中はUIを表示せず即座に後半へ
             this.halftimeDone = true;
             this.matchState = 'playing';
             this.resetPositions();
             return;
         }
 
-        // Pause logic timer while waiting for user interaction
         this.logicTimer.paused = true;
+        this.openSubstitutionUI('halftime');
+    }
+
+    openSubstitutionUI(context = 'halftime') {
+        if (this.matchState === 'playing') {
+            this.logicTimer.paused = true;
+        }
 
         const uiContainer = document.getElementById('ui-layer');
         if (!uiContainer) return;
+
+        let existingModal = document.getElementById('halftime-modal');
+        if (existingModal) existingModal.remove();
 
         const halftimeDiv = document.createElement('div');
         halftimeDiv.id = 'halftime-modal';
         halftimeDiv.className = 'modal-overlay';
 
-        let html = `
-            <div class="modal-content halftime-content">
-                <h2>ハーフタイム</h2>
-                <div class="score-display">${this.playerTeamData.name} ${this.score.player} - ${this.score.opponent} ${this.opponentTeamData.name}</div>
-                <div class="substitution-section">
-                    <h3>スタメン (残りスタミナ)</h3>
-                    <div class="player-grid">
-        `;
+        if (this.substitutionsLeft === undefined) {
+            this.substitutionsLeft = 3;
+        }
 
-        this.playerTeamData.starting11.forEach((p, i) => {
-            html += `<div class="player-card">
-                <span class="pos">${p.position}</span> ${p.name} <br>
-                <span class="stamina">Sta: ${Math.floor(p.currentStamina)}</span>
-            </div>`;
-        });
+        let selectedSubPlayer = null;
 
-        html += `
+        const renderUI = () => {
+            let html = `
+                <div class="modal-content halftime-content" style="max-height: 90vh; overflow-y: auto;">
+                    <h2>${context === 'halftime' ? 'ハーフタイム' : '戦術・選手交代'}</h2>
+                    <div class="score-display">${this.playerTeamData.name} ${this.score.player} - ${this.score.opponent} ${this.opponentTeamData.name}</div>
+
+                    <p style="color: #f1c40f; font-size: 16px;">交代枠: 残り ${this.substitutionsLeft} 人 (交代するスタメンとベンチをクリックして入れ替え)</p>
+
+                    <div class="substitution-section">
+                        <h3>スタメン (残りスタミナ)</h3>
+                        <div class="player-grid" id="starters-grid">
+            `;
+
+            this.playerTeamData.starting11.forEach((p, i) => {
+                let isSelected = selectedSubPlayer === p;
+                let bgStyle = isSelected ? "background: #f1c40f; color: #333;" : p.isSentOff ? "background: #c0392b;" : "";
+                html += `<div class="player-card" data-id="${p.id}" data-type="starter" data-index="${i}" style="cursor: ${p.isSentOff ? 'not-allowed' : 'pointer'}; ${bgStyle}">
+                    <span class="pos">${p.position}</span> ${p.name} <br>
+                    <span class="stamina">Sta: ${Math.floor(p.currentStamina)}</span>
+                    ${p.isSentOff ? '<br><b>退場</b>' : ''}
+                </div>`;
+            });
+
+            html += `
+                        </div>
+                        <h3 style="margin-top: 15px;">ベンチ</h3>
+                        <div class="player-grid" id="bench-grid">
+            `;
+
+            this.playerTeamData.bench.forEach((p, i) => {
+                let isSelected = selectedSubPlayer === p;
+                let bgStyle = isSelected ? "background: #f1c40f; color: #333;" : "";
+                html += `<div class="player-card" data-id="${p.id}" data-type="bench" data-index="${i}" style="cursor: pointer; ${bgStyle}">
+                    <span class="pos">${p.position}</span> ${p.name} <br>
+                    <span class="stamina">Sta: ${Math.floor(p.currentStamina)}</span>
+                </div>`;
+            });
+
+            html += `
+                        </div>
+                    </div>
+                    <div style="margin-top: 20px;">
+                        <button id="btn-close-sub-ui" class="action-btn" style="background: #3498db; color: #fff; padding: 10px 20px; font-size: 18px; border: none; cursor: pointer;">
+                            ${context === 'halftime' ? '後半キックオフ' : '試合に戻る'}
+                        </button>
                     </div>
                 </div>
-                <button id="btn-start-second-half" class="action-btn" style="background: #3498db; color: #fff; padding: 10px 20px; font-size: 18px; border: none; cursor: pointer;">後半キックオフ</button>
-            </div>
-        `;
+            `;
 
-        halftimeDiv.innerHTML = html;
+            halftimeDiv.innerHTML = html;
+
+            halftimeDiv.querySelectorAll('.player-card').forEach(el => {
+                el.addEventListener('click', (e) => {
+                    const type = el.getAttribute('data-type');
+                    const index = parseInt(el.getAttribute('data-index'));
+
+                    const clickedPlayer = type === 'starter' ? this.playerTeamData.starting11[index] : this.playerTeamData.bench[index];
+
+                    if (clickedPlayer.isSentOff) return; // Cannot sub out sent-off players
+
+                    if (!selectedSubPlayer) {
+                        selectedSubPlayer = clickedPlayer;
+                        renderUI();
+                    } else {
+                        if (selectedSubPlayer !== clickedPlayer) {
+                            const isSelectedStarter = this.playerTeamData.starting11.includes(selectedSubPlayer);
+                            const isClickedStarter = this.playerTeamData.starting11.includes(clickedPlayer);
+
+                            // Swap if one is starter and one is bench
+                            if (isSelectedStarter !== isClickedStarter) {
+                                if (this.substitutionsLeft > 0) {
+                                    const starterIdx = isSelectedStarter ? this.playerTeamData.starting11.indexOf(selectedSubPlayer) : this.playerTeamData.starting11.indexOf(clickedPlayer);
+                                    const benchIdx = !isSelectedStarter ? this.playerTeamData.bench.indexOf(selectedSubPlayer) : this.playerTeamData.bench.indexOf(clickedPlayer);
+
+                                    const starterPlayer = this.playerTeamData.starting11[starterIdx];
+                                    const benchPlayer = this.playerTeamData.bench[benchIdx];
+
+                                    this.playerTeamData.starting11[starterIdx] = benchPlayer;
+                                    this.playerTeamData.bench[benchIdx] = starterPlayer;
+
+                                    this.substitutionsLeft--;
+
+                                    // Update sprites if during match or even at halftime to reflect changes
+                                    this.handleSubstitutionSpriteUpdate(starterPlayer, benchPlayer);
+                                }
+                            }
+                        }
+                        selectedSubPlayer = null;
+                        renderUI();
+                    }
+                });
+            });
+
+            document.getElementById('btn-close-sub-ui').addEventListener('click', () => {
+                halftimeDiv.remove();
+                if (context === 'halftime') {
+                    this.halftimeDone = true;
+                    this.matchState = 'kickoff';
+                    this.kickoffTimer = 20;
+                    this.resetPositions();
+                }
+                this.logicTimer.paused = false;
+            });
+        };
+
+        renderUI();
         uiContainer.appendChild(halftimeDiv);
+    }
 
-        document.getElementById('btn-start-second-half').addEventListener('click', () => {
-            halftimeDiv.remove();
-            this.halftimeDone = true;
-            this.matchState = 'kickoff';
-            this.kickoffTimer = 20;
-            this.resetPositions();
-            this.logicTimer.paused = false;
-        });
+    handleSubstitutionSpriteUpdate(outPlayer, inPlayer) {
+        const spriteIndex = this.playerSprites.findIndex(s => s.playerData === outPlayer);
+        if (spriteIndex !== -1) {
+            const outSprite = this.playerSprites[spriteIndex];
+            const oldX = outSprite.x;
+            const oldY = outSprite.y;
+
+            outSprite.destroy();
+
+            inPlayer.dynamicStats = { ...inPlayer.stats };
+            inPlayer.isSubbedIn = true;
+            const newSprite = this.createPlayerSprite(inPlayer, true, oldX, oldY);
+
+            this.playerSprites[spriteIndex] = newSprite;
+        }
     }
 
     checkBallOut() {
@@ -721,6 +901,18 @@ class MatchScene extends Phaser.Scene {
         if (isOut) {
             this.ballSpeed = 0;
             this.handleSetPiece(type, restartX, restartY, isPlayerTeamBall);
+        }
+    }
+
+    handleSendOff(sprite) {
+        // Find if it's player team
+        const isPlayerTeam = sprite.isPlayerTeam;
+        const spritesArray = isPlayerTeam ? this.playerSprites : this.opponentSprites;
+
+        const spriteIndex = spritesArray.indexOf(sprite);
+        if (spriteIndex !== -1) {
+            sprite.destroy(); // Remove from canvas
+            spritesArray.splice(spriteIndex, 1); // Remove from logic
         }
     }
 
@@ -1134,6 +1326,7 @@ class MatchScene extends Phaser.Scene {
         let actionScores = { Keep: 0, Dribble: 0, Pass: 0, Shoot: 0, Clear: 0, Support: 0, RunIntoSpace: 0, HoldPosition: 0, Press: 0, Mark: 0, Cover: 0, Delay: 0, Retreat: 0 };
         const pos = p.playerData.position; const role = p.playerData.role; const tactic = context.tactic;
         const isAttacking = context.isAttacking; const hasBall = context.hasBall; const pitchZone = this.getPitchZone(p.x, p.y, p.isPlayerTeam);
+        const realTimeTactic = context.realTimeTactic;
         const currentThreat = this.calculateThreat(p.x, p.y, p.isPlayerTeam);
         const staminaFactor = Math.max(0.3, p.playerData.currentStamina / 100);
 
@@ -1155,6 +1348,33 @@ class MatchScene extends Phaser.Scene {
         }
 
         let coverTargetId = null;
+
+        // Penetration Trigger (Tempo Switch) - Tactical Eye (Skill 72)
+        if (p.isPlayerTeam && hasBall && (pos === 'CM' || pos === 'CAM')) {
+            if (p.playerData.skills && (p.playerData.skills.includes(72))) {
+                if (pitchZone.third === 'Attacking' && (pitchZone.lane === 'Left Half-space' || pitchZone.lane === 'Right Half-space' || pitchZone.lane === 'Center')) {
+                    // Temporarily boost forwards and show action text if a check passes
+                    if (Math.random() < 0.05 && this.time.now - (this.lastPenetrationTrigger || 0) > 10000) { // Throttle
+                        this.lastPenetrationTrigger = this.time.now;
+                        this.showActionText(p, "急襲！", "#f1c40f");
+
+                        this.playerSprites.forEach(mate => {
+                            if (mate !== p && (mate.playerData.position === 'CF' || mate.playerData.position === 'WG')) {
+                                mate.penetrationTriggerBoost = 200;
+                            }
+                        });
+
+                        actionScores.Pass += 100; // Force passing decision
+                    }
+                }
+            }
+        }
+
+        // Apply any active penetration boost
+        if (p.penetrationTriggerBoost > 0) {
+            actionScores.RunIntoSpace += p.penetrationTriggerBoost;
+            p.penetrationTriggerBoost -= 5; // Decay
+        }
 
         if (hasBall) {
             const goalX = p.isPlayerTeam ? 800 : 0;
@@ -1269,7 +1489,19 @@ class MatchScene extends Phaser.Scene {
             const timeSinceLost = this.timeSinceLastPossessionChange || 0; // Requires engine tracking
             if (tactic === 'HighPress') {
                 if (timeSinceLost < 5000) { // Under 5 seconds
-                    actionScores.Press += 80; // Swarm
+                    actionScores.Press += 200; // Swarm immediately! Maximized score to override positional limits
+                    actionScores.HoldPosition -= 100;
+                    actionScores.Retreat -= 100;
+
+                    // Allow up to 3 players to sprint at the ball holder regardless of normal constraints
+                    const teammates = p.isPlayerTeam ? this.playerSprites : this.opponentSprites;
+                    let sortedMates = teammates.slice().sort((a,b) =>
+                        Phaser.Math.Distance.Between(a.x, a.y, this.ball.x, this.ball.y) - Phaser.Math.Distance.Between(b.x, b.y, this.ball.x, this.ball.y)
+                    );
+                    const rank = sortedMates.indexOf(p);
+                    if (rank < 3) {
+                         actionScores.Press += 300; // Force top 3 closest to swarm
+                    }
                 } else {
                     actionScores.Press += 40;
                 }
@@ -1307,6 +1539,27 @@ class MatchScene extends Phaser.Scene {
             }
         }
 
+
+
+        // --- Apply Real-Time Tactic Bias (Player Team Only) ---
+        if (p.isPlayerTeam) {
+            if (realTimeTactic === 'Attack') {
+                if (!hasBall && isAttacking) {
+                    actionScores.RunIntoSpace += 50; // Push forward aggressively
+                    if (pos === 'CB' || pos === 'SB') actionScores.RunIntoSpace += 30; // Even defenders push up
+                }
+            } else if (realTimeTactic === 'Defend') {
+                if (!hasBall && !isAttacking) {
+                    actionScores.Retreat += 80;
+                    actionScores.HoldPosition += 50;
+                    actionScores.Press -= 40; // Don't break shape
+
+                    if (pos === 'SB' || pos === 'WG') {
+                        actionScores.Cover += 60; // Collapse into backline
+                    }
+                }
+            }
+        }
 
         // Role-based Action Evaluation Bias (Phase 3 - DF/GK)
         if (!p.playerData.isMob) {
@@ -1521,13 +1774,24 @@ class MatchScene extends Phaser.Scene {
                 p.aiTickTimer = 0;
                 if (!hasBall) p.targetMaintainTimer = Phaser.Math.Between(15, 20); // Hold decision for 15-20 frames
 
-                const context = { tactic, isAttacking, hasBall };
+                const context = { tactic, isAttacking, hasBall, realTimeTactic: p.isPlayerTeam ? this.realTimeTactic : 'Balance' };
                 const evaluation = this.evaluateActions(p, context);
                 let bestAction = evaluation.action;
                 p.currentAction = bestAction;
                 p.lastEvaluation = { bestPassTarget: context.bestPassTarget, targetLineX: evaluation.targetLineX };
                 const dir = p.isPlayerTeam ? 1 : -1;
-                const base = this.getDynamicBasePosition(p, p.isPlayerTeam, isAttacking);
+                let base = this.getDynamicBasePosition(p, p.isPlayerTeam, isAttacking);
+
+                // Target Y and X modifications for RealTimeTactic
+                if (p.isPlayerTeam) {
+                    // Player attacks towards X=800 (+), Opponent attacks towards X=0 (-)
+                    const attackDirection = p.isPlayerTeam ? 1 : -1;
+                    if (this.realTimeTactic === 'Attack') {
+                        base.x += attackDirection * 50; // Shift whole team forward
+                    } else if (this.realTimeTactic === 'Defend') {
+                        base.x -= attackDirection * 100; // Shift whole team deep
+                    }
+                }
 
                 if (p.chasingLooseBall && !this.ball.owner) {
                     bestAction = 'ChaseLooseBall';
@@ -1736,6 +2000,9 @@ class MatchScene extends Phaser.Scene {
                     const currentVelX = (totalForceX / totalMagnitude) * actualSpeed;
                     const currentVelY = (totalForceY / totalMagnitude) * actualSpeed;
                     if (Math.abs(currentVelX - p.lastSpeedX) + Math.abs(currentVelY - p.lastSpeedY) > 2.0) drainRate += 0.05;
+
+                    if (this.realTimeTactic === 'Attack' && p.isPlayerTeam) drainRate *= 1.5;
+                    if (this.realTimeTactic === 'Defend' && p.isPlayerTeam) drainRate *= 0.8;
                     p.lastSpeedX = currentVelX; p.lastSpeedY = currentVelY;
                 } else { p.lastSpeedX = (totalForceX / totalMagnitude) * actualSpeed; p.lastSpeedY = (totalForceY / totalMagnitude) * actualSpeed; }
 
@@ -1937,7 +2204,58 @@ class MatchScene extends Phaser.Scene {
                     if (drawFoulSkill.value > 0) foulChance += drawFoulSkill.value;
 
                     if (Math.random() * 100 < foulChance) {
-                        this.showActionText(tackler, "ファウル", "#e74c3c");
+                        let text = "ファウル";
+                        let color = "#e74c3c";
+                        let isRedCard = false;
+
+                        // Check for Bribe Referee
+                        if (window.gameState.bribeReferee && !tackler.isPlayerTeam) {
+                            isRedCard = true;
+                            window.gameState.bribeReferee = false; // Consume effect
+                            text = "一発退場 (裏工作)";
+                        } else {
+                            // Calculate normal card probability
+                            let cardChance = 15; // Base 15% chance for a card on foul
+                            if (tackler.playerData.skills.includes(78)) cardChance += 20; // 悪童: +20% card chance
+                            if (tackler.playerData.skills.includes(79)) cardChance -= 10; // クリーンファイター: -10% card chance
+
+                            // Check for relic 30 (紳士の品格) if tactler is player team
+                            if (tackler.isPlayerTeam && window.gameState.playerTeam.relics.includes(30)) {
+                                cardChance -= 15;
+                            }
+
+                            cardChance = Math.max(0, cardChance);
+
+                            if (Math.random() * 100 < cardChance) {
+                                // It's a card. Determine Yellow or Red.
+                                const isDirectRed = Math.random() < 0.1; // 10% of cards are direct red
+
+                                if (isDirectRed) {
+                                    isRedCard = true;
+                                    text = "🟥 レッドカード";
+                                } else {
+                                    if (!tackler.playerData.yellowCards) tackler.playerData.yellowCards = 0;
+                                    tackler.playerData.yellowCards++;
+
+                                    if (tackler.playerData.yellowCards >= 2) {
+                                        isRedCard = true;
+                                        text = "🟥 退場 (累積2枚)";
+                                    } else {
+                                        text = "🟨 イエローカード";
+                                        color = "#f1c40f";
+                                    }
+                                }
+                            }
+                        }
+
+                        this.showActionText(tackler, text, color);
+
+                        if (isRedCard) {
+                            tackler.playerData.isSentOff = true;
+                            // Trigger send off processing in the main loop or handle directly here
+                            this.handleSendOff(tackler);
+                        }
+
                         this.ball.owner = null; this.ballSpeed = 0;
                         const isPK = (this.ball.y > 150 && this.ball.y < 450) && ((tackler.isPlayerTeam && this.ball.x < 160) || (!tackler.isPlayerTeam && this.ball.x > 640));
                         this.handleSetPiece(isPK ? 'Penalty Kick' : 'Free Kick', this.ball.x, this.ball.y, !tackler.isPlayerTeam);
