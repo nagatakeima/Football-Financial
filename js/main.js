@@ -830,7 +830,14 @@ class MatchScene extends Phaser.Scene {
                 });
             });
 
-            document.getElementById('btn-close-sub-ui').addEventListener('click', () => {
+        };
+
+        uiContainer.appendChild(halftimeDiv);
+        renderUI();
+
+        const closeBtn = halftimeDiv.querySelector('#btn-close-sub-ui');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
                 halftimeDiv.remove();
                 if (context === 'halftime') {
                     this.halftimeDone = true;
@@ -840,10 +847,7 @@ class MatchScene extends Phaser.Scene {
                 }
                 this.logicTimer.paused = false;
             });
-        };
-
-        renderUI();
-        uiContainer.appendChild(halftimeDiv);
+        }
     }
 
     handleSubstitutionSpriteUpdate(outPlayer, inPlayer) {

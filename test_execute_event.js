@@ -27,15 +27,24 @@ const context = {
         }
     },
     document: {
-        getElementById: () => ({ style: {}, innerHTML: '', addEventListener: () => {}, classList: { remove: () => {}, add: () => {} } }),
+        getElementById: (id) => {
+            return {
+                style: {},
+                innerHTML: '',
+                addEventListener: () => {},
+                classList: { remove: () => {}, add: () => {} },
+                appendChild: () => {}
+            };
+        },
         querySelector: () => ({ style: {}, innerHTML: '', addEventListener: () => {} }),
-        createElement: () => ({ style: {}, innerHTML: '', appendChild: () => {} })
+        createElement: () => { context.alertCalled = true; return { style: {}, innerHTML: '', appendChild: () => {}, classList: { add: () => {}, remove: () => {} }, remove: () => {} }; }
     },
     alertCalled: false,
     alert: (msg) => {
         context.alertCalled = true;
     },
-    console: console
+    console: console,
+    setTimeout: setTimeout
 };
 
 vm.createContext(context);

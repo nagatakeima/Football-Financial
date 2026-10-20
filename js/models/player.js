@@ -32,6 +32,7 @@ class Player {
         this.condition = 100; // 0-100, affects performance
         this.isInjured = false;
         this.subPositions = [];
+        this.careerStats = { appearances: 0, goals: 0, assists: 0, avgRating: 0.0, totalRatingSum: 0 };
     }
 
     getOvr() {
@@ -53,9 +54,9 @@ class Player {
             this.level++;
             this.maxExp = this.level * 100;
 
-            // Increase all stats by 2-3
+            // Increase all stats by flat 3
             for (let key in this.stats) {
-                this.stats[key] = Math.min(100, this.stats[key] + Math.floor(Math.random() * 2) + 2);
+                this.stats[key] = Math.min(100, this.stats[key] + 3);
             }
         }
 
@@ -76,8 +77,10 @@ class Player {
 
     // Helper to generate a random player
     static generateRandom(id, position = null, rarity = 'N') {
+        const initials = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         const names = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez", "Silva", "Costa", "Santos", "Oliveira", "Müller", "Schmidt", "Schneider", "Fischer", "Weber"];
-        const name = names[Math.floor(Math.random() * names.length)] + " " + id;
+        const ini = initials[Math.floor(Math.random() * 26)] + ".";
+        const name = ini + " " + names[Math.floor(Math.random() * names.length)];
 
         if (!position) {
             position = window.MasterData.Positions[Math.floor(Math.random() * window.MasterData.Positions.length)];
@@ -87,9 +90,9 @@ class Player {
         const preference = prefs[Math.floor(Math.random() * prefs.length)];
 
         let rarityBonus = 0;
-        if (rarity === 'R') rarityBonus = 10;
-        if (rarity === 'SR') rarityBonus = 20;
-        if (rarity === 'SSR') rarityBonus = 30;
+        if (rarity === 'R') rarityBonus = 15;
+        if (rarity === 'SR') rarityBonus = 30;
+        if (rarity === 'SSR') rarityBonus = 45;
 
         // Random stats slightly weighted by position
         const stats = {
