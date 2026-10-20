@@ -104,7 +104,7 @@ if (prefMissing) {
 if (mainJsStr.includes('const bestAction = evaluation.action;')) {
     console.log("FAIL: bestAction is still declared as const.");
     simFailed = true;
-} else if (mainJsStr.includes('let bestAction = evaluation.action;')) {
+} else if (mainJsStr.includes('let bestAction = \'HoldPosition\';') || mainJsStr.includes('let bestAction = evaluation.action;')) {
     console.log("PASS: bestAction is correctly declared as let.");
 } else {
     console.log("FAIL: bestAction declaration not found properly.");

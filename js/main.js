@@ -210,9 +210,16 @@ class MatchScene extends Phaser.Scene {
             // Attacking deeply (Phase C): Create 3-2-5 structure
             if (pos === 'SB') {
                 base.x += dir * 80; // SB pushes up into forward line
+                base.y = base.y < 300 ? 60 : 540; // Open up wide
             }
             if (pos === 'CDM') {
                 base.x -= dir * 40; // CDM drops between CBs (Salida Lavolpiana / Rest defense)
+            }
+            if (pos === 'WG') {
+                base.y = base.y < 300 ? 50 : 550; // WGs stay very wide
+            }
+            if (pos === 'CF') {
+                base.x += dir * 40; // CF pushes deeper against opponent DF line
             }
         } else if (!isAttacking && Math.abs(lineShift) > 50) {
             // Defending deeply (Phase F): Create 5-4-1 structure
@@ -424,7 +431,7 @@ class MatchScene extends Phaser.Scene {
         if (this.currentGimmick === "fever") gimmickStr = "熱狂 (前半プレッシャー増)";
         if (this.currentGimmick === "fortress") gimmickStr = "要塞 (スタミナ消費増/ファウル減)";
         if (this.currentGimmick === "badWeather") gimmickStr = "悪天候 (パス成功率低下/ロング有利)";
-        this.add.text(400, 75, `環境: ${gimmickStr}`, { fontSize: '14px', fill: '#e74c3c' }).setOrigin(0.5);
+        this.add.text(20, 20, `環境: ${gimmickStr}`, { fontSize: '12px', fill: '#e74c3c' }).setOrigin(0, 0);
 
         const speed1x = this.add.text(700, 25, '1x', { fontSize: '20px', fill: '#fff', backgroundColor: '#333' }).setOrigin(0.5).setInteractive();
         const speed2x = this.add.text(740, 25, '2x', { fontSize: '20px', fill: '#fff' }).setOrigin(0.5).setInteractive();
@@ -439,9 +446,9 @@ class MatchScene extends Phaser.Scene {
         this.createCommandUI();
 
         // Add Substitution / Tactics Button
-        const subBtnBg = this.add.rectangle(720, 500, 140, 40, 0x3498db).setInteractive().setDepth(100);
+        const subBtnBg = this.add.rectangle(720, 570, 140, 40, 0x3498db).setInteractive().setDepth(100);
         subBtnBg.setStrokeStyle(2, 0x2980b9);
-        this.subBtnText = this.add.text(720, 500, '🔄 交代・戦術', { fontSize: '14px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5).setDepth(101);
+        this.subBtnText = this.add.text(720, 570, '🔄 交代・戦術', { fontSize: '14px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5).setDepth(101);
 
         subBtnBg.on('pointerdown', () => {
             if (this.matchState === 'playing') {
@@ -452,7 +459,7 @@ class MatchScene extends Phaser.Scene {
         // Add Real-Time Tactic Toggles
         this.realTimeTactic = 'Balance';
 
-        const tacticY = 500;
+        const tacticY = 570;
         const tacticBtnWidth = 80;
         const startX = 400 - (tacticBtnWidth * 1.5) - 30; // Center offset slightly to the left of commands
 
@@ -991,17 +998,18 @@ class MatchScene extends Phaser.Scene {
             if (attackingTactic === 'Possession') {
                 atkOutfield.forEach(p => {
                     if (p.playerData.position === 'CB') {
-                        p.x = ownGoalX + dir * 45;
-                        p.y = p.y < 300 ? 200 : 400;
+                        p.x = ownGoalX + dir * 45 + (Math.random() * 10 - 5);
+                        p.y = (p.y < 300 ? 200 : 400) + (Math.random() * 40 - 20);
                     } else if (p.playerData.position === 'SB') {
-                        p.x = ownGoalX + dir * 205;
-                        p.y = p.y < 300 ? 85 : 515;
+                        p.x = ownGoalX + dir * 120 + (Math.random() * 20 - 10);
+                        p.y = (p.y < 300 ? 85 : 515) + (Math.random() * 30 - 15);
                     } else if (p.playerData.position === 'CDM' || p.playerData.position === 'CM') {
-                        p.x = ownGoalX + dir * 165;
-                        p.y = 300 + (Math.random() * 40 - 20);
+                        p.x = ownGoalX + dir * 165 + (Math.random() * 40 - 20);
+                        p.y = 300 + (Math.random() * 80 - 40);
                     } else {
                         // Push others slightly higher
-                        p.x = ownGoalX + dir * 300;
+                        p.x = ownGoalX + dir * 250 + (Math.random() * 60 - 30);
+                        p.y = 300 + (Math.random() * 120 - 60);
                     }
                 });
             } else { // Counter / Retreat / HighPress
@@ -1010,18 +1018,22 @@ class MatchScene extends Phaser.Scene {
                 let targetX = 400 - dir * 20; // Middle third
                 let targetY = 300;
                 if (targetMan) {
-                    targetMan.x = targetX;
-                    targetMan.y = targetY;
+                    targetMan.x = targetX + (Math.random() * 20 - 10);
+                    targetMan.y = targetY + (Math.random() * 20 - 10);
                 }
 
                 // Overload around target man
                 atkOutfield.forEach((p, i) => {
                     if (p !== targetMan) {
                         if (p.playerData.position === 'CB' || p.playerData.position === 'SB') {
-                            p.x = ownGoalX + dir * 250; // Push DF line up
-                        } else {
-                            p.x = targetX + dir * (Math.random() * 40 - 20);
+                            p.x = ownGoalX + dir * 150 + (Math.random() * 40 - 20); // Push DF line up slightly but not too much
+                            p.y = 300 + (Math.random() * 150 - 75);
+                        } else if (p.playerData.position === 'CDM' || p.playerData.position === 'CM') {
+                            p.x = ownGoalX + dir * 220 + (Math.random() * 50 - 25);
                             p.y = targetY + (Math.random() * 100 - 50);
+                        } else {
+                            p.x = targetX + dir * (Math.random() * 60 - 30);
+                            p.y = targetY + (Math.random() * 120 - 60);
                         }
                     }
                 });
@@ -1386,6 +1398,8 @@ class MatchScene extends Phaser.Scene {
             if (distToGoal < 250) {
                 actionScores.Shoot = currentThreat * 1.5;
                 actionScores.Shoot -= this.calculatePassRisk(p.x, p.y, goalX, 300, p.isPlayerTeam) * 0.8;
+            } else if (distToGoal > 300) {
+                actionScores.Shoot = 0;
             }
 
             const teammates = (p.isPlayerTeam ? this.playerSprites : this.opponentSprites).filter(mate => mate !== p);
@@ -1778,13 +1792,21 @@ class MatchScene extends Phaser.Scene {
                 p.aiTickTimer = 0;
                 if (!hasBall) p.targetMaintainTimer = Phaser.Math.Between(15, 20); // Hold decision for 15-20 frames
 
-                const context = { tactic, isAttacking, hasBall, realTimeTactic: p.isPlayerTeam ? this.realTimeTactic : 'Balance' };
-                const evaluation = this.evaluateActions(p, context);
-                let bestAction = evaluation.action;
-                p.currentAction = bestAction;
-                p.lastEvaluation = { bestPassTarget: context.bestPassTarget, targetLineX: evaluation.targetLineX };
+                let bestAction = 'HoldPosition';
                 const dir = p.isPlayerTeam ? 1 : -1;
                 let base = this.getDynamicBasePosition(p, p.isPlayerTeam, isAttacking);
+
+                if (p.gkKeepTimer && p.gkKeepTimer > 0) {
+                    p.gkKeepTimer--;
+                    bestAction = 'Keep';
+                    p.currentAction = bestAction;
+                } else {
+                    const context = { tactic, isAttacking, hasBall, realTimeTactic: p.isPlayerTeam ? this.realTimeTactic : 'Balance' };
+                    const evaluation = this.evaluateActions(p, context);
+                    bestAction = evaluation.action;
+                    p.currentAction = bestAction;
+                    p.lastEvaluation = { bestPassTarget: context.bestPassTarget, targetLineX: evaluation.targetLineX };
+                }
 
                 // Target Y and X modifications for RealTimeTactic
                 if (p.isPlayerTeam) {
@@ -2062,9 +2084,12 @@ class MatchScene extends Phaser.Scene {
             } else { this.ball.z = 0; }
 
             // Increased inertia
-            if (dist < 10 || this.ballSpeed < 0.1) {
+            if (this.ballSpeed < 0.1) {
                 this.ballTarget = null; this.ballSpeed = 0; this.isHighBall = false; this.ball.z = 0;
             } else {
+                if (this.ballTarget && dist < 10 && this.ball.x > 5 && this.ball.x < 795 && this.ball.y > 60 && this.ball.y < 540) {
+                     this.ballTarget = null; // Let the ball roll without a strict target coordinate
+                }
                 const angle = this.ballTarget ? Phaser.Math.Angle.Between(this.ball.x, this.ball.y, targetX, targetY) : (this.ball.angle || 0);
                 this.ball.angle = angle;
                 this.ball.x += Math.cos(angle) * this.ballSpeed; this.ball.y += Math.sin(angle) * this.ballSpeed;
@@ -2377,8 +2402,14 @@ class MatchScene extends Phaser.Scene {
                                     this.showActionText(defendingGK, saveSkill.names[0], "#f1c40f");
                                 }
                                 this.showActionText(defendingGK, "セーブ:成功", "#f1c40f");
+                                this.ball.owner = defendingGK;
+                                this.ballTarget = null;
+                                this.ballSpeed = 0;
+                                defendingGK.gkKeepTimer = 60;
+                                defendingGK.currentAction = 'Keep';
+                            } else {
+                                this.ballTarget = {x: isPlayer ? 780 : 20, y: 300}; this.ballSpeed = 10; this.ball.cooldown = 5;
                             }
-                            this.ballTarget = {x: isPlayer ? 780 : 20, y: 300}; this.ballSpeed = 10; this.ball.cooldown = 5;
                         } else {
                             this.showActionText(kicker, "シュート:失敗", "#e74c3c");
                             this.ballTarget = {x: isPlayer ? 850 : -50, y: Math.random() > 0.5 ? 200 : 400};
