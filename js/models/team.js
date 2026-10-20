@@ -33,6 +33,15 @@ class Team {
         // Generate 18 players ensuring minimal positional coverage
         const reqPositions = ["GK", "CB", "CB", "SB", "SB", "CM", "CM", "WG", "WG", "CF", "CF"];
 
+        // Ensure exactly 1 GK and 6 outfielders for the bench
+        const benchOutfieldPool = ["CB", "SB", "CDM", "CM", "CAM", "WG", "CF"];
+        const benchPos = ["GK"];
+        for (let i = 0; i < 6; i++) {
+            benchPos.push(benchOutfieldPool[Math.floor(Math.random() * benchOutfieldPool.length)]);
+        }
+        benchPos.sort(() => 0.5 - Math.random());
+        const fullPositions = [...reqPositions, ...benchPos];
+
         // Determine which starter indices get 'R' rarity (3 to 5 players)
         const numRare = Math.floor(Math.random() * 3) + 3; // 3, 4, or 5
         let rareIndices = [];
@@ -59,7 +68,7 @@ class Team {
         const benchLevels = generateLevels(7, 18);
 
         for (let i = 0; i < 18; i++) {
-            const pos = i < reqPositions.length ? reqPositions[i] : null;
+            const pos = i < fullPositions.length ? fullPositions[i] : null;
 
             let rarity = 'N';
             if (i < 11 && rareIndices.includes(i)) rarity = 'R';
@@ -96,7 +105,7 @@ class Team {
             // Approximate stat growth for initial levels (e.g., level - 1 times random 2-3)
             if (targetLevel > 1) {
                 for (let key in p.stats) {
-                    const growth = (targetLevel - 1) * (Math.floor(Math.random() * 2) + 2);
+                    const growth = (targetLevel - 1) * 3;
                     p.stats[key] = Math.min(100, p.stats[key] + growth);
                 }
             }
@@ -191,7 +200,7 @@ class Team {
             p.maxExp = targetLevel * 100;
             if (targetLevel > 1) {
                 for (let key in p.stats) {
-                    const growth = (targetLevel - 1) * (Math.floor(Math.random() * 2) + 2);
+                    const growth = (targetLevel - 1) * 3;
                     p.stats[key] = Math.min(100, p.stats[key] + growth);
                 }
             }

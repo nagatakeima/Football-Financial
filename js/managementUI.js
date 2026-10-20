@@ -47,7 +47,7 @@ class ManagementUI {
         const relicsHtml = window.gameState.playerTeam.relics.map(relicId => {
             const relic = window.MasterData.Relics.find(r => r.id === relicId);
             if (!relic) return '';
-            return `<div class="relic-badge" title="${relic.description}">${relic.name}</div>`;
+            return `<div class="relic-badge" data-tooltip="${relic.description}">${relic.name}</div>`;
         }).join('');
 
         let relicsContainer = document.getElementById('top-bar-relics');
@@ -240,13 +240,13 @@ class ManagementUI {
                 }
             }
             const c = window.MasterData.MicroCommands.find(x => x.id === idOrIdx);
-            alert(`戦術コマンド「${c.name}」を獲得しました！`);
+            this.showToast(`戦術コマンド「${c.name}」を獲得しました！`);
 
         } else if (type === 'player') {
             if (team.players.length >= 18) {
                 const selectEl = document.getElementById('victory_trade_select');
                 if (!selectEl) {
-                    alert("放出すべき選手が選択されていません。");
+                    this.showToast("放出すべき選手が選択されていません。");
                     return;
                 }
                 const releaseId = selectEl.value;
@@ -271,12 +271,12 @@ class ManagementUI {
                 team.bench.push(newPlayer);
             }
 
-            alert(`${newPlayer.name} を引き抜きました！`);
+            this.showToast(`${newPlayer.name} を引き抜きました！`);
 
         } else if (type === 'relic') {
             team.relics.push(idOrIdx);
             const r = window.MasterData.Relics.find(x => x.id === idOrIdx);
-            alert(`宝物「${r.name}」を獲得しました！`);
+            this.showToast(`宝物「${r.name}」を獲得しました！`);
         }
 
         window.gameState.pendingVictoryReward = false;
@@ -329,7 +329,7 @@ class ManagementUI {
             window.gameState.ap -= 1;
             window.gameState.hasRestedThisTurn = true;
             window.gameState.playerTeam.players.forEach(p => p.condition = Math.min(100, p.condition + 15));
-            alert("選手が休養し、コンディションが回復しました。");
+            this.showToast("選手が休養し、コンディションが回復しました。");
             this.showDashboard();
         }
     }
@@ -378,7 +378,7 @@ class ManagementUI {
                             <p style="font-size: 12px; color: #eee;">
                                 ${opponent.relics.length > 0 ? opponent.relics.map(rId => {
                                     const r = window.MasterData.Relics.find(x => x.id === rId);
-                                    return r ? r.name : 'Unknown';
+                                    return r ? `<span class="relic-badge" data-tooltip="${r.description}">${r.name}</span>` : 'Unknown';
                                 }).join(', ') : '特になし'}
                             </p>
                         </div>
@@ -399,7 +399,7 @@ class ManagementUI {
                             ${window.gameState.playerTeam.relics.length === 0 ? '<li style="color: #7f8c8d;">なし</li>' : ''}
                             ${window.gameState.playerTeam.relics.map(rId => {
                                 const r = window.MasterData.Relics.find(x => x.id === rId);
-                                return `<li style="padding: 5px 0; border-bottom: 1px solid #34495e;">・${r ? r.name : 'Unknown'}</li>`;
+                                return `<li style="padding: 5px 0; border-bottom: 1px solid #34495e;">・${r ? `<span class="relic-badge" data-tooltip="${r.description}">${r.name}</span>` : 'Unknown'}</li>`;
                             }).join('')}
                         </ul>
                     </div>
@@ -407,7 +407,7 @@ class ManagementUI {
                     <div style="background: rgba(40,40,40,0.95); padding: 15px; border-radius: 8px; text-align: left; flex: 1.5; overflow-y: auto;">
                         <h3 style="color: #f1c40f; margin-bottom: 10px;">セット中ミクロ (戦術コマンド)</h3>
                         <p style="font-size: 12px; color: #ccc; margin-bottom: 10px;">※試合中、手動または自動で発動可能 (最大4つ)</p>
-                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <div style="display: flex; flex-direction: column; gap: 8px; flex-wrap: wrap; max-height: 200px; overflow-y: auto;">
                             ${[0, 1, 2, 3].map(i => {
                                 const cmdId = window.gameState.playerTeam.microCommands[i];
                                 const allCmds = window.MasterData.MicroCommands.filter(c => window.gameState.playerTeam.ownedMicroCommands.includes(c.id));
@@ -415,7 +415,8 @@ class ManagementUI {
                                 allCmds.forEach(c => {
                                     const isSelectedElsewhere = window.gameState.playerTeam.microCommands.includes(c.id) && window.gameState.playerTeam.microCommands[i] !== c.id;
                                     if (!isSelectedElsewhere) {
-                                        optionsHtml += `<option value="${c.id}" ${cmdId === c.id ? 'selected' : ''}>${c.name} (CD:${c.cooldown}s)</option>`;
+                                        const desc = c.description || (c.type === 'buff' ? `${c.target} ${c.value}UP` : c.actionType);
+                                        optionsHtml += `<option value="${c.id}" ${cmdId === c.id ? 'selected' : ''}>${c.name} (CD:${c.cooldown}s) - ${desc}</option>`;
                                     }
                                 });
                                 return `
@@ -652,7 +653,8 @@ class ManagementUI {
         `;
 
         this.uiContent.innerHTML = html;
-        this.selectedPlayerIndex = null; // for tap-to-swap logic
+        this.selectedPlayerIndex = null;
+        this.swapSourceIndex = null; // explicitly track swap mode
         this.renderFormation();
     }
 
@@ -707,7 +709,26 @@ class ManagementUI {
 
         const expPercent = isMax ? 100 : (player.exp / player.maxExp) * 100;
 
+        const roleMap = {
+            'Classic': 'クラシック', 'Inverted': 'インバーテッド', 'Poacher': 'ポーチャー',
+            'Ball-Playing': 'ボールプレイング', 'Stopper': 'ストッパー', 'Covering': 'カバーリング',
+            'Defensive': 'ディフェンシブ', 'Attacking': 'アタッキング', 'Wing-Back': 'ウイングバック',
+            'Anchor': 'アンカー', 'Destroyer': 'デストロイヤー', 'Deep-Lying': 'ディープライイング',
+            'Box-to-Box': 'BtoB', 'Advanced-Playmaker': 'アドバンスドPM', 'Ball-Winning': 'ボールウィニング',
+            'Shadow-Striker': 'シャドーストライカー', 'Enganche': 'エンガンチェ', 'Dynamo': 'ダイナモ',
+            'Classic-Winger': 'ウインガー', 'Crosser': 'クロサー', 'Inside-Forward': 'インサイドFW',
+            'Wide-Playmaker': 'ワイドPM', 'Wide-Target-Man': 'ワイドターゲット', 'Hard-Worker': 'ハードワーカー',
+            'Target-Man': 'ターゲットマン', 'False-9': 'フォルス9', 'Complete': 'コンプリートFW'
+        };
+        const roleJp = player.role ? (roleMap[player.role] || player.role) : 'なし';
+
+        const career = player.careerStats || { appearances: 0, goals: 0, assists: 0, avgRating: 0.0 };
+
+
         detailPanel.innerHTML = `
+            <button onclick="managementUI.toggleSwapMode(${index})" style="margin-bottom: 10px; width: 100%; padding: 8px; font-size: 14px; background: ${this.swapSourceIndex === index ? '#c0392b' : '#2980b9'}; border: 1px solid #fff; border-radius: 4px; cursor: pointer; color: white;">
+                ${this.swapSourceIndex === index ? '取消' : '🔄 この選手を入れ替え対象にする'}
+            </button>
             <div style="background: #222; border: 2px solid ${rarityColor}; border-radius: 8px; padding: 15px; flex: 1; display: flex; flex-direction: column; text-align: left; overflow-y: auto;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #555; padding-bottom: 10px; margin-bottom: 10px;">
                     <div>
@@ -740,9 +761,12 @@ class ManagementUI {
                 <div style="margin-bottom: 10px; font-size: 12px;">
                     <span style="color: #bbb;">メイン適性:</span> <span style="font-weight: bold; color: #fff;">${player.position}</span><br>
                     <span style="color: #bbb;">サブ適性:</span> ${player.subPositions.length > 0 ? player.subPositions.join(', ') : 'なし'}<br>
-                    <span style="color: #bbb;">役割(ロール):</span> ${player.role || 'なし'}
+                    <span style="color: #bbb;">役割(ロール):</span> ${roleJp}
                 </div>
 
+                <div style="margin-bottom: 10px; font-size: 11px; background: rgba(0,0,0,0.3); padding: 5px; border-radius: 4px;">
+                    <span style="color: #f39c12;">通算成績:</span> 出場 ${career.appearances} / G ${career.goals} / A ${career.assists} / 評 ${career.avgRating.toFixed(2)}
+                </div>
                 <div style="margin-bottom: 15px;">
                     <h4 style="border-bottom: 1px solid #444; padding-bottom: 2px; margin-bottom: 5px; font-size: 13px;">ステータス</h4>
                     ${statBarsHtml}
@@ -760,6 +784,7 @@ class ManagementUI {
     renderFormation() {
         const team = window.gameState.playerTeam;
         const container = document.getElementById('formation-container');
+        const rarityColors = {'N': '#7f8c8d', 'R': '#3498db', 'SR': '#9b59b6', 'SSR': '#f1c40f'};
         const benchContainer = document.getElementById('bench-container');
         const canvas = document.getElementById('chem-canvas');
 
@@ -828,7 +853,8 @@ class ManagementUI {
                 border-left: 4px solid ${p.preference === 'Possession' ? '#3498db' : (p.preference === 'Counter' ? '#e74c3c' : (p.preference === 'HighPress' ? '#f1c40f' : '#2ecc71'))};
             `;
             const newBadge = p.isNew ? `<span style="background:red; color:white; font-size:8px; padding:1px 2px; border-radius:3px; font-weight:bold; margin-right:5px;">NEW!</span>` : '';
-            bDiv.innerHTML = `<span>${newBadge}[${p.position}] ${p.name} (${p.level>=10?'MAX':'Lv.'+p.level})</span> <span>OVR:${p.getOvr()}</span>`;
+            bDiv.innerHTML = `<span>${newBadge}<span style="font-size: 10px; font-weight: bold; background: ${rarityColors[p.rarity] || '#7f8c8d'}; color: ${p.rarity === 'SSR' ? '#000' : '#fff'}; padding: 1px 3px; border-radius: 2px; margin-right: 4px;">${p.rarity}</span>[${p.position}] ${p.name} (${p.level>=10?'MAX':'Lv.'+p.level})</span> <span>OVR:${p.getOvr()}</span>`;
+            bDiv.style.border = `1px solid ${rarityColors[p.rarity] || '#555'}`;
             bDiv.onclick = () => this.handlePlayerClick(bIdx, false);
             benchContainer.appendChild(bDiv);
         });
@@ -980,40 +1006,52 @@ class ManagementUI {
         const team = window.gameState.playerTeam;
         const player = index < 11 ? team.starting11[index] : team.bench[index - 11];
 
-        // Remove NEW badge upon click
-        if (player.isNew) {
+        if (player && player.isNew) {
             player.isNew = false;
         }
 
-        if (this.selectedPlayerIndex === null) {
-            // First click
-            this.selectedPlayerIndex = index;
-            this.renderFormation();
-            this.renderPlayerDetailCard(player, index);
-        } else {
-            // Second click: swap
-            const idx1 = this.selectedPlayerIndex;
+        if (this.swapSourceIndex !== null) {
+            // We are in swap mode
+            const idx1 = this.swapSourceIndex;
             const idx2 = index;
 
             if (idx1 !== idx2) {
                 let p1 = idx1 < 11 ? team.starting11[idx1] : team.bench[idx1 - 11];
                 let p2 = idx2 < 11 ? team.starting11[idx2] : team.bench[idx2 - 11];
 
-                // Swap them in data structure
                 if (idx1 < 11) team.starting11[idx1] = p2;
                 else team.bench[idx1 - 11] = p2;
 
                 if (idx2 < 11) team.starting11[idx2] = p1;
                 else team.bench[idx2 - 11] = p1;
 
-                // Recalculate chemistry
                 window.ChemistrySystem.calculateTeamChemistry(team);
             }
 
-            this.selectedPlayerIndex = null;
+            // Exit swap mode
+            this.swapSourceIndex = null;
+            this.selectedPlayerIndex = index; // Keep selection on the newly clicked player position
             this.renderFormation();
-            this.renderPlayerDetailCard(null); // Clear detail card after swap
+            this.renderPlayerDetailCard(idx1 !== idx2 ? p1 : player, index); // p1 is the player that moved to this slot
+        } else {
+            // Just view player
+            this.selectedPlayerIndex = index;
+            this.renderFormation();
+            this.renderPlayerDetailCard(player, index);
         }
+    }
+
+    toggleSwapMode(index) {
+        if (this.swapSourceIndex === index) {
+            this.swapSourceIndex = null; // cancel swap mode
+        } else {
+            this.swapSourceIndex = index;
+        }
+        this.renderFormation();
+
+        const team = window.gameState.playerTeam;
+        const player = index < 11 ? team.starting11[index] : team.bench[index - 11];
+        this.renderPlayerDetailCard(player, index);
     }
 
     changeFormation(newForm) {
@@ -1095,6 +1133,22 @@ class ManagementUI {
             const canAfford = canAffordFunds && canAffordAP;
 
             let extraUI = '';
+            if (choice.candidates) {
+                extraUI += `<div style="margin-top: 10px; font-size: 13px; font-weight: bold; color: #2ecc71;">獲得する候補を選択:</div>`;
+                choice.candidates.forEach((cand, candIdx) => {
+                    const skillsStr = cand.skills.map(sid => window.MasterData.PlayerSkills.find(s=>s.id===sid)?.name).filter(Boolean).join(', ') || 'なし';
+                    extraUI += `
+                        <div style="background: #333; padding: 8px; margin-top: 5px; border-radius: 4px; display: flex; align-items: center; gap: 10px;">
+                            <input type="radio" name="draft_select_${eventId}_${idx}" value="${candIdx}" id="cand_${eventId}_${idx}_${candIdx}" ${candIdx === 0 ? 'checked' : ''}>
+                            <label for="cand_${eventId}_${idx}_${candIdx}" style="cursor: pointer; font-size: 12px; display: inline-block;">
+                                <strong>[${cand.position}${cand.subPositions.length>0?'/'+cand.subPositions.join(','):''}] ${cand.name}</strong> <br>
+                                <span style="color: #f1c40f;">OVR: ${cand.getOvr()}</span> / Lv.${cand.level} / スキル: ${skillsStr}
+                            </label>
+                        </div>
+                    `;
+                });
+            }
+
             if (choice.tradeCount > 0) {
                 extraUI += `<div style="margin-top: 5px; font-size: 12px; color: #e74c3c;">放出対象を選択 (${choice.tradeCount}人):</div>`;
                 for (let tc = 0; tc < choice.tradeCount; tc++) {
@@ -1153,6 +1207,7 @@ class ManagementUI {
     generateEvents() {
         const events = [];
         const baseTypes = ['command', 'scout', 'training', 'relic', 'mystery'];
+        window.gameState.turnRelicPool = null;
 
         // Randomly determine number of events: 4 to 7
         const numEvents = Math.floor(Math.random() * 4) + 4;
@@ -1164,24 +1219,22 @@ class ManagementUI {
 
         const tier = window.gameState.currentTier;
         const matchday = window.gameState.league ? window.gameState.league.currentMatchday : 1;
-
-        // Base cost multiplier: (4 - tier) + (matchday * 0.1) => Tier 3: ~1.1, Tier 1: ~3.5
         const costMultiplier = (4 - tier) + (matchday * 0.1);
-
         const currentSquadSize = window.gameState.playerTeam.players.length;
 
-        for (let i = 0; i < numEvents; i++) {
-            // Filter available types (max 2) and handle 11-player guard for 'scout'
-            let availableTypes = baseTypes.filter(t => {
-                if (typeCounts[t] >= 2) return false;
-                // If squad is 11, we CAN do scout, but the *choices* generated later must not reduce size below 11.
-                // However, some scout events strictly require trading. We'll handle the guard inside the choice generation.
-                return true;
-            });
+        // Guarantee at least one of each main type
+        const guaranteedTypes = ['scout', 'training', 'relic', 'command'];
+        const numEventsToGenerate = Math.max(numEvents, 4);
 
-            if (availableTypes.length === 0) availableTypes = ['mystery']; // Fallback
-
-            const type = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+        for (let i = 0; i < numEventsToGenerate; i++) {
+            let type;
+            if (i < 4) {
+                type = guaranteedTypes[i];
+            } else {
+                let availableTypes = baseTypes.filter(t => typeCounts[t] < 2);
+                if (availableTypes.length === 0) availableTypes = ['mystery'];
+                type = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+            }
             typeCounts[type]++;
 
             let eventObj = {
@@ -1194,50 +1247,43 @@ class ManagementUI {
                 eventObj.title = 'スカウトからの提案';
                 eventObj.flavorText = '「監督、有望な選手を見つけました。チームの補強にいかがですか？」';
 
-                // Choice 1: Standard Buy
+                // Draft options creation
+                const generateDraftChoice = (costBase, tradeCount, rarity) => {
+                    const cost = Math.floor(costBase * costMultiplier);
+                    const candidates = [
+                        window.Player.generateRandom("draft_0", null, rarity),
+                        window.Player.generateRandom("draft_1", null, rarity),
+                        window.Player.generateRandom("draft_2", null, rarity)
+                    ];
+                    let descStr = tradeCount > 0 ? `資金¥${cost.toLocaleString()} ＋ 選手${tradeCount}人放出` : `資金¥${cost.toLocaleString()}`;
+                    descStr += `で ${rarity}候補から1人獲得`;
+
+                    eventObj.choices.push({
+                        desc: descStr,
+                        fundCost: cost,
+                        tradeCount: tradeCount,
+                        rewardRarity: rarity,
+                        candidates: candidates
+                    });
+                };
+
+                // Choice 1: Standard
                 if (currentSquadSize >= 18) {
-                    eventObj.choices.push({
-                        desc: `資金¥${Math.floor(100000 * costMultiplier).toLocaleString()} ＋ 選手1人放出で選手を獲得`,
-                        fundCost: Math.floor(100000 * costMultiplier),
-                        tradeCount: 1,
-                        rewardRarity: 'N'
-                    });
+                    generateDraftChoice(100000, 1, 'N');
                 } else {
-                    eventObj.choices.push({
-                        desc: `資金¥${Math.floor(100000 * costMultiplier).toLocaleString()}で選手を獲得`,
-                        fundCost: Math.floor(100000 * costMultiplier),
-                        tradeCount: 0,
-                        rewardRarity: 'N'
-                    });
+                    generateDraftChoice(100000, 0, 'N');
                 }
 
                 // Choice 2: Trade 1
-                // Only allow trade if currentSquadSize - tradeCount + 1 >= 11
                 if (currentSquadSize - 1 + 1 >= 11) {
-                    eventObj.choices.push({
-                        desc: `資金¥${Math.floor(200000 * costMultiplier).toLocaleString()} ＋ 選手1人放出で、R選手を獲得`,
-                        fundCost: Math.floor(200000 * costMultiplier),
-                        tradeCount: 1,
-                        rewardRarity: 'R'
-                    });
+                    generateDraftChoice(200000, 1, 'R');
                 } else {
-                    // Fallback to pure buy if trade not allowed
-                    eventObj.choices.push({
-                        desc: `資金¥${Math.floor(300000 * costMultiplier).toLocaleString()}で、R選手を獲得`,
-                        fundCost: Math.floor(300000 * costMultiplier),
-                        tradeCount: 0,
-                        rewardRarity: 'R'
-                    });
+                    generateDraftChoice(300000, 0, 'R');
                 }
 
-                // Choice 3: Premium Trade
+                // Choice 3: Premium
                 if (currentSquadSize - 2 + 1 >= 11) {
-                    eventObj.choices.push({
-                        desc: `資金¥${Math.floor(400000 * costMultiplier).toLocaleString()} ＋ 選手2人放出で、SR/SSR選手を獲得`,
-                        fundCost: Math.floor(400000 * costMultiplier),
-                        tradeCount: 2,
-                        rewardRarity: Math.random() > 0.8 ? 'SSR' : 'SR'
-                    });
+                    generateDraftChoice(400000, 2, Math.random() > 0.8 ? 'SSR' : 'SR');
                 }
             } else if (type === 'training') {
                 const isAwakening = Math.random() > 0.7;
@@ -1259,14 +1305,16 @@ class ManagementUI {
                 eventObj.title = '怪しい商人';
                 eventObj.flavorText = '「ヘッヘッヘ、いいお宝があるぜ。買わねえか？」';
 
-                const unownedRelics = window.MasterData.Relics.filter(r => !window.gameState.playerTeam.relics.includes(r.id));
-                const numChoices = Math.min(3, unownedRelics.length);
+                // Use game state tracker for unowned relics so multiple merchants in a turn share the pool
+                if (!window.gameState.turnRelicPool) {
+                    window.gameState.turnRelicPool = window.MasterData.Relics.filter(r => !window.gameState.playerTeam.relics.includes(r.id)).sort(() => 0.5 - Math.random());
+                }
+                const numChoices = Math.min(3, window.gameState.turnRelicPool.length);
 
                 for(let c=0; c<numChoices; c++) {
-                    const r = unownedRelics[c];
-                    // Cost scales up per choice index
+                    const r = window.gameState.turnRelicPool.pop(); // Remove so it doesn't appear again this turn
                     eventObj.choices.push({
-                        desc: `資金¥${Math.floor((300000 + c*100000) * costMultiplier).toLocaleString()}で「${r.name}」を購入`,
+                        desc: `資金¥${Math.floor((300000 + c*100000) * costMultiplier).toLocaleString()}で「${r.name}」を購入 (${r.description})`,
                         fundCost: Math.floor((300000 + c*100000) * costMultiplier),
                         rewardRelicId: r.id
                     });
@@ -1314,7 +1362,7 @@ class ManagementUI {
         const choice = evt.choices[choiceIdx];
 
         if (window.gameState.ap < 1 || window.gameState.funds < choice.fundCost) {
-            alert("リソースが不足しています。");
+            this.showToast("リソースが不足しています。");
             return;
         }
 
@@ -1331,7 +1379,7 @@ class ManagementUI {
                 }
             }
             if (selectedIds.size < choice.tradeCount) {
-                alert("同じ選手を複数回選択することはできません。別の選手を選んでください。");
+                this.showToast("同じ選手を複数回選択することはできません。別の選手を選んでください。");
                 return; // abort
             }
 
@@ -1357,7 +1405,21 @@ class ManagementUI {
 
         // Process Rewards
         if (evt.type === 'scout') {
-            const newPlayer = window.Player.generateRandom(`scout_${Date.now()}`, null, choice.rewardRarity);
+            let newPlayer;
+            if (choice.candidates) {
+                let selectedCandidateIndex = 0;
+                const radioGrp = document.getElementsByName(`draft_select_${eventId}_${choiceIdx}`);
+                for (let radio of radioGrp) {
+                    if (radio.checked) {
+                        selectedCandidateIndex = parseInt(radio.value);
+                        break;
+                    }
+                }
+                newPlayer = choice.candidates[selectedCandidateIndex];
+                newPlayer.id = `scout_${Date.now()}`; // Refresh ID
+            } else {
+                newPlayer = window.Player.generateRandom(`scout_${Date.now()}`, null, choice.rewardRarity);
+            }
             newPlayer.isNew = true;
             // Generate decent level based on tier
             newPlayer.level = Math.floor(Math.random() * (4 - window.gameState.currentTier + 1)) + 1;
@@ -1374,12 +1436,12 @@ class ManagementUI {
             if (tradedPlayers.length > 0) {
                 alertMsg += `\n(放出した選手: ${tradedPlayers.map(p=>p.name).join(', ')})`;
             }
-            alert(alertMsg);
+            this.showToast(alertMsg);
 
         } else if (evt.type === 'relic' && choice.rewardRelicId) {
             team.relics.push(choice.rewardRelicId);
             const r = window.MasterData.Relics.find(x => x.id === choice.rewardRelicId);
-            alert(`宝物「${r.name}」を獲得しました！`);
+            this.showToast(`宝物「${r.name}」を獲得しました！`);
         } else if (evt.type === 'command' && choice.rewardCmdId) {
             team.ownedMicroCommands.push(choice.rewardCmdId);
             for (let i = 0; i < 4; i++) {
@@ -1389,51 +1451,54 @@ class ManagementUI {
                 }
             }
             const c = window.MasterData.MicroCommands.find(x => x.id === choice.rewardCmdId);
-            alert(`戦術コマンド「${c.name}」を獲得しました！`);
+            this.showToast(`戦術コマンド「${c.name}」を獲得しました！`);
         } else if (evt.type === 'training') {
             if (choice.action === 'awaken') {
                 const selectEl = document.getElementById(`awaken_select_${eventId}_${choiceIdx}`);
                 const p = team.players.find(x => String(x.id) === selectEl.value);
                 if (p) {
-                    p.addExp(300); // 3 levels worth roughly
-                    alert(`${p.name} が特別覚醒しました！ (現在Lv.${p.level})`);
+                    const oldLv = p.level;
+                    for (let i = 0; i < 2; i++) {
+                        if (p.level < 10) p.addExp(p.maxExp);
+                    }
+                    this.showToast(`${p.name} が特別覚醒しました！ (Lv.${oldLv} ➔ Lv.${p.level})`);
                 }
             } else if (choice.action === 'train_pos') {
                 const targets = team.players.filter(p => choice.targetPos.includes(p.position));
                 targets.forEach(p => p.addExp(120));
-                alert(`${choice.targetPos.join('/')}陣の特訓が完了し、対象選手が大量の経験値を獲得しました！`);
+                this.showToast(`${choice.targetPos.join('/')}陣の特訓が完了し、対象選手が大量の経験値を獲得しました！`);
             } else if (choice.action === 'teach_skill') {
                 const selectEl = document.getElementById(`teach_select_${eventId}_${choiceIdx}`);
                 if (!selectEl || !selectEl.value) {
-                    alert("対象選手がいません。");
+                    this.showToast("対象選手がいません。");
                     return;
                 }
                 const p = team.players.find(x => String(x.id) === selectEl.value);
                 if (p) {
                     p.skills.push(choice.skill.id);
-                    alert(`${p.name} にスキル『${choice.skill.name}』を伝授しました！`);
+                    this.showToast(`${p.name} にスキル『${choice.skill.name}』を伝授しました！`);
                 }
             } else if (choice.action === 'heavy') {
                 team.players.forEach(p => {
                     p.condition = 100;
                     p.addExp(50);
                 });
-                alert("特別合宿完了！コンディションが全快し、経験値を獲得しました。");
+                this.showToast("特別合宿完了！コンディションが全快し、経験値を獲得しました。");
             } else if (choice.action === 'light') {
                 team.players.forEach(p => {
                     p.condition = Math.min(100, p.condition + 30);
                     p.addExp(10);
                 });
-                alert("軽めの調整完了。コンディションが回復しました。");
+                this.showToast("軽めの調整完了。コンディションが回復しました。");
             }
         } else if (evt.type === 'mystery') {
             if (choice.action === 'bribe_referee') {
                 window.gameState.bribeReferee = true;
-                alert("怪しいフィクサーに裏工作を依頼した。次の試合で相手が最初にファウルを犯した時、一発退場になるだろう……");
+                this.showToast("怪しいフィクサーに裏工作を依頼した。次の試合で相手が最初にファウルを犯した時、一発退場になるだろう……");
             } else if (choice.action === 'sponsor_tour') {
                 window.gameState.funds += 400000;
                 team.players.forEach(p => p.condition = Math.max(0, p.condition - 25));
-                alert("強行スポンサー巡業で¥400,000の資金を得たが、チーム全員の体力が減少した……");
+                this.showToast("強行スポンサー巡業で¥400,000の資金を得たが、チーム全員の体力が減少した……");
             } else if (choice.action === 'mad_science') {
                 const selectEl = document.getElementById(`mad_select_${eventId}_${choiceIdx}`);
                 const p = team.players.find(x => String(x.id) === selectEl.value);
@@ -1442,26 +1507,26 @@ class ManagementUI {
                     if (!p.skills.includes(77)) {
                         p.skills.push(77); // ID 77: ガラスの天才
                     }
-                    alert(`${p.name} は肉体改造を受け、レベルが劇的に上昇したが、『ガラスの天才』の副作用が付与された！`);
+                    this.showToast(`${p.name} は肉体改造を受け、レベルが劇的に上昇したが、『ガラスの天才』の副作用が付与された！`);
                 }
             } else if (choice.action === 'refuse_science') {
                 team.players.forEach(p => p.condition = Math.min(100, p.condition + 10));
-                alert("断った。ホッとしたのか、全員の体力が少し回復した。");
+                this.showToast("断った。ホッとしたのか、全員の体力が少し回復した。");
             } else if (choice.action === 'random_good') {
                 const heal = Math.random() > 0.5;
                 if (heal) {
                     team.players.forEach(p => p.condition = 100);
-                    alert("偶然良いリフレッシュになり、コンディションが全快しました。");
+                    this.showToast("偶然良いリフレッシュになり、コンディションが全快しました。");
                 } else {
                     window.gameState.funds += 100000;
-                    alert("道端で¥100,000拾いました。");
+                    this.showToast("道端で¥100,000拾いました。");
                 }
             } else if (choice.action === 'random_great') {
                 const p = team.players[Math.floor(Math.random() * team.players.length)];
                 p.addExp(200);
-                alert(`お布施の恩恵か、${p.name} が突如として成長しました！ (Lv.${p.level})`);
+                this.showToast(`お布施の恩恵か、${p.name} が突如として成長しました！ (Lv.${p.level})`);
             } else {
-                alert("何も起きませんでした。");
+                this.showToast("何も起きませんでした。");
             }
         }
 
@@ -1470,6 +1535,30 @@ class ManagementUI {
 
         this.showEvents();
         this.updateTopBar();
+    }
+
+    showToast(msg) {
+        const uiLayer = document.getElementById('ui-layer');
+        if (!uiLayer) return;
+        const toast = document.createElement('div');
+        toast.className = 'toast-notification';
+        toast.innerText = msg;
+        uiLayer.appendChild(toast);
+
+        // Trigger reflow
+        void toast.offsetWidth;
+        toast.classList.add('show');
+
+        // Auto remove
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+
+        toast.onclick = () => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        };
     }
 
     showGameOver() {

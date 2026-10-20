@@ -30,8 +30,28 @@ class GameState {
 
         // Give player some random micro commands to start (e.g., 4 commands)
         const randomCmds = window.MasterData.MicroCommands.sort(() => 0.5 - Math.random()).slice(0, 6).map(c => c.id);
-        this.playerTeam.ownedMicroCommands = [...randomCmds];
-        this.playerTeam.microCommands = randomCmds.slice(0, 4);
+
+        // Ensure "ミドルシュート" (id 12) is included and set as default instead of substitute or overlapping
+        if (!randomCmds.includes(12)) {
+            randomCmds[0] = 12;
+        }
+
+        this.playerTeam.ownedMicroCommands = [...new Set([...randomCmds, 12])];
+
+        // Force slot 0 to be 12, then fill rest
+        const defaultSet = [12];
+        for (const cmdId of randomCmds) {
+            if (cmdId !== 12 && defaultSet.length < 4 && cmdId !== 6) { // Avoid id 6 (substitute) if possible
+                defaultSet.push(cmdId);
+            }
+        }
+        while(defaultSet.length < 4) {
+             const fallback = window.MasterData.MicroCommands.find(c => !defaultSet.includes(c.id) && c.id !== 6);
+             if (fallback) defaultSet.push(fallback.id);
+             else break;
+        }
+
+        this.playerTeam.microCommands = defaultSet;
 
         this.initializeLeague(this.currentTier);
 
