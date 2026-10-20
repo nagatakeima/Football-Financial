@@ -1090,6 +1090,23 @@ class ManagementUI {
                 team.starting11.forEach(p => { extraUI += `<option value="${p.id}">[${p.position}] ${p.name} (Lv.${p.level})</option>`; });
                 team.bench.forEach(p => { extraUI += `<option value="${p.id}">ベンチ: [${p.position}] ${p.name} (Lv.${p.level})</option>`; });
                 extraUI += `</select>`;
+            } else if (choice.action === 'teach_skill') {
+                extraUI += `<div style="margin-top: 5px; font-size: 12px; color: #3498db;">伝授する選手を選択:</div>`;
+                extraUI += `<select id="teach_select_${eventId}_${idx}" style="width: 100%; margin-top: 3px; background: #222; color: #fff; padding: 3px; border: 1px solid #555;">`;
+
+                const validTargets = team.players.filter(p => p.skills.length < 3 && choice.skill.allowedPositions.includes(p.position) && !p.skills.includes(choice.skill.id));
+                if (validTargets.length === 0) {
+                    extraUI += `<option value="">対象選手がいません</option>`;
+                } else {
+                    validTargets.forEach(p => { extraUI += `<option value="${p.id}">[${p.position}] ${p.name} (Lv.${p.level})</option>`; });
+                }
+                extraUI += `</select>`;
+            } else if (choice.action === 'mad_science') {
+                extraUI += `<div style="margin-top: 5px; font-size: 12px; color: #3498db;">手術対象を選択:</div>`;
+                extraUI += `<select id="mad_select_${eventId}_${idx}" style="width: 100%; margin-top: 3px; background: #222; color: #fff; padding: 3px; border: 1px solid #555;">`;
+                team.starting11.forEach(p => { extraUI += `<option value="${p.id}">[${p.position}] ${p.name} (Lv.${p.level})</option>`; });
+                team.bench.forEach(p => { extraUI += `<option value="${p.id}">ベンチ: [${p.position}] ${p.name} (Lv.${p.level})</option>`; });
+                extraUI += `</select>`;
             }
 
             detailHtml += `
@@ -1295,16 +1312,16 @@ class ManagementUI {
             }
 
             // Execute trade removals
-            selectedIds.forEach(id => {
-                const pIndex = team.players.findIndex(p => p.id === id);
+            selectedIds.forEach(idStr => {
+                const pIndex = team.players.findIndex(p => String(p.id) === idStr);
                 if (pIndex !== -1) {
                     const p = team.players[pIndex];
                     tradedPlayers.push(p);
                     team.players.splice(pIndex, 1);
                     // Remove from starting11 or bench
-                    const sIdx = team.starting11.findIndex(sp => sp.id === id);
+                    const sIdx = team.starting11.findIndex(sp => String(sp.id) === idStr);
                     if (sIdx !== -1) team.starting11.splice(sIdx, 1);
-                    const bIdx = team.bench.findIndex(bp => bp.id === id);
+                    const bIdx = team.bench.findIndex(bp => String(bp.id) === idStr);
                     if (bIdx !== -1) team.bench.splice(bIdx, 1);
                 }
             });
@@ -1352,10 +1369,25 @@ class ManagementUI {
         } else if (evt.type === 'training') {
             if (choice.action === 'awaken') {
                 const selectEl = document.getElementById(`awaken_select_${eventId}_${choiceIdx}`);
-                const p = team.players.find(x => x.id === selectEl.value);
+                const p = team.players.find(x => String(x.id) === selectEl.value);
                 if (p) {
                     p.addExp(300); // 3 levels worth roughly
                     alert(`${p.name} が特別覚醒しました！ (現在Lv.${p.level})`);
+                }
+            } else if (choice.action === 'train_pos') {
+                const targets = team.players.filter(p => choice.targetPos.includes(p.position));
+                targets.forEach(p => p.addExp(120));
+                alert(`${choice.targetPos.join('/')}陣の特訓が完了し、対象選手が大量の経験値を獲得しました！`);
+            } else if (choice.action === 'teach_skill') {
+                const selectEl = document.getElementById(`teach_select_${eventId}_${choiceIdx}`);
+                if (!selectEl || !selectEl.value) {
+                    alert("対象選手がいません。");
+                    return;
+                }
+                const p = team.players.find(x => String(x.id) === selectEl.value);
+                if (p) {
+                    p.skills.push(choice.skill.id);
+                    alert(`${p.name} にスキル『${choice.skill.name}』を伝授しました！`);
                 }
             } else if (choice.action === 'heavy') {
                 team.players.forEach(p => {
@@ -1363,7 +1395,7 @@ class ManagementUI {
                     p.addExp(50);
                 });
                 alert("特別合宿完了！コンディションが全快し、経験値を獲得しました。");
-            } else {
+            } else if (choice.action === 'light') {
                 team.players.forEach(p => {
                     p.condition = Math.min(100, p.condition + 30);
                     p.addExp(10);
@@ -1371,7 +1403,27 @@ class ManagementUI {
                 alert("軽めの調整完了。コンディションが回復しました。");
             }
         } else if (evt.type === 'mystery') {
-            if (choice.action === 'random_good') {
+            if (choice.action === 'bribe_referee') {
+                window.gameState.bribeReferee = true;
+                alert("怪しいフィクサーに裏工作を依頼した。次の試合で相手が最初にファウルを犯した時、一発退場になるだろう……");
+            } else if (choice.action === 'sponsor_tour') {
+                window.gameState.funds += 400000;
+                team.players.forEach(p => p.condition = Math.max(0, p.condition - 25));
+                alert("強行スポンサー巡業で¥400,000の資金を得たが、チーム全員の体力が減少した……");
+            } else if (choice.action === 'mad_science') {
+                const selectEl = document.getElementById(`mad_select_${eventId}_${choiceIdx}`);
+                const p = team.players.find(x => String(x.id) === selectEl.value);
+                if (p) {
+                    p.addExp(900); // 3 levels worth
+                    if (!p.skills.includes(77)) {
+                        p.skills.push(77); // ID 77: ガラスの天才
+                    }
+                    alert(`${p.name} は肉体改造を受け、レベルが劇的に上昇したが、『ガラスの天才』の副作用が付与された！`);
+                }
+            } else if (choice.action === 'refuse_science') {
+                team.players.forEach(p => p.condition = Math.min(100, p.condition + 10));
+                alert("断った。ホッとしたのか、全員の体力が少し回復した。");
+            } else if (choice.action === 'random_good') {
                 const heal = Math.random() > 0.5;
                 if (heal) {
                     team.players.forEach(p => p.condition = 100);
