@@ -904,6 +904,18 @@ class MatchScene extends Phaser.Scene {
         }
     }
 
+    handleSendOff(sprite) {
+        // Find if it's player team
+        const isPlayerTeam = sprite.isPlayerTeam;
+        const spritesArray = isPlayerTeam ? this.playerSprites : this.opponentSprites;
+
+        const spriteIndex = spritesArray.indexOf(sprite);
+        if (spriteIndex !== -1) {
+            sprite.destroy(); // Remove from canvas
+            spritesArray.splice(spriteIndex, 1); // Remove from logic
+        }
+    }
+
     handleSetPiece(type, x, y, isPlayerTeam) {
         this.matchState = 'setpiece';
         this.currentSetPieceType = type;
