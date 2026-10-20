@@ -357,7 +357,31 @@ class ManagementUI {
                     <div style="text-align: left;">
                         <p style="margin-bottom: 10px;"><strong>予想フォーメーション:</strong> ${opponent.formation}</p>
                         <p style="margin-bottom: 10px;"><strong>戦術志向:</strong> ${opponentTactic}</p>
+                        <p style="margin-bottom: 10px;"><strong>チーム特性:</strong> ${
+                            opponent.specializedConcept === 'HighLine' ? '超ハイライン軍団 (Speed 特化)' :
+                            opponent.specializedConcept === 'TargetMan' ? '放り込み軍団 (Physical 特化)' :
+                            opponent.specializedConcept === 'LowBlock' ? '堅守速攻 (Defense 特化)' : 'バランス型'
+                        }</p>
                         <p style="margin-bottom: 10px; color: #f39c12;"><strong>スタメン平均戦力:</strong> 約${Math.floor(opponent.starting11.reduce((sum, p) => sum + p.stats.pass + p.stats.defense + p.stats.speed, 0) / 11 / 3)}</p>
+
+                        <div style="margin-top: 15px; padding: 10px; border: 1px solid #c0392b; background: rgba(192, 57, 43, 0.2);">
+                            <h4 style="color: #e74c3c; margin-bottom: 5px;">⚠️ 要注意選手</h4>
+                            ${(() => {
+                                const keyPlayer = opponent.starting11.reduce((prev, current) => (prev.getOvr() > current.getOvr()) ? prev : current);
+                                return `<p><strong>${keyPlayer.name} (${keyPlayer.position})</strong> - OVR: ${keyPlayer.getOvr()}</p>
+                                        <p style="font-size: 12px; color: #ccc;">SPD: ${Math.floor(keyPlayer.stats.speed)} / PHY: ${Math.floor(keyPlayer.stats.physical)} / DEF: ${Math.floor(keyPlayer.stats.defense)}</p>`;
+                            })()}
+                        </div>
+
+                        <div style="margin-top: 15px; padding: 10px; border: 1px solid #f1c40f; background: rgba(241, 196, 15, 0.2);">
+                            <h4 style="color: #f1c40f; margin-bottom: 5px;">敵の所持宝物</h4>
+                            <p style="font-size: 12px; color: #eee;">
+                                ${opponent.relics.length > 0 ? opponent.relics.map(rId => {
+                                    const r = window.MasterData.Relics.find(x => x.id === rId);
+                                    return r ? r.name : 'Unknown';
+                                }).join(', ') : '特になし'}
+                            </p>
+                        </div>
 
                         <div style="margin-top: 20px; background: #222; padding: 15px; border-radius: 5px;">
                             <h4 style="color: #3498db; margin-bottom: 10px;">環境・ギミック予告</h4>

@@ -64,7 +64,30 @@ class Team {
             let rarity = 'N';
             if (i < 11 && rareIndices.includes(i)) rarity = 'R';
 
+
+            // Adjust rarity based on concept
+            if (!this.isPlayerTeam) {
+                if (this.specializedConcept === 'HighLine' && i < 11 && (pos === 'WG' || pos === 'CF' || pos === 'CAM')) {
+                    if (Math.random() > 0.5) rarity = 'R';
+                }
+            }
+
             const p = window.Player.generateRandom(`${this.id}_${i}`, pos, rarity);
+
+            // Apply targeted stat boosts based on concept
+            if (!this.isPlayerTeam) {
+                if (this.specializedConcept === 'HighLine') {
+                    p.stats.speed = Math.min(100, p.stats.speed + 15);
+                } else if (this.specializedConcept === 'TargetMan') {
+                    if (pos === 'CF' || pos === 'CB') {
+                        p.stats.physical = Math.min(100, p.stats.physical + 20);
+                    }
+                } else if (this.specializedConcept === 'LowBlock') {
+                    if (pos === 'CB' || pos === 'SB' || pos === 'CDM') {
+                        p.stats.defense = Math.min(100, p.stats.defense + 15);
+                    }
+                }
+            }
 
             // Assign level and pre-calculate stats for that level
             const targetLevel = i < 11 ? starterLevels[i] : benchLevels[i - 11];
@@ -132,6 +155,23 @@ class Team {
             // For AI teams, we can keep them simpler or scale with tier later. For now, flat 1 or slightly randomized.
             starterLevels = Array(11).fill(1).map(() => Math.floor(Math.random() * 3) + 1);
             benchLevels = Array(7).fill(1).map(() => Math.floor(Math.random() * 2) + 1);
+        }
+
+        // --- Specialized CPU Team Generation ---
+        if (!this.isPlayerTeam) {
+            const types = ['Normal', 'HighLine', 'TargetMan', 'LowBlock'];
+            this.specializedConcept = types[Math.floor(Math.random() * types.length)];
+
+            if (this.specializedConcept === 'HighLine') {
+                this.formation = "4-3-3";
+                managerData.preference = "HighPress";
+            } else if (this.specializedConcept === 'TargetMan') {
+                this.formation = "4-4-2";
+                managerData.preference = "Counter";
+            } else if (this.specializedConcept === 'LowBlock') {
+                this.formation = "5-4-1";
+                managerData.preference = "Retreat";
+            }
         }
 
         // Ensure 18 players
