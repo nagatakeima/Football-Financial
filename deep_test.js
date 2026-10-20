@@ -10,6 +10,12 @@ const delay = ms => new Promise(res => setTimeout(res, ms));
         // Output console logs from the page
         page.on('console', msg => console.log('PAGE LOG:', msg.text()));
 
+        // Automatically accept dialogs (alerts, confirms)
+        page.on('dialog', async dialog => {
+            console.log('Dialog dismissed:', dialog.message());
+            await dialog.accept();
+        });
+
         await page.goto('http://localhost:3000/index.html');
         console.log("Navigated to game.");
         await page.waitForSelector('.menu-box button');
@@ -52,7 +58,9 @@ const delay = ms => new Promise(res => setTimeout(res, ms));
             }
             // back
             eventButtons = await page.$$('.menu-box button');
-            await eventButtons[eventButtons.length - 1].click();
+            if(eventButtons.length > 0) {
+                await eventButtons[eventButtons.length - 1].click();
+            }
             await delay(500);
 
             // Match
@@ -78,12 +86,14 @@ const delay = ms => new Promise(res => setTimeout(res, ms));
             console.log(`Match ${loop} started. Skpping match...`);
 
             // Skip match
-            await delay(500);
+            await delay(1000); // Wait a bit longer to ensure window.game is fully initialized
             await page.evaluate(() => {
-                const scene = window.game.scene.keys.MatchScene;
-                if(scene && scene.isSkip !== undefined) {
-                    scene.isSkip = true;
-                    scene.tickMatch();
+                if (window.game && window.game.scene && window.game.scene.keys && window.game.scene.keys.MatchScene) {
+                    const scene = window.game.scene.keys.MatchScene;
+                    if(scene && scene.isSkip !== undefined) {
+                        scene.isSkip = true;
+                        scene.tickMatch();
+                    }
                 }
             });
 
@@ -101,6 +111,22 @@ const delay = ms => new Promise(res => setTimeout(res, ms));
                     if (btn) btn.click();
                 });
                 await delay(1000); // wait for match to finish after halftime
+            }
+
+            // Check if Victory Reward UI appeared
+            const isVictoryReward = await page.evaluate(() => document.getElementById('victory-detail-panel') !== null);
+            if (isVictoryReward) {
+                console.log('Claiming victory reward...');
+                await page.evaluate(() => {
+                    const typeBtns = document.querySelectorAll('.ui-left-panel button');
+                    if(typeBtns.length > 0) typeBtns[0].click();
+                });
+                await delay(500);
+                await page.evaluate(() => {
+                    const claimBtns = document.querySelectorAll('#victory-detail-panel button');
+                    if(claimBtns.length > 0) claimBtns[0].click();
+                });
+                await delay(1000);
             }
 
             const closeBtns = await page.$$('.menu-box button');

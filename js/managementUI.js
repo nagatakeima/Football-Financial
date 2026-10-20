@@ -43,6 +43,22 @@ class ManagementUI {
             <span class="ap">AP: ${window.gameState.ap}/10</span>
         `;
 
+        // Render relics bar
+        const relicsHtml = window.gameState.playerTeam.relics.map(relicId => {
+            const relic = window.MasterData.Relics.find(r => r.id === relicId);
+            if (!relic) return '';
+            return `<div class="relic-badge" title="${relic.description}">${relic.name}</div>`;
+        }).join('');
+
+        let relicsContainer = document.getElementById('top-bar-relics');
+        if (!relicsContainer) {
+            relicsContainer = document.createElement('div');
+            relicsContainer.id = 'top-bar-relics';
+            relicsContainer.style = 'display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap;';
+            this.topBar.appendChild(relicsContainer);
+        }
+        relicsContainer.innerHTML = relicsHtml;
+
         this.topBarSchedule.textContent = `第${window.gameState.currentTier}部 第${window.gameState.league ? window.gameState.league.currentMatchday : 1}節`;
     }
 
@@ -55,12 +71,14 @@ class ManagementUI {
         `;
 
         window.MasterData.Managers.forEach(m => {
+            const initialRelic = window.MasterData.Relics.find(r => r.name === m.initialTrait);
+            const relicDesc = initialRelic ? initialRelic.description : '';
             html += `
                 <div style="border: 1px solid #555; padding: 15px; border-radius: 5px; text-align: left; background: #333;">
                     <h3 style="color: #f1c40f; margin-bottom: 5px;">${m.name}</h3>
                     <p><strong>戦術志向:</strong> ${m.preference}</p>
                     <p><strong>初期フォーメーション:</strong> ${m.formations.join(', ')}</p>
-                    <p><strong>初期特性 (宝物):</strong> ${m.initialTrait}</p>
+                    <p><strong>初期特性 (宝物):</strong> ${m.initialTrait} <span style="font-size: 12px; color: #aaa;">${relicDesc}</span></p>
                     <p><strong>初期資金:</strong> ¥${m.initialFunds.toLocaleString()}</p>
                     <button style="margin-top: 10px; width: 100%;" onclick="managementUI.selectManager(${m.id})">この監督でスタート</button>
                 </div>
@@ -75,6 +93,195 @@ class ManagementUI {
     selectManager(managerId) {
         window.gameState.startNewDive(managerId);
         this.updateTopBar();
+        this.showDashboard();
+    }
+
+    showVictoryReward() {
+        if (!window.gameState.pendingVictoryReward || !window.gameState.lastOpponentStarting11) {
+            this.showDashboard();
+            return;
+        }
+
+        let html = `
+            <div class="menu-box ui-layout-container" style="background: transparent; border: none; padding: 0;">
+                <div class="ui-left-panel" style="flex: 1; padding: 20px; border-radius: 8px; background: rgba(40,40,40,0.95); display: flex; flex-direction: column;">
+                    <h2 style="color: #f1c40f; margin-bottom: 10px;">MATCH WON! 勝利報酬</h2>
+                    <p style="font-size: 14px; margin-bottom: 20px;">見事な勝利です！以下の3つの報酬から1つを選んで獲得してください。</p>
+
+                    <div style="flex: 1; display: flex; flex-direction: column; gap: 15px;">
+                        <button onclick="managementUI.selectVictoryRewardType('command')" style="padding: 15px; font-size: 16px; background: #9b59b6; text-align: left;">
+                            <span style="font-size: 20px; font-weight: bold;">【戦術コマンド】</span> を獲得
+                        </button>
+                        <button onclick="managementUI.selectVictoryRewardType('player')" style="padding: 15px; font-size: 16px; background: #27ae60; text-align: left;">
+                            <span style="font-size: 20px; font-weight: bold;">【相手選手引き抜き】</span> を獲得
+                        </button>
+                        <button onclick="managementUI.selectVictoryRewardType('relic')" style="padding: 15px; font-size: 16px; background: #f39c12; text-align: left; color: #000;">
+                            <span style="font-size: 20px; font-weight: bold;">【宝物 (特性)】</span> を獲得
+                        </button>
+                    </div>
+                </div>
+
+                <div class="ui-right-panel" id="victory-detail-panel" style="flex: 1.5; margin-left: 10px; padding: 20px; border-radius: 8px; background: rgba(40,40,40,0.95); overflow-y: auto;">
+                    <p style="color: #bbb; text-align: center; margin-top: 50px;">左のリストから報酬のジャンルを選択してください</p>
+                </div>
+            </div>
+        `;
+        this.uiContent.innerHTML = html;
+        this.currentVictoryRewardChoices = null;
+        this.currentVictoryRewardType = null;
+    }
+
+    selectVictoryRewardType(type) {
+        const detailPanel = document.getElementById('victory-detail-panel');
+        if (!detailPanel) return;
+
+        this.currentVictoryRewardType = type;
+        let html = '';
+
+        if (type === 'command') {
+            if (!this.currentVictoryRewardChoices || this.currentVictoryRewardChoices.type !== 'command') {
+                const unownedCmds = window.MasterData.MicroCommands.filter(c => !window.gameState.playerTeam.ownedMicroCommands.includes(c.id));
+                const shuffled = unownedCmds.sort(() => 0.5 - Math.random());
+                this.currentVictoryRewardChoices = { type: 'command', items: shuffled.slice(0, 3) };
+            }
+
+            html += `<h3 style="color: #9b59b6; margin-bottom: 15px;">戦術コマンド獲得</h3>`;
+            if (this.currentVictoryRewardChoices.items.length === 0) {
+                html += `<p>これ以上獲得できるコマンドがありません。</p>`;
+            } else {
+                html += `<p style="margin-bottom: 15px;">以下のコマンドから1つを選んでください。</p><div style="display: flex; flex-direction: column; gap: 10px;">`;
+                this.currentVictoryRewardChoices.items.forEach(cmd => {
+                    html += `
+                        <div style="background: #222; padding: 15px; border: 1px solid #555; border-radius: 5px; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <span style="font-weight: bold; font-size: 16px;">${cmd.name}</span> <span style="font-size: 12px; color: #aaa;">(CD: ${cmd.cooldown}s)</span>
+                            </div>
+                            <button onclick="managementUI.claimVictoryReward('command', ${cmd.id})" style="background: #2980b9;">獲得</button>
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+            }
+
+        } else if (type === 'player') {
+            html += `<h3 style="color: #27ae60; margin-bottom: 15px;">相手選手引き抜き</h3>`;
+            html += `<p style="margin-bottom: 15px;">対戦相手のスタメンから1人を獲得できます。<br><span style="color:#e74c3c; font-size: 12px;">※18人上限を超える場合は、獲得時に手持ち選手との入れ替え（放出）が必要です。</span></p>`;
+
+            const players = window.gameState.lastOpponentStarting11;
+            html += `<div style="display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto; padding-right: 10px;">`;
+
+            players.forEach((p, idx) => {
+                const isSSR = p.rarity === 'SSR';
+                html += `
+                    <div style="background: #222; padding: 10px; border: 1px solid #555; border-radius: 5px; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <span style="background: ${isSSR?'#f1c40f':'#3498db'}; color: ${isSSR?'#000':'#fff'}; padding: 2px 5px; border-radius: 3px; font-size: 10px;">${p.rarity||'N'}</span>
+                            <strong>[${p.position}] ${p.name}</strong> <span style="font-size:12px;">(Lv.${p.level})</span>
+                            <span style="color:#f1c40f; margin-left: 10px; font-size:12px;">OVR: ${p.getOvr()}</span>
+                        </div>
+                        <button onclick="managementUI.claimVictoryReward('player', ${idx})" style="background: #27ae60;">引き抜く</button>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+
+            // Release UI if needed
+            if (window.gameState.playerTeam.players.length >= 18) {
+                html += `
+                    <div style="margin-top: 15px; padding: 10px; background: #c0392b; border-radius: 5px;">
+                        <p style="font-size: 12px; margin-bottom: 5px;">⚠️ チーム上限(18人)に達しています。獲得するには誰かを放出してください:</p>
+                        <select id="victory_trade_select" style="width: 100%; padding: 5px; background: #222; color: #fff;">
+                            ${window.gameState.playerTeam.bench.map(p => `<option value="${p.id}">ベンチ: [${p.position}] ${p.name}</option>`).join('')}
+                            ${window.gameState.playerTeam.starting11.map(p => `<option value="${p.id}">スタメン: [${p.position}] ${p.name}</option>`).join('')}
+                        </select>
+                    </div>
+                `;
+            }
+
+        } else if (type === 'relic') {
+            if (!this.currentVictoryRewardChoices || this.currentVictoryRewardChoices.type !== 'relic') {
+                const unownedRelics = window.MasterData.Relics.filter(r => !window.gameState.playerTeam.relics.includes(r.id));
+                const shuffled = unownedRelics.sort(() => 0.5 - Math.random());
+                this.currentVictoryRewardChoices = { type: 'relic', items: shuffled.slice(0, 3) };
+            }
+
+            html += `<h3 style="color: #f39c12; margin-bottom: 15px;">宝物獲得</h3>`;
+            if (this.currentVictoryRewardChoices.items.length === 0) {
+                html += `<p>これ以上獲得できる宝物がありません。</p>`;
+            } else {
+                html += `<p style="margin-bottom: 15px;">以下の宝物から1つを選んでください。</p><div style="display: flex; flex-direction: column; gap: 10px;">`;
+                this.currentVictoryRewardChoices.items.forEach(r => {
+                    html += `
+                        <div style="background: #222; padding: 15px; border: 1px solid #555; border-radius: 5px; display: flex; flex-direction: column; gap: 10px;">
+                            <div>
+                                <span style="font-weight: bold; font-size: 16px; color: #f39c12;">${r.name}</span>
+                            </div>
+                            <div style="font-size: 12px; color: #bbb;">${r.description || ''}</div>
+                            <button onclick="managementUI.claimVictoryReward('relic', ${r.id})" style="background: #d35400; align-self: flex-end;">獲得</button>
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+            }
+        }
+
+        detailPanel.innerHTML = html;
+    }
+
+    claimVictoryReward(type, idOrIdx) {
+        const team = window.gameState.playerTeam;
+
+        if (type === 'command') {
+            team.ownedMicroCommands.push(idOrIdx);
+            for (let i = 0; i < 4; i++) {
+                if (!team.microCommands[i]) {
+                    team.microCommands[i] = idOrIdx;
+                    break;
+                }
+            }
+            const c = window.MasterData.MicroCommands.find(x => x.id === idOrIdx);
+            alert(`戦術コマンド「${c.name}」を獲得しました！`);
+
+        } else if (type === 'player') {
+            if (team.players.length >= 18) {
+                const selectEl = document.getElementById('victory_trade_select');
+                if (!selectEl) {
+                    alert("放出すべき選手が選択されていません。");
+                    return;
+                }
+                const releaseId = selectEl.value;
+                const pIndex = team.players.findIndex(p => p.id === releaseId);
+                if (pIndex !== -1) {
+                    team.players.splice(pIndex, 1);
+                    const sIdx = team.starting11.findIndex(sp => sp.id === releaseId);
+                    if (sIdx !== -1) team.starting11.splice(sIdx, 1);
+                    const bIdx = team.bench.findIndex(bp => bp.id === releaseId);
+                    if (bIdx !== -1) team.bench.splice(bIdx, 1);
+                }
+            }
+
+            const newPlayer = window.gameState.lastOpponentStarting11[idOrIdx];
+            newPlayer.isNew = true;
+            newPlayer.id = `poached_${Date.now()}`; // Ensure unique ID
+
+            team.players.push(newPlayer);
+            if (team.starting11.length < 11) {
+                team.starting11.push(newPlayer);
+            } else {
+                team.bench.push(newPlayer);
+            }
+
+            alert(`${newPlayer.name} を引き抜きました！`);
+
+        } else if (type === 'relic') {
+            team.relics.push(idOrIdx);
+            const r = window.MasterData.Relics.find(x => x.id === idOrIdx);
+            alert(`宝物「${r.name}」を獲得しました！`);
+        }
+
+        window.gameState.pendingVictoryReward = false;
+        window.gameState.lastOpponentStarting11 = null;
+        this.currentVictoryRewardChoices = null;
         this.showDashboard();
     }
 
@@ -300,7 +507,11 @@ class ManagementUI {
             `;
             this.uiContent.innerHTML = html;
         } else {
-            this.showDashboard();
+            if (window.gameState.pendingVictoryReward) {
+                this.showVictoryReward();
+            } else {
+                this.showDashboard();
+            }
         }
     }
 
@@ -400,35 +611,17 @@ class ManagementUI {
                     </div>
                 </div>
 
-                <div class="ui-right-panel" style="flex: 1; gap: 10px; border-radius: 8px; margin-left: 10px;">
+                <div class="ui-middle-panel" style="flex: 1; gap: 10px; border-radius: 8px; margin-left: 10px;">
                     <h3 style="background: #2c3e50; padding: 8px; border-radius: 4px;">ベンチ</h3>
                     <div id="bench-container" style="display: flex; flex-direction: column; gap: 5px; overflow-y: auto; flex: 1;">
                         <!-- Bench players injected here -->
                     </div>
+                </div>
 
-                    <h3 style="background: #f39c12; padding: 8px; margin-top: 10px; border-radius: 4px;">セット中コマンド</h3>
-                    <div style="display: flex; flex-direction: column; gap: 5px;">
-                        ${[0, 1, 2, 3].map(i => {
-                            const cmdId = team.microCommands[i];
-                            const allCmds = window.MasterData.MicroCommands.filter(c => team.ownedMicroCommands.includes(c.id));
-                            let optionsHtml = `<option value="">未セット</option>`;
-                            allCmds.forEach(c => {
-                                const isSelectedElsewhere = team.microCommands.includes(c.id) && team.microCommands[i] !== c.id;
-                                if (!isSelectedElsewhere) {
-                                    optionsHtml += `<option value="${c.id}" ${cmdId === c.id ? 'selected' : ''}>${c.name}</option>`;
-                                }
-                            });
-                            return `
-                                <div style="background: #333; padding: 5px; border: 1px solid #f39c12; font-size: 12px; display: flex;">
-                                    <select style="width: 100%; background: #222; color: white; border: none;"
-                                        onchange="managementUI.updateMicroCommand(${i}, this.value, 'squad')">
-                                        ${optionsHtml}
-                                    </select>
-                                </div>
-                            `;
-                        }).join('')}
+                <div class="ui-right-panel" id="player-detail-panel" style="flex: 1.5; gap: 10px; border-radius: 8px; margin-left: 10px; display: flex; flex-direction: column;">
+                    <div style="flex: 1; display: flex; align-items: center; justify-content: center; color: #aaa;">
+                        選手を選択すると詳細が表示されます
                     </div>
-
                     <button style="margin-top: 15px; width: 100%; padding: 12px; background: #27ae60;" onclick="managementUI.showDashboard()">戻る (編成確定)</button>
                 </div>
             </div>
@@ -437,6 +630,107 @@ class ManagementUI {
         this.uiContent.innerHTML = html;
         this.selectedPlayerIndex = null; // for tap-to-swap logic
         this.renderFormation();
+    }
+
+    renderPlayerDetailCard(player, index) {
+        const detailPanel = document.getElementById('player-detail-panel');
+        if (!detailPanel) return;
+        if (!player) {
+            detailPanel.innerHTML = `
+                <div style="flex: 1; display: flex; align-items: center; justify-content: center; color: #aaa;">
+                    選手を選択すると詳細が表示されます
+                </div>
+                <button style="margin-top: 15px; width: 100%; padding: 12px; background: #27ae60;" onclick="managementUI.showDashboard()">戻る (編成確定)</button>
+            `;
+            return;
+        }
+
+        // Color mapping for rarity
+        const rarityColors = {
+            'N': '#7f8c8d', // Gray
+            'R': '#3498db', // Blue
+            'SR': '#9b59b6', // Purple
+            'SSR': '#f1c40f' // Gold
+        };
+        const rarityColor = rarityColors[player.rarity] || rarityColors['N'];
+        const isMax = player.level >= 10;
+
+        const statBarsHtml = Object.entries(player.stats).map(([key, val]) => {
+            let color = '#e74c3c'; // red
+            if(val >= 80) color = '#f1c40f'; // gold
+            else if(val >= 60) color = '#2ecc71'; // green
+            else if(val >= 40) color = '#3498db'; // blue
+
+            const label = {pass: 'Pass', shoot: 'Shoot', defense: 'Defense', physical: 'Physical', speed: 'Speed', mental: 'Mental', stamina: 'Stamina'}[key];
+            return `
+                <div style="display: flex; align-items: center; font-size: 12px; margin-bottom: 3px;">
+                    <span style="width: 55px;">${label}</span>
+                    <div style="flex: 1; background: #333; height: 10px; border-radius: 5px; margin: 0 5px; overflow: hidden;">
+                        <div style="width: ${val}%; background: ${color}; height: 100%;"></div>
+                    </div>
+                    <span style="width: 20px; text-align: right;">${val}</span>
+                </div>
+            `;
+        }).join('');
+
+        const skillsHtml = player.skills.length > 0 ? player.skills.map(sId => {
+            const s = window.MasterData.PlayerSkills.find(sk => sk.id === sId);
+            if (!s) return '';
+            return `<div style="background: #2c3e50; padding: 4px; margin-bottom: 2px; border-radius: 4px; font-size: 11px;">
+                <strong>${s.name}</strong> - ${s.description || '効果なし'}
+            </div>`;
+        }).join('') : '<div style="font-size: 12px; color: #777;">なし</div>';
+
+        const expPercent = isMax ? 100 : (player.exp / player.maxExp) * 100;
+
+        detailPanel.innerHTML = `
+            <div style="background: #222; border: 2px solid ${rarityColor}; border-radius: 8px; padding: 15px; flex: 1; display: flex; flex-direction: column; text-align: left; overflow-y: auto;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #555; padding-bottom: 10px; margin-bottom: 10px;">
+                    <div>
+                        <span style="background: ${rarityColor}; color: ${player.rarity === 'SSR' ? '#000' : '#fff'}; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 12px;">${player.rarity}</span>
+                        <span style="font-size: 14px; margin-left: 5px;">${player.nationality || ''}</span>
+                        <h3 style="margin-top: 5px;">${player.name}</h3>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 20px; font-weight: bold; color: #f1c40f;">OVR ${player.getOvr()}</div>
+                        <div style="font-size: 12px;">${isMax ? 'Lv.MAX' : 'Lv.'+player.level}</div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 10px;">
+                    <div style="font-size: 10px; margin-bottom: 2px;">EXP ${isMax ? 'MAX' : player.exp + ' / ' + player.maxExp}</div>
+                    <div style="width: 100%; background: #333; height: 6px; border-radius: 3px; overflow: hidden;">
+                        <div style="width: ${expPercent}%; background: #9b59b6; height: 100%;"></div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <div style="font-size: 12px; margin-bottom: 2px; display: flex; justify-content: space-between;">
+                        <span>体力</span><span>${player.condition}%</span>
+                    </div>
+                    <div style="width: 100%; background: #333; height: 8px; border-radius: 4px; overflow: hidden;">
+                        <div style="width: ${player.condition}%; background: ${player.condition > 50 ? '#2ecc71' : '#e74c3c'}; height: 100%;"></div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 10px; font-size: 12px;">
+                    <span style="color: #bbb;">メイン適性:</span> <span style="font-weight: bold; color: #fff;">${player.position}</span><br>
+                    <span style="color: #bbb;">サブ適性:</span> ${player.subPositions.length > 0 ? player.subPositions.join(', ') : 'なし'}<br>
+                    <span style="color: #bbb;">役割(ロール):</span> ${player.role || 'なし'}
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <h4 style="border-bottom: 1px solid #444; padding-bottom: 2px; margin-bottom: 5px; font-size: 13px;">ステータス</h4>
+                    ${statBarsHtml}
+                </div>
+
+                <div>
+                    <h4 style="border-bottom: 1px solid #444; padding-bottom: 2px; margin-bottom: 5px; font-size: 13px;">スキル</h4>
+                    ${skillsHtml}
+                </div>
+            </div>
+            <button style="margin-top: 15px; width: 100%; padding: 12px; background: #27ae60;" onclick="managementUI.showDashboard()">戻る (編成確定)</button>
+        `;
     }
 
     renderFormation() {
@@ -478,19 +772,19 @@ class ManagementUI {
                 ${isMob ? 'opacity: 0.8;' : ''}
             `;
 
-            let skillNames = p.skills.map(sId => window.MasterData.PlayerSkills.find(s => s.id === sId)?.name).filter(n=>n).join(', ');
-            pDiv.title = `${p.name}\n[${p.position}${p.subPositions.length > 0 ? ' / '+p.subPositions.join(',') : ''}] ${p.role}\nPass:${p.stats.pass} Def:${p.stats.defense} Spd:${p.stats.speed}\nSkills: ${skillNames || 'なし'}`;
-
             let roleText = p.role || '';
             if (isMob) {
                 roleText = '汎用(モブ)';
             }
 
+            const newBadge = p.isNew ? `<span style="position:absolute; top:-5px; right:-5px; background:red; color:white; font-size:8px; padding:1px 2px; border-radius:3px; font-weight:bold; z-index:3;">NEW!</span>` : '';
+
             pDiv.innerHTML = `
+                ${newBadge}
                 <span style="font-weight: bold;">${isMob ? '⚠️ ' : ''}${p.position}${isSubPos ? '*' : ''}</span>
                 <span style="font-size: 7px; color: #f1c40f;">${roleText}</span>
                 <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40px;">${p.name.substring(0,4)}</span>
-                <span style="font-size: 8px;">疲${100 - p.condition}</span>
+                <span style="font-size: 8px;">${p.level>=10?'Lv.MAX':'Lv.'+p.level}</span>
             `;
             pDiv.onclick = () => this.handlePlayerClick(idx, true);
             container.appendChild(pDiv);
@@ -506,10 +800,11 @@ class ManagementUI {
             bDiv.style = `
                 background: ${isSelected ? '#f39c12' : '#333'};
                 border: 1px solid #555; padding: 8px; font-size: 12px;
-                cursor: pointer; display: flex; justify-content: space-between;
+                cursor: pointer; display: flex; justify-content: space-between; position: relative;
                 border-left: 4px solid ${p.preference === 'Possession' ? '#3498db' : (p.preference === 'Counter' ? '#e74c3c' : (p.preference === 'HighPress' ? '#f1c40f' : '#2ecc71'))};
             `;
-            bDiv.innerHTML = `<span>[${p.position}${p.subPositions.length > 0 ? '/サブ:' + p.subPositions.join(',') : ''}] ${p.role ? p.role : ''} ${p.name}</span> <span>志向: ${p.preference.substring(0,1)} 疲: ${100-p.condition}</span>`;
+            const newBadge = p.isNew ? `<span style="background:red; color:white; font-size:8px; padding:1px 2px; border-radius:3px; font-weight:bold; margin-right:5px;">NEW!</span>` : '';
+            bDiv.innerHTML = `<span>${newBadge}[${p.position}] ${p.name} (${p.level>=10?'MAX':'Lv.'+p.level})</span> <span>OVR:${p.getOvr()}</span>`;
             bDiv.onclick = () => this.handlePlayerClick(bIdx, false);
             benchContainer.appendChild(bDiv);
         });
@@ -658,13 +953,21 @@ class ManagementUI {
     }
 
     handlePlayerClick(index, isStarter) {
+        const team = window.gameState.playerTeam;
+        const player = index < 11 ? team.starting11[index] : team.bench[index - 11];
+
+        // Remove NEW badge upon click
+        if (player.isNew) {
+            player.isNew = false;
+        }
+
         if (this.selectedPlayerIndex === null) {
             // First click
             this.selectedPlayerIndex = index;
             this.renderFormation();
+            this.renderPlayerDetailCard(player, index);
         } else {
             // Second click: swap
-            const team = window.gameState.playerTeam;
             const idx1 = this.selectedPlayerIndex;
             const idx2 = index;
 
@@ -685,6 +988,7 @@ class ManagementUI {
 
             this.selectedPlayerIndex = null;
             this.renderFormation();
+            this.renderPlayerDetailCard(null); // Clear detail card after swap
         }
     }
 
@@ -715,18 +1019,16 @@ class ManagementUI {
                         ${events.map(e => {
                             let borderColor = '#555';
                             if(e.type === 'scout') borderColor = '#27ae60';
-                            if(e.type === 'shop') borderColor = '#f39c12';
+                            if(e.type === 'relic') borderColor = '#f39c12';
                             if(e.type === 'training') borderColor = '#3498db';
-                            if(e.type === 'sponsor') borderColor = '#9b59b6';
-                            if(e.isRare || e.id.includes('emerg')) borderColor = '#e74c3c';
-
-                            const canAfford = window.gameState.ap >= e.apCost && window.gameState.funds >= e.fundCost;
+                            if(e.type === 'command') borderColor = '#9b59b6';
+                            if(e.type === 'mystery') borderColor = '#95a5a6';
 
                             return `
                                 <div id="card_${e.id}" class="event-card" onclick="managementUI.selectEvent('${e.id}')"
-                                     style="background: #333; border: 2px solid ${borderColor}; border-radius: 8px; padding: 15px; cursor: pointer; opacity: ${canAfford ? '1' : '0.5'}; display: flex; flex-direction: column; justify-content: space-between;">
+                                     style="background: #333; border: 2px solid ${borderColor}; border-radius: 8px; padding: 15px; cursor: pointer; display: flex; flex-direction: column; justify-content: space-between;">
                                     <h3 style="font-size: 16px; margin-bottom: 5px;">${e.title}</h3>
-                                    <div style="font-size: 14px; color: #f1c40f;">AP ${e.apCost} / ¥${e.fundCost.toLocaleString()}</div>
+                                    <div style="font-size: 12px; color: #bbb;">${e.flavorText}</div>
                                 </div>
                             `;
                         }).join('')}
@@ -734,8 +1036,8 @@ class ManagementUI {
                 </div>
 
                 <div class="ui-right-panel" style="flex: 1; display: flex; flex-direction: column; margin-left: 10px; padding: 0; background: transparent;">
-                    <div id="event-detail-panel" style="flex: 1; background: #2c3e50; border: 2px solid #34495e; border-radius: 8px; padding: 20px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: left;">
-                        <p style="color: #bbb;">イベントを選択してください</p>
+                    <div id="event-detail-panel" style="flex: 1; background: #2c3e50; border: 2px solid #34495e; border-radius: 8px; padding: 20px; display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch; text-align: left; overflow-y: auto;">
+                        <p style="color: #bbb; text-align: center; margin-top: 50px;">イベントを選択してください</p>
                     </div>
 
                     <button style="margin-top: 15px; width: 100%; padding: 15px; font-size: 16px; background: #c0392b;" onclick="managementUI.showDashboard()">戻る (マネジメント完了)</button>
@@ -754,228 +1056,337 @@ class ManagementUI {
         document.querySelectorAll('.event-card').forEach(c => c.style.boxShadow = 'none');
         document.getElementById(`card_${eventId}`).style.boxShadow = '0 0 15px #f1c40f';
 
-        const canAfford = window.gameState.ap >= e.apCost && window.gameState.funds >= e.fundCost;
         const detailPanel = document.getElementById('event-detail-panel');
+        const team = window.gameState.playerTeam;
 
         let detailHtml = `
-            <h3 style="margin-bottom: 10px; border-bottom: 1px solid #555; padding-bottom: 5px; width: 100%; text-align: center;">${e.title}</h3>
-            <div style="flex: 1; width: 100%; overflow-y: auto; font-size: 14px; line-height: 1.5; margin-bottom: 15px;">
+            <h3 style="margin-bottom: 10px; border-bottom: 1px solid #555; padding-bottom: 5px; text-align: center;">${e.title}</h3>
+            <p style="font-size: 13px; color: #ddd; margin-bottom: 15px; font-style: italic;">${e.flavorText}</p>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
         `;
 
-        if (e.type === 'scout') {
-            detailHtml += `
-                <p style="color: #27ae60; font-weight: bold;">選手: ${e.player.name}</p>
-                <p>メイン適性: ${e.player.position} / サブ適性: ${e.player.subPositions.join(', ')}</p><p>役割(ロール): ${e.player.role}</p><p>所持スキル: ${e.player.skills.map(sId => window.MasterData.PlayerSkills.find(s => s.id === sId)?.name).filter(n=>n).join(', ') || 'なし'}</p>
-                <p>戦術志向: ${e.player.preference}</p>
-                <p>スタミナ: ${e.player.stats.stamina} / スピード: ${e.player.stats.speed}</p>
-            `;
-        } else if (e.type === 'shop') {
-            detailHtml += `
-                <p style="color: #f39c12; font-weight: bold;">アイテム: ${e.item.name}</p>
-                <p>種類: ${e.itemType === 'relic' ? '宝物 (パッシブ効果)' : 'ミクロ (戦術コマンド)'}</p>
-                <p style="margin-top: 10px; color: #ddd;">${e.item.description || '強力なアイテムです。'}</p>
-            `;
-        } else {
-            detailHtml += `<p>${e.desc}</p>`;
-        }
+        e.choices.forEach((choice, idx) => {
+            const canAffordFunds = window.gameState.funds >= choice.fundCost;
+            const canAffordAP = window.gameState.ap >= 1; // Assuming 1 AP per event for now
+            const canAfford = canAffordFunds && canAffordAP;
 
-        detailHtml += `
-            </div>
-            <div style="background: #1a252f; width: 100%; padding: 10px; text-align: center; border-radius: 5px; margin-bottom: 15px;">
-                <span style="color: ${window.gameState.ap >= e.apCost ? '#fff' : '#e74c3c'};">必要 AP: ${e.apCost}</span><br>
-                <span style="color: ${window.gameState.funds >= e.fundCost ? '#fff' : '#e74c3c'};">必要 資金: ¥${e.fundCost.toLocaleString()}</span>
-            </div>
-            <button onclick="managementUI.executeEvent('${e.id}')" ${!canAfford ? 'disabled' : ''} style="width: 100%; padding: 15px; font-size: 18px; background: ${canAfford ? '#27ae60' : '#555'};">実行 (確定)</button>
-        `;
+            let extraUI = '';
+            if (choice.tradeCount > 0) {
+                extraUI += `<div style="margin-top: 5px; font-size: 12px; color: #e74c3c;">放出対象を選択 (${choice.tradeCount}人):</div>`;
+                for (let tc = 0; tc < choice.tradeCount; tc++) {
+                    extraUI += `<select id="trade_select_${eventId}_${idx}_${tc}" style="width: 100%; margin-top: 3px; background: #222; color: #fff; padding: 3px; border: 1px solid #555;">`;
+                    // Generate options prioritizing bench
+                    team.bench.forEach(p => {
+                        extraUI += `<option value="${p.id}">[${p.position}] ${p.name} (Lv.${p.level})</option>`;
+                    });
+                    team.starting11.forEach(p => {
+                        extraUI += `<option value="${p.id}">スタメン: [${p.position}] ${p.name} (Lv.${p.level})</option>`;
+                    });
+                    extraUI += `</select>`;
+                }
+            } else if (choice.action === 'awaken') {
+                extraUI += `<div style="margin-top: 5px; font-size: 12px; color: #3498db;">覚醒対象を選択:</div>`;
+                extraUI += `<select id="awaken_select_${eventId}_${idx}" style="width: 100%; margin-top: 3px; background: #222; color: #fff; padding: 3px; border: 1px solid #555;">`;
+                team.starting11.forEach(p => { extraUI += `<option value="${p.id}">[${p.position}] ${p.name} (Lv.${p.level})</option>`; });
+                team.bench.forEach(p => { extraUI += `<option value="${p.id}">ベンチ: [${p.position}] ${p.name} (Lv.${p.level})</option>`; });
+                extraUI += `</select>`;
+            }
 
+            detailHtml += `
+                <div style="background: #1a252f; border: 1px solid ${canAfford ? '#3498db' : '#555'}; padding: 10px; border-radius: 5px;">
+                    <div style="font-size: 13px; margin-bottom: 5px; line-height: 1.4;">${choice.desc}</div>
+                    ${extraUI}
+                    <button onclick="managementUI.executeEvent('${e.id}', ${idx})"
+                            ${!canAfford ? 'disabled' : ''}
+                            style="margin-top: 10px; width: 100%; padding: 8px; font-size: 14px; background: ${canAfford ? '#2980b9' : '#555'};">
+                        実行 (AP: 1)
+                    </button>
+                </div>
+            `;
+        });
+
+        detailHtml += `</div>`;
         detailPanel.innerHTML = detailHtml;
     }
 
     generateEvents() {
         const events = [];
-        const types = ['training', 'scout', 'shop', 'sponsor'];
+        const baseTypes = ['command', 'scout', 'training', 'relic', 'mystery'];
 
-        let totalApCost = 0;
-        const maxAp = 10;
-        const targetMinAp = maxAp + 2; // at least 12 AP total to force choice
+        // Randomly determine number of events: 4 to 7
+        const numEvents = Math.floor(Math.random() * 4) + 4;
 
-        // Ensure at least 3 categories are present
-        const selectedCategories = [];
-        while(selectedCategories.length < 3) {
-            const cat = types[Math.floor(Math.random() * types.length)];
-            if (!selectedCategories.includes(cat)) selectedCategories.push(cat);
-        }
+        // Count how many of each type we've added to enforce max 2 per category
+        const typeCounts = {
+            command: 0, scout: 0, training: 0, relic: 0, mystery: 0
+        };
 
-        // We need 6 events total
-        for (let i = 0; i < 6; i++) {
-            let cat = i < 3 ? selectedCategories[i] : types[Math.floor(Math.random() * types.length)];
+        const tier = window.gameState.currentTier;
+        const matchday = window.gameState.league ? window.gameState.league.currentMatchday : 1;
 
-            // Check for Rare/Emergency events based on hidden stats
-            const isRare = window.gameState.managerInfluence >= 10 && Math.random() < 0.3;
-            const isEmergency = window.gameState.losingStreak >= 2 && Math.random() < 0.5;
+        // Base cost multiplier: (4 - tier) + (matchday * 0.1) => Tier 3: ~1.1, Tier 1: ~3.5
+        const costMultiplier = (4 - tier) + (matchday * 0.1);
 
-            if (isEmergency && i === 5) {
-                // Emergency Board Meeting
-                events.push({
-                    id: `evt_emerg_${i}`,
-                    type: 'sponsor',
-                    title: '【緊急】フロントからの叱咤',
-                    desc: '連敗の責任を追及されるが、資金援助を引き出す。AP0で資金獲得。',
-                    apCost: 0,
-                    fundCost: 0,
-                    rewardFunds: 500000
-                });
-                continue;
-            }
+        const currentSquadSize = window.gameState.playerTeam.players.length;
 
-            if (cat === 'training') {
-                const cost = isRare ? 1 : Math.floor(Math.random() * 2) + 2; // 2-3 AP
-                events.push({
-                    id: `evt_train_${i}`,
-                    type: 'training',
-                    title: isRare ? '伝説のコーチの特訓' : '全体練習',
-                    desc: isRare ? 'チーム全体のコンディションが全回復し、スタッツも微増する。' : 'コンディションを回復する。',
-                    apCost: cost,
-                    fundCost: 0,
-                    isRare: isRare
-                });
-                totalApCost += cost;
-            } else if (cat === 'scout') {
-                const newPlayer = window.Player.generateRandom(`scout_${Date.now()}_${i}`);
-                if (isRare) {
-                    newPlayer.stats.pass += 20; newPlayer.stats.speed += 20; // Bump stats
-                    newPlayer.name = "★" + newPlayer.name;
-                }
-                const cost = 2;
-                events.push({
-                    id: `evt_scout_${i}`,
-                    type: 'scout',
-                    player: newPlayer,
-                    title: isRare ? '超大物スカウト' : '選手スカウト',
-                    apCost: cost,
-                    fundCost: isRare ? 800000 : 300000
-                });
-                totalApCost += cost;
-            } else if (cat === 'shop') {
-                const unownedRelics = window.MasterData.Relics.filter(r => !window.gameState.playerTeam.relics.includes(r.id));
-                const unownedCmds = window.MasterData.MicroCommands.filter(c => !window.gameState.playerTeam.ownedMicroCommands.includes(c.id));
+        for (let i = 0; i < numEvents; i++) {
+            // Filter available types (max 2) and handle 11-player guard for 'scout'
+            let availableTypes = baseTypes.filter(t => {
+                if (typeCounts[t] >= 2) return false;
+                // If squad is 11, we CAN do scout, but the *choices* generated later must not reduce size below 11.
+                // However, some scout events strictly require trading. We'll handle the guard inside the choice generation.
+                return true;
+            });
 
-                const isRelic = Math.random() > 0.5 && unownedRelics.length > 0;
+            if (availableTypes.length === 0) availableTypes = ['mystery']; // Fallback
 
-                if (isRelic || unownedCmds.length === 0) {
-                    const randomRelic = unownedRelics[Math.floor(Math.random() * unownedRelics.length)];
-                    if(randomRelic) {
-                        const cost = 1;
-                        events.push({
-                            id: `evt_shop_${i}`,
-                            type: 'shop',
-                            itemType: 'relic',
-                            item: randomRelic,
-                            title: 'ショップ (宝物)',
-                            apCost: cost,
-                            fundCost: 500000
-                        });
-                        totalApCost += cost;
-                    }
+            const type = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+            typeCounts[type]++;
+
+            let eventObj = {
+                id: `evt_${Date.now()}_${i}`,
+                type: type,
+                choices: []
+            };
+
+            if (type === 'scout') {
+                eventObj.title = 'スカウトからの提案';
+                eventObj.flavorText = '「監督、有望な選手を見つけました。チームの補強にいかがですか？」';
+
+                // Choice 1: Standard Buy
+                if (currentSquadSize >= 18) {
+                    eventObj.choices.push({
+                        desc: `資金¥${Math.floor(100000 * costMultiplier).toLocaleString()} ＋ 選手1人放出で選手を獲得`,
+                        fundCost: Math.floor(100000 * costMultiplier),
+                        tradeCount: 1,
+                        rewardRarity: 'N'
+                    });
                 } else {
-                    const randomCmd = unownedCmds[Math.floor(Math.random() * unownedCmds.length)];
-                    if(randomCmd) {
-                        const cost = 1;
-                        events.push({
-                            id: `evt_shop_${i}`,
-                            type: 'shop',
-                            itemType: 'microCommand',
-                            item: randomCmd,
-                            title: 'ショップ (ミクロ)',
-                            apCost: cost,
-                            fundCost: 200000
-                        });
-                        totalApCost += cost;
-                    }
+                    eventObj.choices.push({
+                        desc: `資金¥${Math.floor(100000 * costMultiplier).toLocaleString()}で選手を獲得`,
+                        fundCost: Math.floor(100000 * costMultiplier),
+                        tradeCount: 0,
+                        rewardRarity: 'N'
+                    });
                 }
-            } else if (cat === 'sponsor') {
-                const cost = Math.floor(Math.random() * 2) + 1; // 1-2 AP
-                events.push({
-                    id: `evt_sponsor_${i}`,
-                    type: 'sponsor',
-                    title: isRare ? '大口スポンサー契約' : 'スポンサー営業',
-                    desc: isRare ? '多額の活動資金を獲得する。' : '活動資金を獲得する。',
-                    apCost: cost,
-                    fundCost: 0,
-                    rewardFunds: isRare ? 1000000 : (cost === 2 ? 300000 : 150000),
-                    isRare: isRare
-                });
-                totalApCost += cost;
+
+                // Choice 2: Trade 1
+                // Only allow trade if currentSquadSize - tradeCount + 1 >= 11
+                if (currentSquadSize - 1 + 1 >= 11) {
+                    eventObj.choices.push({
+                        desc: `資金¥${Math.floor(200000 * costMultiplier).toLocaleString()} ＋ 選手1人放出で、R選手を獲得`,
+                        fundCost: Math.floor(200000 * costMultiplier),
+                        tradeCount: 1,
+                        rewardRarity: 'R'
+                    });
+                } else {
+                    // Fallback to pure buy if trade not allowed
+                    eventObj.choices.push({
+                        desc: `資金¥${Math.floor(300000 * costMultiplier).toLocaleString()}で、R選手を獲得`,
+                        fundCost: Math.floor(300000 * costMultiplier),
+                        tradeCount: 0,
+                        rewardRarity: 'R'
+                    });
+                }
+
+                // Choice 3: Premium Trade
+                if (currentSquadSize - 2 + 1 >= 11) {
+                    eventObj.choices.push({
+                        desc: `資金¥${Math.floor(400000 * costMultiplier).toLocaleString()} ＋ 選手2人放出で、SR/SSR選手を獲得`,
+                        fundCost: Math.floor(400000 * costMultiplier),
+                        tradeCount: 2,
+                        rewardRarity: Math.random() > 0.8 ? 'SSR' : 'SR'
+                    });
+                }
+            } else if (type === 'training') {
+                const isAwakening = Math.random() > 0.7;
+                if (isAwakening) {
+                    eventObj.title = '特別覚醒イベント';
+                    eventObj.flavorText = '「特定の選手の潜在能力を引き出すチャンスです！」';
+                    eventObj.choices.push({
+                        desc: `資金¥${Math.floor(300000 * costMultiplier).toLocaleString()}で、指定選手1名を大幅レベルアップ`,
+                        fundCost: Math.floor(300000 * costMultiplier),
+                        action: 'awaken'
+                    });
+                } else {
+                    eventObj.title = '全体練習メニュー';
+                    eventObj.flavorText = '「今日の練習はどうしますか？」';
+                    eventObj.choices.push({ desc: '軽めの調整 (無償)', fundCost: 0, action: 'light' });
+                    eventObj.choices.push({ desc: `特別合宿 (資金¥${Math.floor(150000 * costMultiplier).toLocaleString()})`, fundCost: Math.floor(150000 * costMultiplier), action: 'heavy' });
+                }
+            } else if (type === 'relic') {
+                eventObj.title = '怪しい商人';
+                eventObj.flavorText = '「ヘッヘッヘ、いいお宝があるぜ。買わねえか？」';
+
+                const unownedRelics = window.MasterData.Relics.filter(r => !window.gameState.playerTeam.relics.includes(r.id));
+                const numChoices = Math.min(3, unownedRelics.length);
+
+                for(let c=0; c<numChoices; c++) {
+                    const r = unownedRelics[c];
+                    // Cost scales up per choice index
+                    eventObj.choices.push({
+                        desc: `資金¥${Math.floor((300000 + c*100000) * costMultiplier).toLocaleString()}で「${r.name}」を購入`,
+                        fundCost: Math.floor((300000 + c*100000) * costMultiplier),
+                        rewardRelicId: r.id
+                    });
+                }
+                if(numChoices === 0) {
+                    eventObj.choices.push({ desc: '「もう売るもんはねえよ」', fundCost: 0, action: 'none' });
+                }
+            } else if (type === 'command') {
+                eventObj.title = '戦術コーチの提案';
+                eventObj.flavorText = '「新しい戦術オプションを導入しませんか？」';
+
+                const unownedCmds = window.MasterData.MicroCommands.filter(c => !window.gameState.playerTeam.ownedMicroCommands.includes(c.id));
+                const numChoices = Math.min(2, unownedCmds.length);
+
+                for(let c=0; c<numChoices; c++) {
+                    const cmd = unownedCmds[c];
+                    eventObj.choices.push({
+                        desc: `資金¥${Math.floor(150000 * costMultiplier).toLocaleString()}で「${cmd.name}」を習得`,
+                        fundCost: Math.floor(150000 * costMultiplier),
+                        rewardCmdId: cmd.id
+                    });
+                }
+                if(numChoices === 0) {
+                    eventObj.choices.push({ desc: '「すでに完璧な戦術をマスターしています」', fundCost: 0, action: 'none' });
+                }
+            } else {
+                // mystery
+                eventObj.title = '謎の出来事';
+                eventObj.flavorText = '「何かが起きる予感がする……」';
+                eventObj.choices.push({ desc: '様子を見る', fundCost: 0, action: 'random_good' });
+                eventObj.choices.push({ desc: `お布施する (¥${Math.floor(50000 * costMultiplier).toLocaleString()})`, fundCost: Math.floor(50000 * costMultiplier), action: 'random_great' });
             }
-        }
 
-        // Adjust AP to meet the Target Min AP requirement (>= 12)
-        // Prevent infinite loop if we don't have enough events that can be upgraded
-        let attempts = 0;
-        while(totalApCost < targetMinAp && attempts < 100 && events.length > 0) {
-            const validEvents = events.filter(e => e.apCost < 3 && e.apCost > 0);
-            if (validEvents.length === 0) break; // Can't increase AP any further
-
-            const e = validEvents[Math.floor(Math.random() * validEvents.length)];
-            e.apCost++;
-            totalApCost++;
-            attempts++;
+            events.push(eventObj);
         }
 
         window.gameState.currentEvents = events;
     }
 
-    executeEvent(eventId) {
+    executeEvent(eventId, choiceIdx) {
         const eventIndex = window.gameState.currentEvents.findIndex(e => e.id === eventId);
         if (eventIndex === -1) return;
 
         const evt = window.gameState.currentEvents[eventIndex];
+        const choice = evt.choices[choiceIdx];
 
-        if (window.gameState.ap < evt.apCost || window.gameState.funds < evt.fundCost) {
+        if (window.gameState.ap < 1 || window.gameState.funds < choice.fundCost) {
             alert("リソースが不足しています。");
             return;
         }
 
-        // Pay cost
-        window.gameState.ap -= evt.apCost;
-        window.gameState.funds -= evt.fundCost;
+        const team = window.gameState.playerTeam;
 
-        if (evt.type === 'scout') {
-            window.gameState.playerTeam.players.push(evt.player);
-            window.gameState.playerTeam.bench.push(evt.player); // Add to bench by default
-            alert(`${evt.player.name} を獲得しました！`);
-        } else if (evt.type === 'shop') {
-            if (evt.itemType === 'relic') {
-                window.gameState.playerTeam.relics.push(evt.item.id);
-                alert(`宝物「${evt.item.name}」を獲得しました！`);
-            } else if (evt.itemType === 'microCommand') {
-                window.gameState.playerTeam.ownedMicroCommands.push(evt.item.id);
-                // Also add to active if slot is empty
-                for (let i = 0; i < 4; i++) {
-                    if (!window.gameState.playerTeam.microCommands[i]) {
-                        window.gameState.playerTeam.microCommands[i] = evt.item.id;
-                        break;
-                    }
+        // Verify and process trades
+        let tradedPlayers = [];
+        if (choice.tradeCount > 0) {
+            const selectedIds = new Set();
+            for (let tc = 0; tc < choice.tradeCount; tc++) {
+                const selectEl = document.getElementById(`trade_select_${eventId}_${choiceIdx}_${tc}`);
+                if (selectEl) {
+                    selectedIds.add(selectEl.value);
                 }
-                alert(`戦術コマンド「${evt.item.name}」を獲得しました！`);
             }
-        } else if (evt.type === 'training') {
-            window.gameState.playerTeam.players.forEach(p => {
-                p.condition = 100;
-                if (evt.isRare) {
-                    p.stats.pass = Math.min(100, p.stats.pass + 2);
-                    p.stats.speed = Math.min(100, p.stats.speed + 2);
+            if (selectedIds.size < choice.tradeCount) {
+                alert("同じ選手を複数回選択することはできません。別の選手を選んでください。");
+                return; // abort
+            }
+
+            // Execute trade removals
+            selectedIds.forEach(id => {
+                const pIndex = team.players.findIndex(p => p.id === id);
+                if (pIndex !== -1) {
+                    const p = team.players[pIndex];
+                    tradedPlayers.push(p);
+                    team.players.splice(pIndex, 1);
+                    // Remove from starting11 or bench
+                    const sIdx = team.starting11.findIndex(sp => sp.id === id);
+                    if (sIdx !== -1) team.starting11.splice(sIdx, 1);
+                    const bIdx = team.bench.findIndex(bp => bp.id === id);
+                    if (bIdx !== -1) team.bench.splice(bIdx, 1);
                 }
             });
-            alert(evt.isRare ? "伝説の特訓完了！コンディション全快し能力上昇！" : "練習完了！コンディションが回復しました。");
-        } else if (evt.type === 'sponsor') {
-            window.gameState.funds += evt.rewardFunds;
-            alert(`スポンサーから ¥${evt.rewardFunds.toLocaleString()} を獲得しました！`);
         }
 
-        // Increase manager influence if a high AP event was chosen
-        if (evt.apCost >= 2) {
-            window.gameState.managerInfluence += 1;
+        // Pay cost
+        window.gameState.ap -= 1;
+        window.gameState.funds -= choice.fundCost;
+
+        // Process Rewards
+        if (evt.type === 'scout') {
+            const newPlayer = window.Player.generateRandom(`scout_${Date.now()}`, null, choice.rewardRarity);
+            newPlayer.isNew = true;
+            // Generate decent level based on tier
+            newPlayer.level = Math.floor(Math.random() * (4 - window.gameState.currentTier + 1)) + 1;
+            newPlayer.maxExp = newPlayer.level * 100;
+
+            team.players.push(newPlayer);
+            if (team.starting11.length < 11) {
+                team.starting11.push(newPlayer);
+            } else {
+                team.bench.push(newPlayer);
+            }
+
+            let alertMsg = `${newPlayer.name} (${choice.rewardRarity}) を獲得しました！`;
+            if (tradedPlayers.length > 0) {
+                alertMsg += `\n(放出した選手: ${tradedPlayers.map(p=>p.name).join(', ')})`;
+            }
+            alert(alertMsg);
+
+        } else if (evt.type === 'relic' && choice.rewardRelicId) {
+            team.relics.push(choice.rewardRelicId);
+            const r = window.MasterData.Relics.find(x => x.id === choice.rewardRelicId);
+            alert(`宝物「${r.name}」を獲得しました！`);
+        } else if (evt.type === 'command' && choice.rewardCmdId) {
+            team.ownedMicroCommands.push(choice.rewardCmdId);
+            for (let i = 0; i < 4; i++) {
+                if (!team.microCommands[i]) {
+                    team.microCommands[i] = choice.rewardCmdId;
+                    break;
+                }
+            }
+            const c = window.MasterData.MicroCommands.find(x => x.id === choice.rewardCmdId);
+            alert(`戦術コマンド「${c.name}」を獲得しました！`);
+        } else if (evt.type === 'training') {
+            if (choice.action === 'awaken') {
+                const selectEl = document.getElementById(`awaken_select_${eventId}_${choiceIdx}`);
+                const p = team.players.find(x => x.id === selectEl.value);
+                if (p) {
+                    p.addExp(300); // 3 levels worth roughly
+                    alert(`${p.name} が特別覚醒しました！ (現在Lv.${p.level})`);
+                }
+            } else if (choice.action === 'heavy') {
+                team.players.forEach(p => {
+                    p.condition = 100;
+                    p.addExp(50);
+                });
+                alert("特別合宿完了！コンディションが全快し、経験値を獲得しました。");
+            } else {
+                team.players.forEach(p => {
+                    p.condition = Math.min(100, p.condition + 30);
+                    p.addExp(10);
+                });
+                alert("軽めの調整完了。コンディションが回復しました。");
+            }
+        } else if (evt.type === 'mystery') {
+            if (choice.action === 'random_good') {
+                const heal = Math.random() > 0.5;
+                if (heal) {
+                    team.players.forEach(p => p.condition = 100);
+                    alert("偶然良いリフレッシュになり、コンディションが全快しました。");
+                } else {
+                    window.gameState.funds += 100000;
+                    alert("道端で¥100,000拾いました。");
+                }
+            } else if (choice.action === 'random_great') {
+                const p = team.players[Math.floor(Math.random() * team.players.length)];
+                p.addExp(200);
+                alert(`お布施の恩恵か、${p.name} が突如として成長しました！ (Lv.${p.level})`);
+            } else {
+                alert("何も起きませんでした。");
+            }
         }
 
         // Remove event so it can't be bought again
