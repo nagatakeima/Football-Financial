@@ -52,7 +52,7 @@
 
 ### 30_AI_Positions (個別役割AI)
 - [ロールリスト](docs/30_AI_Positions/00_Role_List.md)
-- 各ポジション役割のAI仕様： [CB](docs/30_AI_Positions/12_AI_Pos_CB.md) / [SB](docs/30_AI_Positions/13_AI_Pos_SB.md) / [CDM](docs/30_AI_Positions/14_AI_Pos_CDM.md) / [CM](docs/30_AI_Positions/15_AI_Pos_CM.md) / [CAM](docs/30_AI_Positions/16_AI_Pos_CAM.md) / [WB_SH](docs/30_AI_Positions/17_AI_Pos_WB_SH.md) / [W](docs/30_AI_Positions/18_AI_Pos_W.md) / [CF](docs/30_AI_Positions/19_AI_Pos_CF.md)
+- 各ポジション役割のAI仕様： [CB](docs/30_AI_Positions/12_AI_Pos_CB.md) / [SB](docs/30_AI_Positions/13_AI_Pos_SB.md) / [CDM](docs/30_AI_Positions/14_AI_Pos_CDM.md) / [CM](docs/30_AI_Positions/15_AI_Pos_CM.md) / [CAM](docs/30_AI_Positions/16_AI_Pos_CAM.md) / [WG](docs/30_AI_Positions/17_AI_Pos_WG.md) / [CF](docs/30_AI_Positions/18_AI_Pos_CF.md)
 
 ### 40_System_Overrides (システム・オーバーライド)
 - [システム・オーバーライド](docs/40_System_Overrides/20_System_Overrides.md)

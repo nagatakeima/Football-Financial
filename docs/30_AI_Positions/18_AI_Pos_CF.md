@@ -1,4 +1,4 @@
-# 19. AI Position: CF (Center Forward)
+# 18. AI Position: CF (Center Forward)
 
 本ドキュメントは、センターフォワード（CF / ストライカー）特有の Utility AI 評価スコアの調整を定義する。
 Tier 2 の FW基底ロジック（`11_AI_Base_FW.md`）の純粋な体現者であり、チームの最終的な得点源となる。
@@ -21,7 +21,7 @@ Tier 2 の FW基底ロジック（`11_AI_Base_FW.md`）の純粋な体現者で�
 *   **裏抜け (Poacher / Line Breaker):**
     *   常にオフサイドラインと駆け引きし、味方MF（特にCAM等）が前を向いた瞬間に、敵CBの死角からZ座標の奥（裏）へ抜ける「Run into Space」のスコアが跳ね上がる。
 *   **クロスのターゲット (Box Presence):**
-    *   味方サイド（W/SB）がクロスを上げる体勢に入った際、ニアポスト、ファーポスト、あるいはPA中央のペナルティスポット付近への「Run into Space」が強制的に発動する。
+    *   味方サイド（WG/SB）がクロスを上げる体勢に入った際、ニアポスト、ファーポスト、あるいはPA中央のペナルティスポット付近への「Run into Space」が強制的に発動する。
 
 ### 2.2. Defense (非保持時)
 *   **チェイシング (Chasing):**
