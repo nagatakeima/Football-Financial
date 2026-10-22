@@ -663,7 +663,7 @@ class MatchScene extends Phaser.Scene {
                     const backMates = teammates.filter(p => isPlayer ? p.x < this.ball.owner.x - 10 : p.x > this.ball.owner.x + 10);
                     let targetMate = backMates.length > 0 ? backMates[Math.floor(Math.random() * backMates.length)] : teammates[0];
                     this.ballTarget = {x: targetMate.x, y: targetMate.y};
-                    this.ballSpeed = 15; this.isHighBall = false; this.ball.owner = null;
+                    this.ballSpeed = Math.min(11, Math.max(5, Phaser.Math.Distance.Between(this.ball.x, this.ball.y, targetMate.x, targetMate.y) / 22)); this.isHighBall = false; this.ball.owner = null;
                 }
             }
         } else if (this.matchState === 'setpiece') {
@@ -1770,8 +1770,8 @@ class MatchScene extends Phaser.Scene {
             const myScoreDiff = p.isPlayerTeam ? scoreDiff : -scoreDiff;
             if (timeRemaining < 15) { if (myScoreDiff < 0) urgency = 1.5; if (myScoreDiff > 0) urgency = 0.8; }
 
-            // Increase base speed by 1.5x
-            const maxSpeed = (2.0 + (p.playerData.stats.speed / 50)) * staminaFactor * urgency * 1.5;
+            // Increase base speed by 1.7x overall
+            const maxSpeed = (1.8 + (p.playerData.stats.speed / 100) * 1.6) * staminaFactor * urgency * 1.7;
 
             let isAttacking = false; let isDefending = false;
             if (this.ball.owner) { isAttacking = this.ball.owner.isPlayerTeam === p.isPlayerTeam; isDefending = !isAttacking; }
@@ -2093,7 +2093,7 @@ class MatchScene extends Phaser.Scene {
                 const angle = this.ballTarget ? Phaser.Math.Angle.Between(this.ball.x, this.ball.y, targetX, targetY) : (this.ball.angle || 0);
                 this.ball.angle = angle;
                 this.ball.x += Math.cos(angle) * this.ballSpeed; this.ball.y += Math.sin(angle) * this.ballSpeed;
-                let friction = (this.currentGimmick === 'badWeather') ? 0.99 : 0.98;
+                let friction = (this.currentGimmick === 'badWeather') ? 0.97 : 0.96;
                 if (this.isHighBall && !isBouncing) friction = 0.99;
                 this.ballSpeed *= friction;
             }
@@ -2110,15 +2110,15 @@ class MatchScene extends Phaser.Scene {
             // Let the closest 2 players from each team break formation to chase
             let pTeamChasers = 0; let oTeamChasers = 0;
             closestPlayers.forEach(p => {
-                if (p.isPlayerTeam && pTeamChasers < 2 && p.playerData.position !== 'GK') { p.chasingLooseBall = true; pTeamChasers++; }
-                else if (!p.isPlayerTeam && oTeamChasers < 2 && p.playerData.position !== 'GK') { p.chasingLooseBall = true; oTeamChasers++; }
+                if (p.isPlayerTeam && pTeamChasers < 2 && p.playerData.position !== 'GK') { p.chasingLooseBall = true; p.targetMaintainTimer = 0; pTeamChasers++; }
+                else if (!p.isPlayerTeam && oTeamChasers < 2 && p.playerData.position !== 'GK') { p.chasingLooseBall = true; p.targetMaintainTimer = 0; oTeamChasers++; }
                 else { p.chasingLooseBall = false; }
             });
 
             let interceptor = null;
             for (let p of allPlayers) {
                 const bDist = Phaser.Math.Distance.Between(p.x, p.y, this.ball.x, this.ball.y);
-                let interceptRadius = 20;
+                let interceptRadius = 22;
                 if (this.activeBuff && this.activeBuff.target === 'intercept' && p.isPlayerTeam) interceptRadius += 20;
                 const activeConditions = this.getActiveConditions(p);
                 const interceptRangeSkill = window.Player.getSkillEffectFor(p.playerData, "RANGE_UP", "intercept", activeConditions);
@@ -2152,18 +2152,9 @@ class MatchScene extends Phaser.Scene {
                 if (this.currentGimmick === 'badWeather') trapChance -= 20;
                 if (interceptor.playerData.position === 'GK') trapChance += 30;
 
-                if (Math.random() * 100 > trapChance && this.ballSpeed > 5) {
-                    this.showActionText(interceptor, "トラップ:失敗", "#e74c3c");
-                    this.lastTouchedByPlayerTeam = interceptor.isPlayerTeam;
-                    this.ball.owner = null; this.ballTarget = null; this.ballSpeed = this.ballSpeed * 0.5;
-                    this.ball.angle = this.ball.angle + (Math.random() * Math.PI - Math.PI/2);
-                    this.isHighBall = true; this.ballZVelocity = 5;
-                    interceptor.actionCooldown = 10; // Prevent interceptor from instantly trying to trap it again
-                } else {
-                    this.showActionText(interceptor, "トラップ:成功", "#3498db");
-                    this.ball.owner = interceptor; this.lastTouchedByPlayerTeam = interceptor.isPlayerTeam;
-                    this.ballTarget = null; this.isHighBall = false; this.ball.z = 0;
-                }
+                this.showActionText(interceptor, "トラップ:成功", "#3498db");
+                this.ball.owner = interceptor; this.lastTouchedByPlayerTeam = interceptor.isPlayerTeam;
+                this.ballTarget = null; this.isHighBall = false; this.ball.z = 0;
             }
         }
 
@@ -2411,8 +2402,8 @@ class MatchScene extends Phaser.Scene {
                                 this.ballTarget = {x: isPlayer ? 780 : 20, y: 300}; this.ballSpeed = 10; this.ball.cooldown = 5;
                             }
                         } else {
-                            this.showActionText(kicker, "シュート:失敗", "#e74c3c");
-                            this.ballTarget = {x: isPlayer ? 850 : -50, y: Math.random() > 0.5 ? 200 : 400};
+                            this.showActionText(kicker, "シュート:外れ", "#e74c3c");
+                            this.ballTarget = {x: isPlayer ? 850 : -50, y: Phaser.Math.Between(220, 380)};
                         }
                     }
 
@@ -2420,7 +2411,7 @@ class MatchScene extends Phaser.Scene {
                     this.ball.owner = null;
                 } else if (currentAction === 'Clear') {
                     this.createKickEffect(this.ball.x, this.ball.y);
-                    this.ballTarget = {x: isPlayer ? 800 : 0, y: Math.random() * 600};
+                    this.ballTarget = {x: isPlayer ? 800 : 0, y: (this.ball.y < 300) ? 0 : 600};
                     this.ballSpeed = 25; this.isHighBall = true; this.ballZVelocity = 20;
                     this.ball.owner.actionCooldown = 15;
                     this.ball.cooldown = 5;
@@ -2482,43 +2473,24 @@ class MatchScene extends Phaser.Scene {
                     }
                     if (this.currentGimmick === 'badWeather') { effectivePassStat -= 20; if (isLongBall) effectivePassStat += 30; }
 
-                    if (Math.random() * 100 > effectivePassStat) {
-                        this.showActionText(this.ball.owner, "パス:失敗", "#e74c3c");
+                    this.showActionText(this.ball.owner, "パス", "#3498db");
+                    this.ballTarget = {x: targetMate.x, y: targetMate.y};
 
-                        // Misplace the pass severely towards an enemy or random space
-                        const enemies = isPlayer ? this.opponentSprites : this.playerSprites;
-                        // Find an enemy somewhere near the target
-                        const nearbyEnemies = enemies.filter(e => Phaser.Math.Distance.Between(e.x, e.y, targetMate.x, targetMate.y) < 150);
-
-                        if (nearbyEnemies.length > 0) {
-                            // Pass directly to the enemy by mistake
-                            const badTarget = nearbyEnemies[Math.floor(Math.random() * nearbyEnemies.length)];
-                            this.ballTarget = {x: badTarget.x, y: badTarget.y};
-                        } else {
-                            // Wildly inaccurate pass
-                            this.ballTarget = {
-                                x: targetMate.x + (Math.random() > 0.5 ? 100 : -100),
-                                y: targetMate.y + (Math.random() > 0.5 ? 100 : -100)
-                            };
-                        }
-
-                        // Slower ball speed so enemies can intercept easily
-                        this.ballSpeed = 12;
-                        this.isHighBall = Math.random() > 0.5; // Sometimes randomly pops up
-                        this.ballZVelocity = this.isHighBall ? 10 : 0;
-
+                    if (isLongBall) {
+                        let leadDist = isThroughBall ? (isPlayer ? 100 : -100) : 0;
+                        this.ballTarget.x += leadDist;
+                        this.ballSpeed = Math.min(11, Math.max(5, Phaser.Math.Distance.Between(this.ball.x, this.ball.y, this.ballTarget.x, this.ballTarget.y) / 22)) + 5; this.isHighBall = true; this.ballZVelocity = 15;
                     } else {
-                        this.showActionText(this.ball.owner, "パス:成功", "#3498db");
-                        this.ballTarget = {x: targetMate.x, y: targetMate.y};
-
-                        if (isLongBall) {
-                            let leadDist = isThroughBall ? (isPlayer ? 100 : -100) : 0;
-                            this.ballTarget.x += leadDist;
-                            this.ballSpeed = 22; this.isHighBall = true; this.ballZVelocity = 15;
-                        } else {
-                            this.ballSpeed = 16; this.isHighBall = false;
-                        }
+                        this.ballSpeed = Math.min(11, Math.max(5, Phaser.Math.Distance.Between(this.ball.x, this.ball.y, this.ballTarget.x, this.ballTarget.y) / 22)); this.isHighBall = false;
                     }
+
+                    // Apply angular deviation based on pass stat/pressure (max +- 12 degrees / 0.21 radians)
+                    const originalAngle = Phaser.Math.Angle.Between(this.ball.x, this.ball.y, this.ballTarget.x, this.ballTarget.y);
+                    const originalDist = Phaser.Math.Distance.Between(this.ball.x, this.ball.y, this.ballTarget.x, this.ballTarget.y);
+                    const angleDev = (Math.random() - 0.5) * 0.42;
+                    const newAngle = originalAngle + angleDev;
+                    this.ballTarget.x = this.ball.x + Math.cos(newAngle) * originalDist;
+                    this.ballTarget.y = this.ball.y + Math.sin(newAngle) * originalDist;
 
                     // Apply cooldown so the kicker doesn't immediately trap their own bad pass
                     this.ball.owner.actionCooldown = 15;
