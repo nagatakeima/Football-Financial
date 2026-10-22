@@ -1990,6 +1990,7 @@ class MatchScene extends Phaser.Scene {
 
     endMatch(playerScore, oppScore) {
         this.scene.pause();
+
         const resultBg = this.add.rectangle(400, 300, 400, 200, 0x000000, 0.9);
         resultBg.setStrokeStyle(4, 0xffffff);
         this.add.text(400, 250, 'MATCH FINISHED', { fontSize: '32px', fill: '#fff' }).setOrigin(0.5);
@@ -1997,6 +1998,9 @@ class MatchScene extends Phaser.Scene {
         const btn = this.add.rectangle(400, 360, 150, 40, 0x3498db).setInteractive();
         this.add.text(400, 360, 'ロッカールームへ', { fontSize: '16px', fill: '#fff' }).setOrigin(0.5);
         btn.on('pointerdown', () => {
+            document.getElementById('phaser-game').style.display = 'none';
+            document.getElementById('ui-layer').style.pointerEvents = 'auto';
+
             window.gameState.processPostMatch(playerScore, oppScore);
             document.getElementById('ui-content').style.display = 'flex';
             document.querySelector('header.top-bar').style.display = 'flex';
@@ -2028,6 +2032,8 @@ let game;
 function startGame() {
     document.getElementById('ui-content').style.display = 'none';
     document.querySelector('header.top-bar').style.display = 'none';
+    document.getElementById('phaser-game').style.display = 'flex';
+    document.getElementById('ui-layer').style.pointerEvents = 'none';
 
     if (!game) {
         game = new Phaser.Game(config);

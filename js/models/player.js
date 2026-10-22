@@ -89,20 +89,26 @@ class Player {
         const prefs = Object.values(window.TacticalPreferences);
         const preference = prefs[Math.floor(Math.random() * prefs.length)];
 
-        let rarityBonus = 0;
-        if (rarity === 'R') rarityBonus = 15;
-        if (rarity === 'SR') rarityBonus = 30;
-        if (rarity === 'SSR') rarityBonus = 45;
+        let baseStat = 40; // N base
+        if (rarity === 'R') baseStat = 55;
+        if (rarity === 'SR') baseStat = 70;
+        if (rarity === 'SSR') baseStat = 80;
+
+        // Base random function for stats centered around the baseStat
+        const genStat = (bonus = 0) => {
+            let variance = Math.floor(Math.random() * 14) - 7; // -7 to +7
+            return Math.min(100, Math.max(10, baseStat + variance + bonus));
+        };
 
         // Random stats slightly weighted by position
         const stats = {
-            pass: Player.randomStat(position === 'CM' || position === 'CAM' ? 20 : 0) + rarityBonus,
-            shoot: Player.randomStat(position === 'CF' || position === 'WG' ? 20 : 0) + rarityBonus,
-            defense: Player.randomStat(position === 'CB' || position === 'CDM' ? 20 : 0) + rarityBonus,
-            physical: Player.randomStat(position === 'CB' || position === 'CF' ? 20 : 0) + rarityBonus,
-            speed: Player.randomStat(position === 'WG' || position === 'SB' ? 20 : 0) + rarityBonus,
-            mental: Player.randomStat() + rarityBonus,
-            stamina: Player.randomStat(10) + rarityBonus
+            pass: genStat(position === 'CM' || position === 'CAM' ? 10 : 0),
+            shoot: genStat(position === 'CF' || position === 'WG' ? 10 : 0),
+            defense: genStat(position === 'CB' || position === 'CDM' ? 10 : 0),
+            physical: genStat(position === 'CB' || position === 'CF' ? 10 : 0),
+            speed: genStat(position === 'WG' || position === 'SB' ? 10 : 0),
+            mental: genStat(0),
+            stamina: genStat(10)
         };
 
         // Clamp stats to 100
