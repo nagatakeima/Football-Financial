@@ -742,6 +742,31 @@ class ManagementUI {
         if (this.swapSourceIndex !== null && this.swapSourceIndex !== index) {
             const team = window.gameState.playerTeam;
             const srcPlayer = this.swapSourceIndex < 11 ? team.starting11[this.swapSourceIndex] : team.bench[this.swapSourceIndex - 11];
+
+            const srcStatBarsHtml = Object.entries(srcPlayer.stats).map(([key, val]) => {
+                let color = '#e74c3c';
+                if(val >= 80) color = '#f1c40f';
+                else if(val >= 60) color = '#2ecc71';
+                else if(val >= 40) color = '#3498db';
+
+                const label = {pass: 'Pass', shoot: 'Shoot', defense: 'Defense', physical: 'Physical', speed: 'Speed', mental: 'Mental', stamina: 'Stamina'}[key];
+                return `
+                    <div style="display: flex; align-items: center; font-size: 9px; margin-bottom: 2px;">
+                        <span style="width: 45px;">${label}</span>
+                        <div style="flex: 1; background: #333; height: 6px; border-radius: 3px; margin: 0 4px; overflow: hidden;">
+                            <div style="width: ${val}%; background: ${color}; height: 100%;"></div>
+                        </div>
+                        <span style="width: 15px; text-align: right;">${val}</span>
+                    </div>
+                `;
+            }).join('');
+
+            const srcSkillsHtml = srcPlayer.skills.length > 0 ? srcPlayer.skills.map(sId => {
+                const s = window.MasterData.PlayerSkills.find(sk => sk.id === sId);
+                if (!s) return '';
+                return `<span style="background: #2c3e50; padding: 2px 4px; margin: 1px; border-radius: 3px; font-size: 9px; display: inline-block;">${s.name}</span>`;
+            }).join('') : '<span style="font-size: 9px; color: #777;">なし</span>';
+
             comparisonHtml = `
             <div style="background: #111; border: 2px dashed #e74c3c; border-radius: 8px; padding: 10px; flex: 1; display: flex; flex-direction: column; text-align: left; overflow-y: auto; margin-top: 10px;">
                 <h4 style="color: #e74c3c; margin-bottom: 5px; font-size: 12px;">入れ替え元: ${srcPlayer.name}</h4>
@@ -749,6 +774,14 @@ class ManagementUI {
                 <div style="display: flex; justify-content: space-between; font-size: 11px; color: #ccc; margin-bottom: 5px;">
                     <div><strong>主:</strong> ${srcPlayer.position}</div>
                     <div><strong>副:</strong> ${srcPlayer.subPositions && srcPlayer.subPositions.length > 0 ? srcPlayer.subPositions.join(', ') : 'なし'}</div>
+                </div>
+                <div style="margin-bottom: 5px;">
+                    <h4 style="border-bottom: 1px solid #444; padding-bottom: 2px; margin-bottom: 2px; font-size: 10px; color: #aaa;">ステータス</h4>
+                    ${srcStatBarsHtml}
+                </div>
+                <div>
+                    <h4 style="border-bottom: 1px solid #444; padding-bottom: 2px; margin-bottom: 2px; font-size: 10px; color: #aaa;">スキル</h4>
+                    <div>${srcSkillsHtml}</div>
                 </div>
             </div>`;
         }
@@ -867,7 +900,7 @@ class ManagementUI {
                 <span style="font-size: 8px; color: #f1c40f;">OVR: ${p.getOvr()}</span>
                 <span style="font-size: 8px;">${p.level>=10?'Lv.MAX':'Lv.'+p.level}</span>
                 <div style="width: 80%; height: 3px; background: #555; margin-top: 2px; border-radius: 2px; overflow: hidden;">
-                    <div style="width: ${p.currentStamina}%; height: 100%; background: #2ecc71;"></div>
+                    <div style="width: ${p.condition ?? 100}%; height: 100%; background: ${p.condition > 50 ? '#2ecc71' : (p.condition > 20 ? '#f1c40f' : '#e74c3c')};"></div>
                 </div>
             `;
             pDiv.onclick = () => this.handlePlayerClick(idx, true);

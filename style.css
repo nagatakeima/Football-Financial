@@ -283,8 +283,8 @@ button:disabled {
     content: attr(data-tooltip);
     position: absolute;
     top: 120%;
-    left: 50%;
-    transform: translateX(-50%);
+    left: 0;
+    transform: none;
     background: rgba(0, 0, 0, 0.9);
     color: #fff;
     padding: 5px 10px;
@@ -316,6 +316,8 @@ button:disabled {
     z-index: 50; /* Ensure it is above the canvas if needed, but flex takes care of it */
     box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.5);
     flex-shrink: 0;
+    pointer-events: auto; /* Ensure controls are clickable during match */
+    margin-top: auto;
 }
 
 .deck-top-row {
