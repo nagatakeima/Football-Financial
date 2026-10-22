@@ -2152,18 +2152,9 @@ class MatchScene extends Phaser.Scene {
                 if (this.currentGimmick === 'badWeather') trapChance -= 20;
                 if (interceptor.playerData.position === 'GK') trapChance += 30;
 
-                if (Math.random() * 100 > trapChance && this.ballSpeed > 5) {
-                    this.showActionText(interceptor, "トラップ:失敗", "#e74c3c");
-                    this.lastTouchedByPlayerTeam = interceptor.isPlayerTeam;
-                    this.ball.owner = null; this.ballTarget = null; this.ballSpeed = this.ballSpeed * 0.5;
-                    this.ball.angle = this.ball.angle + (Math.random() * Math.PI - Math.PI/2);
-                    this.isHighBall = true; this.ballZVelocity = 5;
-                    interceptor.actionCooldown = 10; // Prevent interceptor from instantly trying to trap it again
-                } else {
-                    this.showActionText(interceptor, "トラップ:成功", "#3498db");
-                    this.ball.owner = interceptor; this.lastTouchedByPlayerTeam = interceptor.isPlayerTeam;
-                    this.ballTarget = null; this.isHighBall = false; this.ball.z = 0;
-                }
+                this.showActionText(interceptor, "トラップ:成功", "#3498db");
+                this.ball.owner = interceptor; this.lastTouchedByPlayerTeam = interceptor.isPlayerTeam;
+                this.ballTarget = null; this.isHighBall = false; this.ball.z = 0;
             }
         }
 
@@ -2411,8 +2402,8 @@ class MatchScene extends Phaser.Scene {
                                 this.ballTarget = {x: isPlayer ? 780 : 20, y: 300}; this.ballSpeed = 10; this.ball.cooldown = 5;
                             }
                         } else {
-                            this.showActionText(kicker, "シュート:失敗", "#e74c3c");
-                            this.ballTarget = {x: isPlayer ? 850 : -50, y: Math.random() > 0.5 ? 200 : 400};
+                            this.showActionText(kicker, "シュート:外れ", "#e74c3c");
+                            this.ballTarget = {x: isPlayer ? 850 : -50, y: Phaser.Math.Between(220, 380)};
                         }
                     }
 
@@ -2420,7 +2411,7 @@ class MatchScene extends Phaser.Scene {
                     this.ball.owner = null;
                 } else if (currentAction === 'Clear') {
                     this.createKickEffect(this.ball.x, this.ball.y);
-                    this.ballTarget = {x: isPlayer ? 800 : 0, y: Math.random() * 600};
+                    this.ballTarget = {x: isPlayer ? 800 : 0, y: (this.ball.y < 300) ? 0 : 600};
                     this.ballSpeed = 25; this.isHighBall = true; this.ballZVelocity = 20;
                     this.ball.owner.actionCooldown = 15;
                     this.ball.cooldown = 5;
@@ -2482,43 +2473,24 @@ class MatchScene extends Phaser.Scene {
                     }
                     if (this.currentGimmick === 'badWeather') { effectivePassStat -= 20; if (isLongBall) effectivePassStat += 30; }
 
-                    if (Math.random() * 100 > effectivePassStat) {
-                        this.showActionText(this.ball.owner, "パス:失敗", "#e74c3c");
+                    this.showActionText(this.ball.owner, "パス", "#3498db");
+                    this.ballTarget = {x: targetMate.x, y: targetMate.y};
 
-                        // Misplace the pass severely towards an enemy or random space
-                        const enemies = isPlayer ? this.opponentSprites : this.playerSprites;
-                        // Find an enemy somewhere near the target
-                        const nearbyEnemies = enemies.filter(e => Phaser.Math.Distance.Between(e.x, e.y, targetMate.x, targetMate.y) < 150);
-
-                        if (nearbyEnemies.length > 0) {
-                            // Pass directly to the enemy by mistake
-                            const badTarget = nearbyEnemies[Math.floor(Math.random() * nearbyEnemies.length)];
-                            this.ballTarget = {x: badTarget.x, y: badTarget.y};
-                        } else {
-                            // Wildly inaccurate pass
-                            this.ballTarget = {
-                                x: targetMate.x + (Math.random() > 0.5 ? 100 : -100),
-                                y: targetMate.y + (Math.random() > 0.5 ? 100 : -100)
-                            };
-                        }
-
-                        // Slower ball speed so enemies can intercept easily
-                        this.ballSpeed = 12;
-                        this.isHighBall = Math.random() > 0.5; // Sometimes randomly pops up
-                        this.ballZVelocity = this.isHighBall ? 10 : 0;
-
+                    if (isLongBall) {
+                        let leadDist = isThroughBall ? (isPlayer ? 100 : -100) : 0;
+                        this.ballTarget.x += leadDist;
+                        this.ballSpeed = Math.min(11, Math.max(5, Phaser.Math.Distance.Between(this.ball.x, this.ball.y, this.ballTarget.x, this.ballTarget.y) / 22)) + 5; this.isHighBall = true; this.ballZVelocity = 15;
                     } else {
-                        this.showActionText(this.ball.owner, "パス:成功", "#3498db");
-                        this.ballTarget = {x: targetMate.x, y: targetMate.y};
-
-                        if (isLongBall) {
-                            let leadDist = isThroughBall ? (isPlayer ? 100 : -100) : 0;
-                            this.ballTarget.x += leadDist;
-                            this.ballSpeed = 22; this.isHighBall = true; this.ballZVelocity = 15;
-                        } else {
-                            this.ballSpeed = 16; this.isHighBall = false;
-                        }
+                        this.ballSpeed = Math.min(11, Math.max(5, Phaser.Math.Distance.Between(this.ball.x, this.ball.y, this.ballTarget.x, this.ballTarget.y) / 22)); this.isHighBall = false;
                     }
+
+                    // Apply angular deviation based on pass stat/pressure (max +- 12 degrees / 0.21 radians)
+                    const originalAngle = Phaser.Math.Angle.Between(this.ball.x, this.ball.y, this.ballTarget.x, this.ballTarget.y);
+                    const originalDist = Phaser.Math.Distance.Between(this.ball.x, this.ball.y, this.ballTarget.x, this.ballTarget.y);
+                    const angleDev = (Math.random() - 0.5) * 0.42;
+                    const newAngle = originalAngle + angleDev;
+                    this.ballTarget.x = this.ball.x + Math.cos(newAngle) * originalDist;
+                    this.ballTarget.y = this.ball.y + Math.sin(newAngle) * originalDist;
 
                     // Apply cooldown so the kicker doesn't immediately trap their own bad pass
                     this.ball.owner.actionCooldown = 15;
