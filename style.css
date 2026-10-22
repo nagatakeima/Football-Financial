@@ -30,6 +30,12 @@ body {
     flex-direction: row; /* Default to horizontal split for PC/Landscape */
 }
 
+/* Match mode layout overrides */
+#game-container.match-mode {
+    flex-direction: column !important;
+    justify-content: flex-start;
+}
+
 /* UI Layer (HTML over Phaser Canvas or alongside it depending on state) */
 #ui-layer {
     position: absolute;
