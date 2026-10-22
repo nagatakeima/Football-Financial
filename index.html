@@ -25,6 +25,21 @@
 
         <!-- Phaser Canvas Container (only visible during match) -->
         <div id="phaser-game" style="display: none;"></div>
+
+        <!-- Micro Command Deck (visible during match) -->
+        <div id="micro-command-bar" style="display: none;">
+            <div class="deck-top-row">
+                <div class="tactic-toggles">
+                    <button class="tactic-btn active" data-tactic="Balance">⚖️ バランス</button>
+                    <button class="tactic-btn" data-tactic="Attack">🔥 猛攻</button>
+                    <button class="tactic-btn" data-tactic="Defend">🛡️ 全員守備</button>
+                </div>
+                <button id="btn-sub-tactic" class="sub-btn">🔄 交代・戦術 (枠: 3)</button>
+            </div>
+            <div class="deck-bottom-row" id="command-slots-container">
+                <!-- Command slots injected dynamically -->
+            </div>
+        </div>
     </div>
 
     <!-- Data Models & Logic -->

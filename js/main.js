@@ -310,6 +310,9 @@ class MatchScene extends Phaser.Scene {
     createPlayerSprite(x, y, color, number, isPlayerTeam, player) {
         let container = this.add.container(x, y);
         if (player.position === 'GK') color = isPlayerTeam ? 0x2ecc71 : 0xf1c40f;
+
+        let aura = this.add.circle(0, 15, 25, 0xffffff, 0);
+
         let shadow = this.add.ellipse(0, 15, 20, 8, 0x000000, 0.4);
         let legL = this.add.rectangle(-4, 12, 4, 10, 0xecf0f1);
         let legR = this.add.rectangle(4, 12, 4, 10, 0xecf0f1);
@@ -328,9 +331,11 @@ class MatchScene extends Phaser.Scene {
         let eyeR = this.add.rectangle(3, -13, 2, 2, 0x000000);
         let numText = this.add.text(0, 1, number, { fontSize: '10px', fontStyle: 'bold', color: '#fff' }).setOrigin(0.5);
 
-        container.add([shadow, legL, legR, shoeL, shoeR, pants, sleeveL, sleeveR, body, head, hair, eyeL, eyeR, numText]);
+        container.add([aura, shadow, legL, legR, shoeL, shoeR, pants, sleeveL, sleeveR, body, head, hair, eyeL, eyeR, numText]);
 
+        container.aura = aura;
         container.legL = legL; container.legR = legR; container.shoeL = shoeL; container.shoeR = shoeR;
+        container.bodyParts = [body, pants, sleeveL, sleeveR, head, hair, eyeL, eyeR, numText];
         container.playerData = player; container.isPlayerTeam = isPlayerTeam; container.animTick = Math.random() * 10;
         container.baseColor = color; container.dirX = 1;
 
@@ -445,51 +450,6 @@ class MatchScene extends Phaser.Scene {
         this.setSpeed(1, this.speedButtons);
         this.createCommandUI();
 
-        // Add Substitution / Tactics Button
-        const subBtnBg = this.add.rectangle(720, 570, 140, 40, 0x3498db).setInteractive().setDepth(100);
-        subBtnBg.setStrokeStyle(2, 0x2980b9);
-        this.subBtnText = this.add.text(720, 570, '🔄 交代・戦術', { fontSize: '14px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5).setDepth(101);
-
-        subBtnBg.on('pointerdown', () => {
-            if (this.matchState === 'playing') {
-                this.openSubstitutionUI('match');
-            }
-        });
-
-        // Add Real-Time Tactic Toggles
-        this.realTimeTactic = 'Balance';
-
-        const tacticY = 570;
-        const tacticBtnWidth = 80;
-        const startX = 400 - (tacticBtnWidth * 1.5) - 30; // Center offset slightly to the left of commands
-
-        const createTacticBtn = (x, text, tacticValue, color, icon) => {
-            const bg = this.add.rectangle(x, tacticY, tacticBtnWidth, 40, 0x222222).setInteractive().setDepth(100);
-            bg.setStrokeStyle(2, 0x555555);
-            const label = this.add.text(x, tacticY, `${icon} ${text}`, { fontSize: '12px', fill: '#fff' }).setOrigin(0.5).setDepth(101);
-
-            bg.on('pointerdown', () => {
-                this.tacticButtons.forEach(btn => {
-                    btn.bg.setFillStyle(0x222222);
-                    btn.bg.setStrokeStyle(2, 0x555555);
-                });
-                bg.setFillStyle(color);
-                bg.setStrokeStyle(2, 0xffffff);
-                this.realTimeTactic = tacticValue;
-            });
-
-            return { bg, label, value: tacticValue };
-        };
-
-        this.tacticButtons = [];
-        this.tacticButtons.push(createTacticBtn(100, 'バランス', 'Balance', 0x34495e, '⚖️'));
-        this.tacticButtons.push(createTacticBtn(190, '猛攻', 'Attack', 0xc0392b, '🔥'));
-        this.tacticButtons.push(createTacticBtn(280, '全員守備', 'Defend', 0x27ae60, '🛡️'));
-
-        // Default select Balance
-        this.tacticButtons[0].bg.setFillStyle(0x34495e);
-        this.tacticButtons[0].bg.setStrokeStyle(2, 0xffffff);
-
     }
 
     showActionText(sprite, text, color) {
@@ -512,8 +472,10 @@ class MatchScene extends Phaser.Scene {
     }
 
     createCommandUI() {
-        const cmdY = 550; const spacing = 180; const startX = 400 - (spacing * 1.5);
         this.commandSlots = [];
+        const container = document.getElementById('command-slots-container');
+        if (container) container.innerHTML = '';
+
         this.playerTeamData.microCommands.forEach((cmdId, i) => {
             const cmdData = Object.assign({}, window.MasterData.MicroCommands.find(c => c.id === cmdId));
             if (!cmdData) return;
@@ -523,14 +485,72 @@ class MatchScene extends Phaser.Scene {
                 if (r && r.effectType === "CD_REDUCTION") cdReduction += r.value;
             });
             cmdData.cooldown = cmdData.cooldown * (1 - cdReduction);
-            const bg = this.add.rectangle(startX + (i * spacing), cmdY, 160, 50, 0x2c3e50).setInteractive();
-            bg.setStrokeStyle(2, 0x34495e);
-            const text = this.add.text(startX + (i * spacing), cmdY, cmdData.name, { fontSize: '12px', fill: '#fff', align: 'center', wordWrap: { width: 150 } }).setOrigin(0.5);
-            const cdOverlay = this.add.rectangle(startX + (i * spacing), cmdY, 160, 50, 0x000000, 0.6);
-            cdOverlay.scaleY = 0;
-            this.commandSlots.push({ cmdId: cmdId, data: cmdData, bg: bg, cdOverlay: cdOverlay, currentCd: 0, usesLeft: cmdData.maxUses !== undefined ? cmdData.maxUses : Infinity });
-            bg.on('pointerdown', () => this.triggerCommand(i));
+
+            const slotData = { cmdId: cmdId, data: cmdData, currentCd: 0, usesLeft: cmdData.maxUses !== undefined ? cmdData.maxUses : Infinity };
+            this.commandSlots.push(slotData);
+
+            if (container) {
+                const slotEl = document.createElement('div');
+                slotEl.className = 'command-slot';
+                slotEl.id = `cmd-slot-${i}`;
+
+                const nameEl = document.createElement('div');
+                nameEl.className = 'command-name';
+                nameEl.innerText = cmdData.name;
+
+                const descEl = document.createElement('div');
+                descEl.className = 'command-desc';
+                descEl.innerText = `残り: ${slotData.usesLeft === Infinity ? '∞' : slotData.usesLeft}`;
+
+                const cdBar = document.createElement('div');
+                cdBar.className = 'command-cd-bar';
+                cdBar.id = `cmd-cd-${i}`;
+
+                slotEl.appendChild(nameEl);
+                slotEl.appendChild(descEl);
+                slotEl.appendChild(cdBar);
+
+                slotEl.addEventListener('click', () => {
+                    this.triggerCommand(i);
+                });
+
+                container.appendChild(slotEl);
+            }
         });
+
+        // Also initialize tactic buttons state
+        this.realTimeTactic = 'Balance';
+
+        // Add listeners to tactic toggles
+        document.querySelectorAll('.tactic-btn').forEach(btn => {
+            // Remove old listeners by cloning
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+
+            newBtn.addEventListener('click', (e) => {
+                document.querySelectorAll('.tactic-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                this.realTimeTactic = e.target.getAttribute('data-tactic');
+            });
+        });
+
+        // Sub btn listener
+        const subBtn = document.getElementById('btn-sub-tactic');
+        if (subBtn) {
+            const newSubBtn = subBtn.cloneNode(true);
+            subBtn.parentNode.replaceChild(newSubBtn, subBtn);
+            newSubBtn.addEventListener('click', () => {
+                if (this.matchState === 'playing') {
+                    this.openSubstitutionUI('match');
+                }
+            });
+            this.subBtnDOM = newSubBtn;
+        }
+
+        const microBar = document.getElementById('micro-command-bar');
+        if (microBar) {
+            microBar.style.display = 'flex';
+        }
     }
 
     triggerCommand(slotIndex) {
@@ -543,11 +563,15 @@ class MatchScene extends Phaser.Scene {
             if (slot.data.condition === "lead" && !isLead) return;
         }
         slot.usesLeft -= 1;
-        if (slot.usesLeft <= 0) slot.bg.setAlpha(0.5);
 
-        const flash = this.add.rectangle(slot.bg.x, slot.bg.y, 160, 50, 0xf1c40f, 0.8);
-        this.tweens.add({ targets: flash, alpha: 0, duration: 500, onComplete: () => flash.destroy() });
+        const slotEl = document.getElementById(`cmd-slot-${slotIndex}`);
+        if (slotEl) {
+            const descEl = slotEl.querySelector('.command-desc');
+            if (descEl) descEl.innerText = `残り: ${slot.usesLeft === Infinity ? '∞' : slot.usesLeft}`;
+            if (slot.usesLeft <= 0) slotEl.classList.add('disabled');
+        }
 
+        // Visual feedback handled by DOM and new player effects instead of Phaser rectangles UI
         this.activeBuff = { target: slot.data.target, value: slot.data.value, actionType: slot.data.actionType, duration: 5 };
 
         if (slot.data.actionType === 'substitute') {
@@ -564,778 +588,35 @@ class MatchScene extends Phaser.Scene {
             if (cb) cb.x = 600;
         }
         if (slot.data.actionType === 'comeback') {
-            this.playerSprites.forEach(p => { Object.keys(p.playerData.dynamicStats).forEach(k => p.playerData.dynamicStats[k] += 20); });
+            this.playerSprites.forEach(p => { p.playerData.currentStamina = 100; p.playerData.condition += 10; });
         }
-        if (slot.data.actionType === 'parkBus') {
-            this.playerSprites.forEach(p => { if (p.playerData.position === 'SB' || p.playerData.position === 'CDM') p.x = Math.max(50, p.x - 150); });
+        if (slot.data.actionType === 'shoot') {
+            const fw = this.playerSprites.find(p => p.playerData.position === 'CF' || p.playerData.position === 'WG');
+            if (fw) { fw.playerData.dynamicStats.shoot += 30; }
         }
-        if (slot.data.actionType === 'offsideTrap') {
-             this.opponentSprites.forEach(p => { if (p.x < 300) p.x = 400; });
-        }
+
         slot.currentCd = slot.data.cooldown;
-    }
 
-    tickMatch() {
-        if (this.isSkip) { this.finishMatchInstantly(); return; }
-        this.matchTime += 0.03; // Engine time increment
-        const displayMin = Math.floor(this.matchTime);
-        const displaySec = Math.floor((this.matchTime % 1) * 60);
+        // Show effect on target player
+        let targetSprites = [];
+        if (slot.data.target === 'all') targetSprites = this.playerSprites;
+        else if (slot.data.target === 'self' && this.ball.owner && this.ball.owner.isPlayerTeam) targetSprites = [this.ball.owner];
+        else if (slot.data.target === 'FW') targetSprites = this.playerSprites.filter(p => p.playerData.position === 'CF' || p.playerData.position === 'WG');
+        else if (slot.data.target === 'DF') targetSprites = this.playerSprites.filter(p => p.playerData.position === 'CB' || p.playerData.position === 'SB');
+        else if (slot.data.target === 'MF') targetSprites = this.playerSprites.filter(p => p.playerData.position === 'CM' || p.playerData.position === 'CDM' || p.playerData.position === 'CAM');
 
-        if (this.inStoppageTime) {
-            const baseMin = this.halftimeDone ? 90 : 45;
-            const extraMin = displayMin - baseMin;
-            this.timeText.setText(`${baseMin}+${extraMin}'${displaySec.toString().padStart(2, '0')}`);
-            this.timeText.setFill('#e74c3c');
-        } else {
-            this.timeText.setText(`${displayMin.toString().padStart(2, '0')}:${displaySec.toString().padStart(2, '0')}`);
-            this.timeText.setFill('#f1c40f');
-        }
-
-        if (this.subBtnText && this.substitutionsLeft !== undefined) {
-            this.subBtnText.setText(`🔄 交代・戦術 (枠:${this.substitutionsLeft})`);
-        }
-
-        // --- Engine Tracking for Gegenpress (Possession tracking) ---
-        // Since matchTime is scaled (0 to 90 representing minutes), we use delta time for the 5-sec rule.
-        // Assuming 1 game minute ~ 1000ms real time in the tick loop (based on +0.03 per tick roughly equating to pace).
-        // Let's track the actual real-world MS or approximate matchTime equivalent (5 seconds = approx 0.08 matchTime units).
-        if (!this.lastPossessionChangeTime) this.lastPossessionChangeTime = 0;
-        if (!this.lastPossessionTeam) this.lastPossessionTeam = null;
-
-        const currentPossessorTeam = this.ball.owner ? this.ball.owner.isPlayerTeam : null;
-        if (currentPossessorTeam !== null && currentPossessorTeam !== this.lastPossessionTeam) {
-            this.lastPossessionTeam = currentPossessorTeam;
-            this.lastPossessionChangeTime = this.time.now; // Use Phaser time.now for real-world MS
-        }
-
-        // Expose to evaluateActions logic
-        this.timeSinceLastPossessionChange = this.time.now - this.lastPossessionChangeTime;
-
-        this.commandSlots.forEach(slot => {
-            if (slot.currentCd > 0) {
-                slot.currentCd -= 0.1;
-                if (slot.currentCd < 0) slot.currentCd = 0;
-                slot.cdOverlay.scaleY = slot.currentCd / slot.data.cooldown;
-                slot.cdOverlay.setOrigin(0.5, 1);
-                slot.cdOverlay.y = slot.bg.y + 25;
-            }
+        targetSprites.forEach(sprite => {
+            const ring = this.add.circle(0, 0, 20, 0x3498db, 0);
+            ring.setStrokeStyle(3, 0x00ffff);
+            sprite.add(ring);
+            this.tweens.add({
+                targets: ring,
+                scale: 2,
+                alpha: 0,
+                duration: 1000,
+                onComplete: () => ring.destroy()
+            });
         });
-
-        if (this.activeBuff) {
-            this.activeBuff.duration -= 0.03;
-            if (this.activeBuff.duration <= 0) this.activeBuff = null;
-        }
-
-        if (this.activeBuff && this.activeBuff.target === 'defenseLine') {
-             this.playerSprites.forEach(p => { if (p.x < 300) p.x += 1; if (p.x > 500) p.x -= 1; });
-        }
-        if (this.activeBuff && this.activeBuff.target === 'press') {
-             this.playerSprites.forEach(p => {
-                  if (Phaser.Math.Distance.Between(p.x, p.y, this.ball.x, this.ball.y) < 250) {
-                      const angle = Phaser.Math.Angle.Between(p.x, p.y, this.ball.x, this.ball.y);
-                      p.x += Math.cos(angle) * 1.5; p.y += Math.sin(angle) * 1.5;
-                  }
-             });
-        }
-
-        if (this.currentGimmick === 'fever' && this.matchTime < 45) {
-             this.opponentSprites.forEach(p => {
-                  if (Phaser.Math.Distance.Between(p.x, p.y, this.ball.x, this.ball.y) < 200) {
-                      const angle = Phaser.Math.Angle.Between(p.x, p.y, this.ball.x, this.ball.y);
-                      p.x += Math.cos(angle) * 1.2; p.y += Math.sin(angle) * 1.2;
-                  }
-             });
-        }
-
-        if (this.currentGimmick === 'fortress') {
-            this.playerSprites.forEach(p => { p.playerData.currentStamina -= p.playerData.staminaConsumptionRate * 0.1; });
-        }
-
-        if (this.matchState === 'kickoff') {
-            if (this.kickoffTimer > 0) {
-                this.kickoffTimer -= 1;
-            } else {
-                this.matchState = 'playing';
-                // Force a safe backpass upon kickoff
-                if (this.ball.owner) {
-                    const isPlayer = this.ball.owner.isPlayerTeam;
-                    const teammates = (isPlayer ? this.playerSprites : this.opponentSprites).filter(p => p !== this.ball.owner);
-                    const backMates = teammates.filter(p => isPlayer ? p.x < this.ball.owner.x - 10 : p.x > this.ball.owner.x + 10);
-                    let targetMate = backMates.length > 0 ? backMates[Math.floor(Math.random() * backMates.length)] : teammates[0];
-                    this.ballTarget = {x: targetMate.x, y: targetMate.y};
-                    this.ballSpeed = Math.min(11, Math.max(5, Phaser.Math.Distance.Between(this.ball.x, this.ball.y, targetMate.x, targetMate.y) / 22)); this.isHighBall = false; this.ball.owner = null;
-                }
-            }
-        } else if (this.matchState === 'setpiece') {
-            if (this.kickoffTimer > 0) {
-                this.kickoffTimer -= 1;
-            } else {
-                this.matchState = 'playing';
-                this.currentSetPieceType = null;
-                if (this.setpieceText) { this.setpieceText.destroy(); this.setpieceText = null; }
-            }
-        }
-
-        if (this.matchState === 'playing') {
-            this.simulateAction();
-            if (this.setPieceCooldown && this.setPieceCooldown > 0) {
-                this.setPieceCooldown--;
-            } else {
-                this.checkBallOut();
-            }
-        }
-
-        // ハーフタイム処理
-        if (this.matchTime >= 45 && !this.halftimeDone && this.matchState === 'playing') {
-            const isAttackingThird = this.ball.y > 60 && this.ball.y < 540 && ((this.ball.x > 533 && this.ball.owner && this.ball.owner.isPlayerTeam) || (this.ball.x < 266 && this.ball.owner && !this.ball.owner.isPlayerTeam));
-
-            if (this.matchTime >= 45 + this.firstHalfStoppage && !isAttackingThird) {
-                this.inStoppageTime = false;
-                this.matchState = 'halftime';
-                this.showHalftimeUI();
-            } else {
-                this.inStoppageTime = true;
-            }
-        }
-
-        if (this.matchTime >= 90 && this.matchState === 'playing') {
-            const isAttackingThird = this.ball.y > 60 && this.ball.y < 540 && ((this.ball.x > 533 && this.ball.owner && this.ball.owner.isPlayerTeam) || (this.ball.x < 266 && this.ball.owner && !this.ball.owner.isPlayerTeam));
-
-            if (this.matchTime >= 90 + this.secondHalfStoppage && !isAttackingThird) {
-                this.inStoppageTime = false;
-                this.logicTimer.remove();
-                this.endMatch(this.score.player, this.score.opponent);
-            } else {
-                this.inStoppageTime = true;
-            }
-        }
-    }
-
-    showHalftimeUI() {
-        if (this.isSkip) {
-            this.halftimeDone = true;
-            this.matchState = 'playing';
-            this.resetPositions();
-            return;
-        }
-
-        this.logicTimer.paused = true;
-        this.openSubstitutionUI('halftime');
-    }
-
-    openSubstitutionUI(context = 'halftime') {
-        if (this.matchState === 'playing') {
-            this.logicTimer.paused = true;
-        }
-
-        const uiContainer = document.getElementById('ui-layer');
-        if (!uiContainer) return;
-
-        let existingModal = document.getElementById('halftime-modal');
-        if (existingModal) existingModal.remove();
-
-        const halftimeDiv = document.createElement('div');
-        halftimeDiv.id = 'halftime-modal';
-        halftimeDiv.className = 'modal-overlay';
-
-        if (this.substitutionsLeft === undefined) {
-            this.substitutionsLeft = 3;
-        }
-
-        let selectedSubPlayer = null;
-
-        const renderUI = () => {
-            let html = `
-                <div class="modal-content halftime-content" style="max-height: 90vh; overflow-y: auto;">
-                    <h2>${context === 'halftime' ? 'ハーフタイム' : '戦術・選手交代'}</h2>
-                    <div class="score-display">${this.playerTeamData.name} ${this.score.player} - ${this.score.opponent} ${this.opponentTeamData.name}</div>
-
-                    <p style="color: #f1c40f; font-size: 16px;">交代枠: 残り ${this.substitutionsLeft} 人 (交代するスタメンとベンチをクリックして入れ替え)</p>
-
-                    <div class="substitution-section">
-                        <h3>スタメン (残りスタミナ)</h3>
-                        <div class="player-grid" id="starters-grid">
-            `;
-
-            this.playerTeamData.starting11.forEach((p, i) => {
-                let isSelected = selectedSubPlayer === p;
-                let bgStyle = isSelected ? "background: #f1c40f; color: #333;" : p.isSentOff ? "background: #c0392b;" : "";
-                html += `<div class="player-card" data-id="${p.id}" data-type="starter" data-index="${i}" style="cursor: ${p.isSentOff ? 'not-allowed' : 'pointer'}; ${bgStyle}">
-                    <span class="pos">${p.position}</span> ${p.name} <br>
-                    <span class="stamina">Sta: ${Math.floor(p.currentStamina)}</span>
-                    ${p.isSentOff ? '<br><b>退場</b>' : ''}
-                </div>`;
-            });
-
-            html += `
-                        </div>
-                        <h3 style="margin-top: 15px;">ベンチ</h3>
-                        <div class="player-grid" id="bench-grid">
-            `;
-
-            this.playerTeamData.bench.forEach((p, i) => {
-                let isSelected = selectedSubPlayer === p;
-                let bgStyle = isSelected ? "background: #f1c40f; color: #333;" : "";
-                html += `<div class="player-card" data-id="${p.id}" data-type="bench" data-index="${i}" style="cursor: pointer; ${bgStyle}">
-                    <span class="pos">${p.position}</span> ${p.name} <br>
-                    <span class="stamina">Sta: ${Math.floor(p.currentStamina)}</span>
-                </div>`;
-            });
-
-            html += `
-                        </div>
-                    </div>
-                    <div style="margin-top: 20px;">
-                        <button id="btn-close-sub-ui" class="action-btn" style="background: #3498db; color: #fff; padding: 10px 20px; font-size: 18px; border: none; cursor: pointer;">
-                            ${context === 'halftime' ? '後半キックオフ' : '試合に戻る'}
-                        </button>
-                    </div>
-                </div>
-            `;
-
-            halftimeDiv.innerHTML = html;
-
-            halftimeDiv.querySelectorAll('.player-card').forEach(el => {
-                el.addEventListener('click', (e) => {
-                    const type = el.getAttribute('data-type');
-                    const index = parseInt(el.getAttribute('data-index'));
-
-                    const clickedPlayer = type === 'starter' ? this.playerTeamData.starting11[index] : this.playerTeamData.bench[index];
-
-                    if (clickedPlayer.isSentOff) return; // Cannot sub out sent-off players
-
-                    if (!selectedSubPlayer) {
-                        selectedSubPlayer = clickedPlayer;
-                        renderUI();
-                    } else {
-                        if (selectedSubPlayer !== clickedPlayer) {
-                            const isSelectedStarter = this.playerTeamData.starting11.includes(selectedSubPlayer);
-                            const isClickedStarter = this.playerTeamData.starting11.includes(clickedPlayer);
-
-                            // Swap if one is starter and one is bench
-                            if (isSelectedStarter !== isClickedStarter) {
-                                if (this.substitutionsLeft > 0) {
-                                    const starterIdx = isSelectedStarter ? this.playerTeamData.starting11.indexOf(selectedSubPlayer) : this.playerTeamData.starting11.indexOf(clickedPlayer);
-                                    const benchIdx = !isSelectedStarter ? this.playerTeamData.bench.indexOf(selectedSubPlayer) : this.playerTeamData.bench.indexOf(clickedPlayer);
-
-                                    const starterPlayer = this.playerTeamData.starting11[starterIdx];
-                                    const benchPlayer = this.playerTeamData.bench[benchIdx];
-
-                                    this.playerTeamData.starting11[starterIdx] = benchPlayer;
-                                    this.playerTeamData.bench[benchIdx] = starterPlayer;
-
-                                    this.substitutionsLeft--;
-
-                                    // Update sprites if during match or even at halftime to reflect changes
-                                    this.handleSubstitutionSpriteUpdate(starterPlayer, benchPlayer);
-                                }
-                            }
-                        }
-                        selectedSubPlayer = null;
-                        renderUI();
-                    }
-                });
-            });
-
-        };
-
-        uiContainer.appendChild(halftimeDiv);
-        renderUI();
-
-        const closeBtn = halftimeDiv.querySelector('#btn-close-sub-ui');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => {
-                halftimeDiv.remove();
-                if (context === 'halftime') {
-                    this.halftimeDone = true;
-                    this.matchState = 'kickoff';
-                    this.kickoffTimer = 20;
-                    this.resetPositions();
-                }
-                this.logicTimer.paused = false;
-            });
-        }
-    }
-
-    handleSubstitutionSpriteUpdate(outPlayer, inPlayer) {
-        const spriteIndex = this.playerSprites.findIndex(s => s.playerData === outPlayer);
-        if (spriteIndex !== -1) {
-            const outSprite = this.playerSprites[spriteIndex];
-            const oldX = outSprite.x;
-            const oldY = outSprite.y;
-
-            outSprite.destroy();
-
-            inPlayer.dynamicStats = { ...inPlayer.stats };
-            inPlayer.isSubbedIn = true;
-            const newSprite = this.createPlayerSprite(inPlayer, true, oldX, oldY);
-
-            this.playerSprites[spriteIndex] = newSprite;
-        }
-    }
-
-    checkBallOut() {
-        const leftBound = 5; const rightBound = 795; const topBound = 60; const bottomBound = 540;
-        let isOut = false; let type = ''; let restartX = this.ball.x; let restartY = this.ball.y;
-        let isPlayerTeamBall = !this.lastTouchedByPlayerTeam;
-
-        if (this.ball.y < topBound) {
-            isOut = true; type = 'Throw In'; restartY = 65;
-        } else if (this.ball.y > bottomBound) {
-            isOut = true; type = 'Throw In'; restartY = 535;
-        }
-
-        if (!isOut && this.ball.x < leftBound) {
-            isOut = true;
-            if (this.ball.y >= 260 && this.ball.y <= 340 && this.ball.z <= 30) {
-                 this.triggerGoal(false); this.resetPositions(); return;
-            } else {
-                if (!this.lastTouchedByPlayerTeam) {
-                    type = 'Goal Kick'; restartX = 50; restartY = 300; isPlayerTeamBall = true;
-                } else {
-                    type = 'Corner Kick'; restartX = 15; restartY = this.ball.y < 300 ? 65 : 535; isPlayerTeamBall = false;
-                }
-            }
-        } else if (!isOut && this.ball.x > rightBound) {
-            isOut = true;
-            if (this.ball.y >= 260 && this.ball.y <= 340 && this.ball.z <= 30) {
-                 this.triggerGoal(true); this.resetPositions(); return;
-            } else {
-                if (this.lastTouchedByPlayerTeam) {
-                    type = 'Goal Kick'; restartX = 750; restartY = 300; isPlayerTeamBall = false;
-                } else {
-                    type = 'Corner Kick'; restartX = 785; restartY = this.ball.y < 300 ? 65 : 535; isPlayerTeamBall = true;
-                }
-            }
-        }
-
-        if (isOut) {
-            this.ballSpeed = 0;
-            this.handleSetPiece(type, restartX, restartY, isPlayerTeamBall);
-        }
-    }
-
-    handleSendOff(sprite) {
-        // Find if it's player team
-        const isPlayerTeam = sprite.isPlayerTeam;
-        const spritesArray = isPlayerTeam ? this.playerSprites : this.opponentSprites;
-
-        const spriteIndex = spritesArray.indexOf(sprite);
-        if (spriteIndex !== -1) {
-            sprite.destroy(); // Remove from canvas
-            spritesArray.splice(spriteIndex, 1); // Remove from logic
-        }
-    }
-
-    handleSetPiece(type, x, y, isPlayerTeam) {
-        this.matchState = 'setpiece';
-        this.currentSetPieceType = type;
-        this.kickoffTimer = 30;
-        this.setPieceCooldown = 30; // 30 frames cooldown for checkBallOut
-
-        // Offset to prevent infinite out of bounds
-        if (x <= 5) x = 20;
-        else if (x >= 795) x = 780;
-        if (y <= 60) y = 75;
-        else if (y >= 540) y = 525;
-
-        this.ball.x = x; this.ball.y = y; this.ball.z = 0; this.ballSpeed = 0; this.ballTarget = null; this.ball.owner = null;
-
-        let color = isPlayerTeam ? '#3498db' : '#e74c3c';
-        this.setpieceText = this.add.text(400, 300, type, { fontSize: '48px', fill: color, fontStyle: 'bold', backgroundColor: '#00000088' }).setOrigin(0.5);
-
-        let team = isPlayerTeam ? this.playerSprites : this.opponentSprites;
-        let taker = team.sort((a,b) => Phaser.Math.Distance.Between(a.x, a.y, x, y) - Phaser.Math.Distance.Between(b.x, b.y, x, y))[0];
-
-        if (type === 'Goal Kick') {
-            taker = team.find(p => p.playerData.position === 'GK') || taker;
-            x = isPlayerTeam ? 35 : 765;
-            y = 300;
-        } else if (type === 'Corner Kick') {
-            taker = team.filter(p => p.playerData.position !== 'GK').sort((a,b) => b.playerData.stats.pass - a.playerData.stats.pass)[0] || taker;
-        } else if (type === 'Free Kick' || type === 'Indirect Free Kick') {
-            taker = team.filter(p => p.playerData.position !== 'GK').sort((a,b) => (b.playerData.stats.pass + b.playerData.stats.shoot) - (a.playerData.stats.pass + a.playerData.stats.shoot))[0] || taker;
-        } else if (type === 'Penalty Kick') {
-            taker = team.filter(p => p.playerData.position !== 'GK').sort((a,b) => (b.playerData.stats.shoot + b.playerData.stats.mental) - (a.playerData.stats.shoot + a.playerData.stats.mental))[0] || taker;
-            x = isPlayerTeam ? 685 : 115;
-            y = 300;
-        }
-
-        this.ball.x = x; this.ball.y = y;
-
-        if (taker) {
-            let offsetX = 0; let offsetY = 0;
-            // Only apply offsets if not PK or Goal Kick
-            if (type !== 'Penalty Kick' && type !== 'Goal Kick') {
-                if (x < 30) offsetX = 15; else if (x > 770) offsetX = -15;
-                if (y < 80) offsetY = 15; else if (y > 520) offsetY = -15;
-            }
-            taker.x = x + offsetX; taker.y = y + offsetY;
-            this.ball.owner = taker;
-            this.ball.cooldown = 30; // Also protect ball
-            this.lastTouchedByPlayerTeam = taker.isPlayerTeam;
-        }
-
-        // Retrieve tactical preferences for dynamic positioning safely
-        const atkTeamData = isPlayerTeam ? this.playerTeamData : this.opponentTeamData;
-        const defTeamData = isPlayerTeam ? this.opponentTeamData : this.playerTeamData;
-
-        let atkManager = atkTeamData && atkTeamData.manager ? atkTeamData.manager : (atkTeamData ? window.MasterData.Managers.find(m => m.id === atkTeamData.managerId) : null);
-        let defManager = defTeamData && defTeamData.manager ? defTeamData.manager : (defTeamData ? window.MasterData.Managers.find(m => m.id === defTeamData.managerId) : null);
-
-        const attackingTactic = atkManager ? atkManager.preference : 'Possession';
-        const defendingTactic = defManager ? defManager.preference : 'Possession';
-
-        // Sort outfield players by specific stats to assign dynamic roles
-        const atkOutfield = team.filter(p => p.playerData.position !== 'GK' && p !== taker);
-        const defOutfield = (isPlayerTeam ? this.opponentSprites : this.playerSprites).filter(p => p.playerData.position !== 'GK');
-
-        if (type === 'Goal Kick') {
-            const dir = isPlayerTeam ? 1 : -1;
-            const ownGoalX = isPlayerTeam ? 15 : 785;
-
-            // Attacking Team (Possession vs Others)
-            if (attackingTactic === 'Possession') {
-                atkOutfield.forEach(p => {
-                    if (p.playerData.position === 'CB') {
-                        p.x = ownGoalX + dir * 45 + (Math.random() * 10 - 5);
-                        p.y = (p.y < 300 ? 200 : 400) + (Math.random() * 40 - 20);
-                    } else if (p.playerData.position === 'SB') {
-                        p.x = ownGoalX + dir * 120 + (Math.random() * 20 - 10);
-                        p.y = (p.y < 300 ? 85 : 515) + (Math.random() * 30 - 15);
-                    } else if (p.playerData.position === 'CDM' || p.playerData.position === 'CM') {
-                        p.x = ownGoalX + dir * 165 + (Math.random() * 40 - 20);
-                        p.y = 300 + (Math.random() * 80 - 40);
-                    } else {
-                        // Push others slightly higher
-                        p.x = ownGoalX + dir * 250 + (Math.random() * 60 - 30);
-                        p.y = 300 + (Math.random() * 120 - 60);
-                    }
-                });
-            } else { // Counter / Retreat / HighPress
-                // Target man logic
-                let targetMan = atkOutfield.sort((a,b) => b.playerData.stats.physical - a.playerData.stats.physical)[0];
-                let targetX = 400 - dir * 20; // Middle third
-                let targetY = 300;
-                if (targetMan) {
-                    targetMan.x = targetX + (Math.random() * 20 - 10);
-                    targetMan.y = targetY + (Math.random() * 20 - 10);
-                }
-
-                // Overload around target man
-                atkOutfield.forEach((p, i) => {
-                    if (p !== targetMan) {
-                        if (p.playerData.position === 'CB' || p.playerData.position === 'SB') {
-                            p.x = ownGoalX + dir * 150 + (Math.random() * 40 - 20); // Push DF line up slightly but not too much
-                            p.y = 300 + (Math.random() * 150 - 75);
-                        } else if (p.playerData.position === 'CDM' || p.playerData.position === 'CM') {
-                            p.x = ownGoalX + dir * 220 + (Math.random() * 50 - 25);
-                            p.y = targetY + (Math.random() * 100 - 50);
-                        } else {
-                            p.x = targetX + dir * (Math.random() * 60 - 30);
-                            p.y = targetY + (Math.random() * 120 - 60);
-                        }
-                    }
-                });
-            }
-
-            // Defending team falls back somewhat
-            defOutfield.forEach(p => {
-                p.x = 400 + dir * 50; // Wait near midfield
-                p.y = 300 + (Math.random() * 200 - 100); // Disperse vertically
-            });
-
-        } else if (type === 'Corner Kick') {
-            const dir = isPlayerTeam ? 1 : -1;
-            const enemyGoalX = isPlayerTeam ? 785 : 15;
-            const isTopSide = y < 300;
-            const nearY = isTopSide ? 210 : 390;
-            const farY = isTopSide ? 390 : 210;
-            const centerY = 300;
-            const vitalX = enemyGoalX - dir * 190;
-            const halfWayX = 400;
-
-            // Attackers (Taker is already set)
-            // 1. Short corner support
-            let atkSortedForShort = [...atkOutfield].sort((a,b) => (b.playerData.stats.pass + b.playerData.stats.speed) - (a.playerData.stats.pass + a.playerData.stats.speed));
-            let shortCornerSupport = atkSortedForShort.shift();
-            if (shortCornerSupport) {
-                shortCornerSupport.x = x - dir * 70;
-                shortCornerSupport.y = isTopSide ? y + 20 : y - 20;
-            }
-
-            // 2. PA Targets (4-5)
-            let atkSortedForPA = [...atkSortedForShort].sort((a,b) => (b.playerData.stats.physical + b.playerData.stats.shoot) - (a.playerData.stats.physical + a.playerData.stats.shoot));
-            let paTargets = atkSortedForPA.splice(0, 5); // Take top 5
-            const paSpots = [
-                {x: enemyGoalX - dir * 60, y: nearY}, // Near
-                {x: enemyGoalX - dir * 90, y: centerY}, // Center
-                {x: enemyGoalX - dir * 60, y: farY}, // Far
-                {x: enemyGoalX - dir * 30, y: centerY}, // GK Front
-                {x: enemyGoalX - dir * 120, y: centerY} // Penalty Spot
-            ];
-            paTargets.forEach((p, i) => {
-                if (paSpots[i]) {
-                    p.x = paSpots[i].x; p.y = paSpots[i].y;
-                }
-            });
-
-            // 3. Counter care (top 2 speed)
-            let atkSortedForSpeed = [...atkSortedForPA].sort((a,b) => b.playerData.stats.speed - a.playerData.stats.speed);
-            let counterCare1 = atkSortedForSpeed.shift();
-            let counterCare2 = atkSortedForSpeed.shift();
-            if (counterCare1) { counterCare1.x = halfWayX; counterCare1.y = 220; }
-            if (counterCare2) { counterCare2.x = halfWayX; counterCare2.y = 380; }
-
-            // 4. Vital Area (the rest)
-            atkSortedForSpeed.forEach((p, i) => {
-                p.x = vitalX;
-                p.y = 250 + (i * 100);
-            });
-
-
-            // Defenders
-            // 1. Stone (near post)
-            let defSortedForStone = [...defOutfield].sort((a,b) => b.playerData.stats.defense - a.playerData.stats.defense);
-            let stone = defSortedForStone.shift();
-            if (stone) {
-                stone.x = enemyGoalX - dir * 30;
-                stone.y = isTopSide ? 240 : 360;
-            }
-
-            // 2. Zone Core (top 2 physical)
-            let defSortedForZone = [...defSortedForStone].sort((a,b) => b.playerData.stats.physical - a.playerData.stats.physical);
-            let zone1 = defSortedForZone.shift();
-            let zone2 = defSortedForZone.shift();
-            if (zone1) { zone1.x = enemyGoalX - dir * 45; zone1.y = 280; }
-            if (zone2) { zone2.x = enemyGoalX - dir * 45; zone2.y = 320; }
-
-            // 3. Counter Origin (highest speed)
-            let defSortedForCounter = [...defSortedForZone].sort((a,b) => b.playerData.stats.speed - a.playerData.stats.speed);
-            let counterOrigin = defSortedForCounter.shift();
-            if (counterOrigin) {
-                counterOrigin.x = halfWayX + dir * 20;
-                counterOrigin.y = 300;
-            }
-
-            // 4. Man-markers for PA Targets & Vital Area
-            // Map markers to PA targets directly
-            defSortedForCounter.forEach((p, i) => {
-                if (i < paTargets.length) {
-                    // Mark attacker tightly (slightly towards own goal)
-                    p.x = paTargets[i].x + dir * 15;
-                    p.y = paTargets[i].y;
-                } else {
-                    // Vital Area cover
-                    p.x = enemyGoalX - dir * 170;
-                    p.y = 250 + ((i - paTargets.length) * 100);
-                }
-            });
-
-        } else if (type === 'Free Kick' && (isPlayerTeam ? x > 500 : x < 300)) {
-            // Near Goal Direct Free Kick
-            const dir = isPlayerTeam ? 1 : -1;
-            const enemyGoalX = isPlayerTeam ? 785 : 15;
-
-            // Wall
-            let wallCount = 4;
-            if (Math.abs(y - 300) > 100) wallCount = 3;
-            if (Phaser.Math.Distance.Between(x, y, enemyGoalX, 300) < 150) wallCount = 5;
-
-            let defSortedForWall = [...defOutfield].sort((a,b) => b.playerData.stats.physical - a.playerData.stats.physical);
-            let wallPlayers = defSortedForWall.splice(0, wallCount);
-
-            // Wall Positioning
-            let angleToGoal = Phaser.Math.Angle.Between(x, y, enemyGoalX, 300);
-            let wallCenterX = x + Math.cos(angleToGoal) * 90;
-            let wallCenterY = y + Math.sin(angleToGoal) * 90;
-
-            wallPlayers.forEach((p, i) => {
-                let offsetAngle = angleToGoal + Math.PI/2;
-                let offsetDist = (i - (wallCount-1)/2) * 25;
-                p.x = wallCenterX + Math.cos(offsetAngle) * offsetDist;
-                p.y = wallCenterY + Math.sin(offsetAngle) * offsetDist;
-            });
-
-            // Mark remaining attackers
-            atkOutfield.forEach((atkP, i) => {
-                atkP.x = enemyGoalX - dir * (90 + Math.random() * 60);
-                atkP.y = 300 + (Math.random() * 160 - 80);
-
-                if (i < defSortedForWall.length) {
-                    let defP = defSortedForWall[i];
-                    defP.x = atkP.x - dir * 15;
-                    defP.y = atkP.y;
-                }
-            });
-
-        } else if (type === 'Throw In') {
-            const dir = isPlayerTeam ? 1 : -1;
-            // Attackers overload
-            let nearestAtk = [...atkOutfield].sort((a,b) => Phaser.Math.Distance.Between(a.x, a.y, x, y) - Phaser.Math.Distance.Between(b.x, b.y, x, y));
-            nearestAtk.slice(0, 3).forEach((p, i) => {
-                p.x = x + dir * (30 + i * 20);
-                p.y = y + (y < 300 ? 40 : -40) + i * 15;
-            });
-
-            // Defenders mark
-            let nearestDef = [...defOutfield].sort((a,b) => Phaser.Math.Distance.Between(a.x, a.y, x, y) - Phaser.Math.Distance.Between(b.x, b.y, x, y));
-            nearestDef.slice(0, 3).forEach((p, i) => {
-                let targetAtk = nearestAtk[i];
-                p.x = targetAtk.x + dir * 15;
-                p.y = targetAtk.y;
-            });
-
-        } else if (type === 'Penalty Kick') {
-            const dir = isPlayerTeam ? 1 : -1;
-            const enemyGoalX = isPlayerTeam ? 785 : 15;
-            // All players out of box (beyond 150px penalty area line)
-            [...atkOutfield, ...defOutfield].forEach(p => {
-                p.x = enemyGoalX - dir * 185;
-                p.y = 300 + (Math.random() * 200 - 100);
-            });
-            // GK is already in goal by default positioning logic, but let's enforce
-            let defGK = (isPlayerTeam ? this.opponentSprites : this.playerSprites).find(p => p.playerData.position === 'GK');
-            if (defGK) { defGK.x = enemyGoalX; defGK.y = 300; }
-
-        } else {
-            // Default dispersion for other minor set pieces (midfield free kick, indirect)
-            [...this.playerSprites, ...this.opponentSprites].forEach((p, idx) => {
-                 if (p !== taker && Phaser.Math.Distance.Between(p.x, p.y, x, y) < 80) {
-                     let angle = Phaser.Math.Angle.Between(x, y, 400, 300); // Towards center instead of pushing outwards
-                     angle += (idx - 5) * 0.15; // Point 5: Disperse to prevent stacking
-                     p.x = x + Math.cos(angle) * 90; p.y = y + Math.sin(angle) * 90;
-                 }
-            });
-        }
-
-        // Global Constraints & Validation
-        if (taker) {
-            taker.cachedTargetX = taker.x;
-            taker.cachedTargetY = taker.y;
-        }
-
-        [...this.playerSprites, ...this.opponentSprites].forEach((p, idx) => {
-            if (p !== taker) {
-                // Minimum distance enforcement to prevent 0-second tackles (defending team only)
-                let distToBall = Phaser.Math.Distance.Between(p.x, p.y, x, y);
-                if (p.isPlayerTeam !== isPlayerTeam && distToBall < 85) {
-                    let angle = Phaser.Math.Angle.Between(x, y, 400, 300) + (idx - 5) * 0.1;
-                    p.x = x + Math.cos(angle) * 90;
-                    p.y = y + Math.sin(angle) * 90;
-                }
-
-                // Keep inside bounds
-                p.x = Phaser.Math.Clamp(p.x, 15, 785);
-                p.y = Phaser.Math.Clamp(p.y, 65, 535);
-
-                // Cache Target for Set Piece waiting phase
-                p.cachedTargetX = p.x;
-                p.cachedTargetY = p.y;
-            }
-        });
-    }
-
-    calculateThreat(x, y, isPlayerTeam) {
-        const goalX = isPlayerTeam ? 800 : 0;
-        const dist = Phaser.Math.Distance.Between(x, y, goalX, 300);
-        let threat = Math.max(0, 100 - (dist / 8));
-        threat += Math.max(0, 30 - Math.abs(y - 300) / 10);
-        return threat;
-    }
-
-    calculatePassRisk(startX, startY, targetX, targetY, isPlayerTeam) {
-        const enemies = isPlayerTeam ? this.opponentSprites : this.playerSprites;
-        let risk = Phaser.Math.Distance.Between(startX, startY, targetX, targetY) / 10;
-        const dist = risk * 10;
-        enemies.forEach(enemy => {
-            if (dist === 0) return;
-            const t = ((enemy.x - startX) * (targetX - startX) + (enemy.y - startY) * (targetY - startY)) / (dist * dist);
-            if (t >= 0 && t <= 1) {
-                const projX = startX + t * (targetX - startX);
-                const projY = startY + t * (targetY - startY);
-                const distToLine = Phaser.Math.Distance.Between(enemy.x, enemy.y, projX, projY);
-                if (distToLine < 40) risk += 50 * (1 - distToLine / 40);
-            }
-        });
-        return Math.min(100, risk);
-    }
-
-
-
-    getEffectiveStat(p, statName, activeConditions) {
-        let baseStat = p.playerData.dynamicStats[statName] || 50;
-
-        const condSkill = window.Player.getSkillEffectFor(p.playerData, "STAT_UP_CONDITIONAL", statName, activeConditions);
-        if (condSkill.value !== 0) baseStat += condSkill.value;
-
-        const condSkillAll = window.Player.getSkillEffectFor(p.playerData, "STAT_UP_CONDITIONAL", "all", activeConditions);
-        if (condSkillAll.value !== 0) baseStat += condSkillAll.value;
-
-        return Math.min(100, Math.max(1, baseStat));
-    }
-
-    getActiveConditions(p) {
-        const conditions = ['always'];
-
-        // Match Context
-        const timeElapsed = this.matchTime / 90;
-        if (this.matchTime >= 65) conditions.push('lateGame');
-        if (this.matchTime <= 25) conditions.push('earlyGame');
-
-        if (this.currentGimmick === 'badWeather') conditions.push('badWeather');
-
-        const myScore = p.isPlayerTeam ? this.score.player : this.score.opponent;
-        const enemyScore = p.isPlayerTeam ? this.score.opponent : this.score.player;
-
-        if (myScore < enemyScore) conditions.push('behind');
-        if (myScore > enemyScore && this.matchTime >= 65) conditions.push('leadLateGame');
-
-        if (p.playerData.isSubbedIn) conditions.push('sub');
-
-        // Assume overall strength logic exists or fallback to underdog condition if team rating < opp rating
-        const playerRating = this.playerTeamData ? this.playerTeamData.getOverallStrength ? this.playerTeamData.getOverallStrength() : 50 : 50;
-        const oppRating = this.opponentTeamData ? this.opponentTeamData.getOverallStrength ? this.opponentTeamData.getOverallStrength() : 50 : 50;
-        if (p.isPlayerTeam && playerRating < oppRating) conditions.push('underdog');
-        if (!p.isPlayerTeam && oppRating < playerRating) conditions.push('underdog');
-
-
-        // Positional Context
-        if (p.x > 533) {
-            conditions.push(p.isPlayerTeam ? 'attackingThird' : 'defensiveThird');
-        } else if (p.x < 266) {
-            conditions.push(!p.isPlayerTeam ? 'attackingThird' : 'defensiveThird');
-        }
-
-        // Penalty Area
-        const isPlayerPenaltyArea = (p.x < 150 && p.y > 150 && p.y < 450);
-        const isOpponentPenaltyArea = (p.x > 650 && p.y > 150 && p.y < 450);
-
-        if (p.isPlayerTeam && isOpponentPenaltyArea) conditions.push('penaltyAreaIn');
-        else if (!p.isPlayerTeam && isPlayerPenaltyArea) conditions.push('penaltyAreaIn');
-        else conditions.push('penaltyAreaOut');
-
-        // Pressure Context
-        let pressureCount = 0;
-        const enemies = p.isPlayerTeam ? this.opponentSprites : this.playerSprites;
-        enemies.forEach(e => {
-            if (Phaser.Math.Distance.Between(p.x, p.y, e.x, e.y) < 60) pressureCount++;
-        });
-        if (pressureCount >= 2) conditions.push('underPressure');
-
-        // Player state context
-        if (p.playerData.condition < 40) conditions.push('tired');
-
-        // 1vs1 Context (GK proximity)
-        const enemies2 = p.isPlayerTeam ? this.opponentSprites : this.playerSprites;
-        const enemyGK = enemies2.find(e => e.playerData.position === 'GK');
-        if (enemyGK && Phaser.Math.Distance.Between(p.x, p.y, enemyGK.x, enemyGK.y) < 150) {
-            conditions.push('1vs1');
-        }
-
-        // Just examples. Can be expanded based on game mechanics.
-
-        return conditions;
     }
 
     evaluateActions(p, context) {
@@ -2038,8 +1319,40 @@ class MatchScene extends Phaser.Scene {
                 p.x += (totalForceX / totalMagnitude) * actualSpeed;
                 p.y += (totalForceY / totalMagnitude) * actualSpeed;
                 moved = actualSpeed > 0.1;
+
+                // Swing Animation based on speed
+                if (moved) {
+                    p.animTick += actualSpeed * 0.2;
+                    const swing = Math.sin(p.animTick) * 5;
+                    p.legL.y = 12 + swing; p.shoeL.y = 17 + swing;
+                    p.legR.y = 12 - swing; p.shoeR.y = 17 - swing;
+
+                    const bounce = Math.abs(Math.sin(p.animTick)) * 2;
+                    p.bodyParts.forEach(part => part.y = part.getData('baseY') !== undefined ? part.getData('baseY') - bounce : part.y);
+                    if (p.bodyParts[0].getData('baseY') === undefined) {
+                        p.bodyParts.forEach(part => part.setData('baseY', part.y));
+                    }
+                }
             } else {
                 p.playerData.currentStamina = Math.min(100, p.playerData.currentStamina + 0.05);
+                p.legL.y = 12; p.shoeL.y = 17;
+                p.legR.y = 12; p.shoeR.y = 17;
+                p.bodyParts.forEach(part => {
+                    if (part.getData('baseY') !== undefined) part.y = part.getData('baseY');
+                });
+            }
+
+            // Aura for Tactic
+            if (p.isPlayerTeam) {
+                if (this.realTimeTactic === 'Attack') {
+                    p.aura.setFillStyle(0xe74c3c, 0.4);
+                    p.aura.scale = 1 + Math.sin(this.time.now / 100) * 0.1;
+                } else if (this.realTimeTactic === 'Defend') {
+                    p.aura.setFillStyle(0x3498db, 0.4);
+                    p.aura.scale = 1 + Math.sin(this.time.now / 100) * 0.1;
+                } else {
+                    p.aura.setFillStyle(0xffffff, 0);
+                }
             }
 
             // Issue 9: Clamp players strictly within the visual pitch (60 to 540)
@@ -2507,13 +1820,18 @@ class MatchScene extends Phaser.Scene {
         if (this.ballContainer) {
             this.ballContainer.setDepth(this.ball.y);
             this.ballContainer.x = this.ball.x;
-            this.ballContainer.y = this.ball.y - this.ball.z;
+            this.ballContainer.y = this.ball.y;
+
             const shadow = this.ballContainer.list[0];
+            const ballBody = this.ballContainer.list[1];
+
             if (shadow) {
-                shadow.y = 8 + this.ball.z;
                 let scale = Math.max(0.2, 1 - (this.ball.z / 100));
                 shadow.scaleX = scale; shadow.scaleY = scale;
-                shadow.alpha = Math.max(0.1, 0.3 - (this.ball.z / 200));
+                shadow.alpha = Math.max(0.1, 0.4 - (this.ball.z / 200));
+            }
+            if (ballBody) {
+                ballBody.y = -this.ball.z;
             }
             if (this.ballSpeed > 0) this.ballSprite.rotation += 0.2;
         }
@@ -2593,8 +1911,55 @@ class MatchScene extends Phaser.Scene {
     triggerGoal(isPlayerTeam) {
         if (isPlayerTeam) this.score.player++; else this.score.opponent++;
         this.scoreText.setText(`${this.playerTeamData.name} ${this.score.player} - ${this.score.opponent} ${this.opponentTeamData.name}`);
-        const text = this.add.text(400, 300, 'GOAL!', { fontSize: '64px', fill: '#f1c40f', fontStyle: 'bold' }).setOrigin(0.5);
-        this.tweens.add({ targets: text, scale: 1.5, alpha: 0, duration: 1500, onComplete: () => text.destroy() });
+
+        this.matchState = 'celebration';
+
+        const text = this.add.text(400, 300, 'GOAL!!!', {
+            fontSize: '80px',
+            fill: '#f1c40f',
+            fontStyle: 'bold',
+            stroke: '#c0392b',
+            strokeThickness: 8
+        }).setOrigin(0.5).setDepth(2000).setScale(0.1);
+
+        this.tweens.add({
+            targets: text,
+            scale: 1.5,
+            duration: 800,
+            ease: 'Bounce.easeOut',
+            onComplete: () => {
+                this.tweens.add({
+                    targets: text,
+                    alpha: 0,
+                    delay: 2000,
+                    duration: 500,
+                    onComplete: () => {
+                        text.destroy();
+                        this.resetPositions();
+                    }
+                });
+            }
+        });
+
+        // Find the scorer (last touched) and make them jump
+        let scorer = this.ball.owner;
+        if (!scorer) {
+            // Find closest player to goal
+            const team = isPlayerTeam ? this.playerSprites : this.opponentSprites;
+            const goalX = isPlayerTeam ? 800 : 0;
+            scorer = team.reduce((closest, p) => Math.abs(p.x - goalX) < Math.abs(closest.x - goalX) ? p : closest, team[0]);
+        }
+
+        if (scorer) {
+            this.tweens.add({
+                targets: scorer.bodyParts,
+                y: '-=15',
+                yoyo: true,
+                repeat: 5,
+                duration: 300,
+                ease: 'Sine.easeInOut'
+            });
+        }
     }
 
     finishMatchInstantly() {
