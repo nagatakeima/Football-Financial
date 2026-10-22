@@ -1016,8 +1016,8 @@ class ManagementUI {
             const idx2 = index;
 
             if (idx1 !== idx2) {
-                let p1 = idx1 < 11 ? team.starting11[idx1] : team.bench[idx1 - 11];
-                let p2 = idx2 < 11 ? team.starting11[idx2] : team.bench[idx2 - 11];
+                const p1 = idx1 < 11 ? team.starting11[idx1] : team.bench[idx1 - 11];
+                const p2 = idx2 < 11 ? team.starting11[idx2] : team.bench[idx2 - 11];
 
                 if (idx1 < 11) team.starting11[idx1] = p2;
                 else team.bench[idx1 - 11] = p2;
@@ -1026,13 +1026,19 @@ class ManagementUI {
                 else team.bench[idx2 - 11] = p1;
 
                 window.ChemistrySystem.calculateTeamChemistry(team);
-            }
 
-            // Exit swap mode
-            this.swapSourceIndex = null;
-            this.selectedPlayerIndex = index; // Keep selection on the newly clicked player position
-            this.renderFormation();
-            this.renderPlayerDetailCard(idx1 !== idx2 ? p1 : player, index); // p1 is the player that moved to this slot
+                // Exit swap mode
+                this.swapSourceIndex = null;
+                this.selectedPlayerIndex = index; // Keep selection on the newly clicked player position
+                this.renderFormation();
+                this.renderPlayerDetailCard(p1, index); // p1 is the player that moved to this slot
+            } else {
+                // Exit swap mode
+                this.swapSourceIndex = null;
+                this.selectedPlayerIndex = index;
+                this.renderFormation();
+                this.renderPlayerDetailCard(player, index);
+            }
         } else {
             // Just view player
             this.selectedPlayerIndex = index;

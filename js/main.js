@@ -1032,7 +1032,9 @@ class MatchScene extends Phaser.Scene {
 
             if (p.stunTimer > 0) {
                 p.stunTimer--;
-                p.legL.y = 12; p.legR.y = 12; // Freeze animation
+                if (p.legL && p.legR) {
+                    p.legL.y = 12; p.legR.y = 12; // Freeze animation
+                }
                 return;
             }
 
@@ -1324,22 +1326,30 @@ class MatchScene extends Phaser.Scene {
                 if (moved) {
                     p.animTick += actualSpeed * 0.2;
                     const swing = Math.sin(p.animTick) * 5;
-                    p.legL.y = 12 + swing; p.shoeL.y = 17 + swing;
-                    p.legR.y = 12 - swing; p.shoeR.y = 17 - swing;
+                    if (p.legL && p.legR && p.shoeL && p.shoeR) {
+                        p.legL.y = 12 + swing; p.shoeL.y = 17 + swing;
+                        p.legR.y = 12 - swing; p.shoeR.y = 17 - swing;
+                    }
 
                     const bounce = Math.abs(Math.sin(p.animTick)) * 2;
-                    p.bodyParts.forEach(part => part.y = part.getData('baseY') !== undefined ? part.getData('baseY') - bounce : part.y);
-                    if (p.bodyParts[0].getData('baseY') === undefined) {
-                        p.bodyParts.forEach(part => part.setData('baseY', part.y));
+                    if (p.bodyParts) {
+                        p.bodyParts.forEach(part => part.y = part.getData('baseY') !== undefined ? part.getData('baseY') - bounce : part.y);
+                        if (p.bodyParts[0] && p.bodyParts[0].getData('baseY') === undefined) {
+                            p.bodyParts.forEach(part => part.setData('baseY', part.y));
+                        }
                     }
                 }
             } else {
                 p.playerData.currentStamina = Math.min(100, p.playerData.currentStamina + 0.05);
-                p.legL.y = 12; p.shoeL.y = 17;
-                p.legR.y = 12; p.shoeR.y = 17;
-                p.bodyParts.forEach(part => {
-                    if (part.getData('baseY') !== undefined) part.y = part.getData('baseY');
-                });
+                if (p.legL && p.legR && p.shoeL && p.shoeR) {
+                    p.legL.y = 12; p.shoeL.y = 17;
+                    p.legR.y = 12; p.shoeR.y = 17;
+                }
+                if (p.bodyParts) {
+                    p.bodyParts.forEach(part => {
+                        if (part.getData('baseY') !== undefined) part.y = part.getData('baseY');
+                    });
+                }
             }
 
             // Aura for Tactic
@@ -1367,14 +1377,18 @@ class MatchScene extends Phaser.Scene {
 
             if (moved) {
                 p.animTick += 0.4;
-                p.legL.y = 12 + Math.sin(p.animTick) * 3; p.legR.y = 12 + Math.sin(p.animTick + Math.PI) * 3;
-                p.shoeL.y = 17 + Math.sin(p.animTick) * 3; p.shoeR.y = 17 + Math.sin(p.animTick + Math.PI) * 3;
+                if (p.legL && p.legR && p.shoeL && p.shoeR) {
+                    p.legL.y = 12 + Math.sin(p.animTick) * 3; p.legR.y = 12 + Math.sin(p.animTick + Math.PI) * 3;
+                    p.shoeL.y = 17 + Math.sin(p.animTick) * 3; p.shoeR.y = 17 + Math.sin(p.animTick + Math.PI) * 3;
+                }
                 p.y += (Math.sin(p.animTick*2) > 0 ? 0.5 : -0.5);
                 if (totalForceX > 0.5) p.dirX = 1; else if (totalForceX < -0.5) p.dirX = -1;
                 p.scaleX = p.dirX;
                 let numText = p.list[13]; if (numText) numText.scaleX = p.dirX;
             } else {
-                p.legL.y = 12; p.legR.y = 12; p.shoeL.y = 17; p.shoeR.y = 17;
+                if (p.legL && p.legR && p.shoeL && p.shoeR) {
+                    p.legL.y = 12; p.legR.y = 12; p.shoeL.y = 17; p.shoeR.y = 17;
+                }
             }
         });
 
@@ -1822,8 +1836,8 @@ class MatchScene extends Phaser.Scene {
             this.ballContainer.x = this.ball.x;
             this.ballContainer.y = this.ball.y;
 
-            const shadow = this.ballContainer.list[0];
-            const ballBody = this.ballContainer.list[1];
+            const shadow = (this.ballContainer.list && this.ballContainer.list.length > 0) ? this.ballContainer.list[0] : null;
+            const ballBody = (this.ballContainer.list && this.ballContainer.list.length > 1) ? this.ballContainer.list[1] : null;
 
             if (shadow) {
                 let scale = Math.max(0.2, 1 - (this.ball.z / 100));
@@ -1833,7 +1847,7 @@ class MatchScene extends Phaser.Scene {
             if (ballBody) {
                 ballBody.y = -this.ball.z;
             }
-            if (this.ballSpeed > 0) this.ballSprite.rotation += 0.2;
+            if (this.ballSprite && this.ballSpeed > 0) this.ballSprite.rotation += 0.2;
         }
     }
 
