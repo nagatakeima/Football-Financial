@@ -177,13 +177,7 @@ button:disabled {
 }
 
 /* Match Phase Layout overrides */
-.match-mode #phaser-game {
-    position: relative; /* Take up normal space */
-    flex: 1;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
+
 .match-mode canvas {
     max-width: 100%;
     max-height: 100%;
@@ -193,17 +187,7 @@ button:disabled {
     position: absolute;
     pointer-events: none;
 }
-.match-mode .match-controls {
-    pointer-events: auto;
-    position: absolute;
-    bottom: 0;
-    right: 0;
-    width: 50%;
-    height: 100%;
-    background: rgba(20, 20, 20, 0.8);
-    display: flex;
-    flex-direction: column;
-}
+
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
@@ -291,4 +275,142 @@ button:disabled {
 
 .relic-badge:hover::after {
     opacity: 1;
+}
+
+/* -------------------------------------
+   Micro Command Deck (Match UI)
+------------------------------------- */
+#micro-command-bar {
+    position: relative;
+    width: 100%;
+    height: 120px; /* Fixed height for the control deck */
+    background: linear-gradient(to bottom, #2c3e50, #1a252f);
+    border-top: 3px solid #3498db;
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+    z-index: 50; /* Ensure it is above the canvas if needed, but flex takes care of it */
+    box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.5);
+    flex-shrink: 0;
+}
+
+.deck-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.tactic-toggles {
+    display: flex;
+    gap: 10px;
+}
+
+.tactic-btn {
+    background-color: #222;
+    border: 2px solid #555;
+    color: #fff;
+    padding: 5px 15px;
+    font-size: 14px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.tactic-btn[data-tactic="Balance"].active {
+    background-color: #34495e;
+    border-color: #fff;
+}
+.tactic-btn[data-tactic="Attack"].active {
+    background-color: #c0392b;
+    border-color: #fff;
+}
+.tactic-btn[data-tactic="Defend"].active {
+    background-color: #27ae60;
+    border-color: #fff;
+}
+
+.sub-btn {
+    background-color: #3498db;
+    border: 2px solid #2980b9;
+    color: #fff;
+    padding: 5px 15px;
+    font-size: 14px;
+    border-radius: 6px;
+}
+.sub-btn:hover {
+    background-color: #2980b9;
+}
+
+.deck-bottom-row {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    flex-grow: 1;
+}
+
+.command-slot {
+    position: relative;
+    background-color: #2c3e50;
+    border: 2px solid #34495e;
+    border-radius: 8px;
+    width: 160px;
+    height: 55px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    overflow: hidden;
+    transition: transform 0.1s;
+}
+
+.command-slot:active {
+    transform: scale(0.95);
+}
+
+.command-slot.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.command-name {
+    font-size: 12px;
+    font-weight: bold;
+    z-index: 2;
+    text-align: center;
+    pointer-events: none;
+    text-shadow: 1px 1px 2px #000;
+}
+
+.command-desc {
+    font-size: 10px;
+    color: #aaa;
+    z-index: 2;
+    pointer-events: none;
+}
+
+.command-cd-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 0%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    z-index: 1;
+    pointer-events: none;
+    transition: width 0.1s linear;
+}
+
+/* Update match-mode to be a column to stack canvas and deck */
+.match-mode #game-container {
+    flex-direction: column;
+}
+
+.match-mode #phaser-game {
+    position: relative;
+    flex: 1; /* Takes remaining space */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
 }
