@@ -102,6 +102,23 @@ body {
     width: 100%;
 }
 
+.global-nav {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.global-nav button {
+    padding: 5px 10px;
+    font-size: 12px;
+    background-color: #2c3e50;
+    border: 1px solid #34495e;
+}
+
+.global-nav button:hover {
+    background-color: #34495e;
+}
+
 .relic-badge {
     background-color: #f39c12;
     color: #000;
@@ -192,6 +209,7 @@ button:disabled {
 .match-mode #ui-layer {
     position: absolute;
     pointer-events: none;
+    background: transparent;
 }
 
 
@@ -264,7 +282,7 @@ button:disabled {
 .relic-badge::after {
     content: attr(data-tooltip);
     position: absolute;
-    bottom: 120%;
+    top: 120%;
     left: 50%;
     transform: translateX(-50%);
     background: rgba(0, 0, 0, 0.9);

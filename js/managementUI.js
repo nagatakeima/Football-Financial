@@ -41,6 +41,13 @@ class ManagementUI {
             チーム: ${window.gameState.playerTeam.name}
             <span class="funds">資金: ¥${window.gameState.funds.toLocaleString()}</span>
             <span class="ap">AP: ${window.gameState.ap}/10</span>
+            <div class="global-nav">
+                <button onclick="managementUI.showDashboard()">🏠 ダッシュボード</button>
+                <button onclick="managementUI.showSquad()">📋 編成・戦術</button>
+                <button onclick="managementUI.showEvents()">⚡ イベント (AP)</button>
+                <button onclick="managementUI.showStandings()">🏆 順位表</button>
+                <button onclick="managementUI.showPreMatch()">⚽ 試合へ進む</button>
+            </div>
         `;
 
         // Render relics bar
@@ -630,9 +637,15 @@ class ManagementUI {
                         <!-- Links canvas -->
                         <canvas id="chem-canvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></canvas>
 
+                        <div style="position:absolute; top: 10px; width: 100%; text-align: center; color: rgba(255,255,255,0.5); font-weight: bold; font-size: 14px; pointer-events: none; z-index: 1;">▲ ATTACK (FW)</div>
+                        <div style="position:absolute; bottom: 10px; width: 100%; text-align: center; color: rgba(255,255,255,0.5); font-weight: bold; font-size: 14px; pointer-events: none; z-index: 1;">▼ DEFENSE (GK)</div>
+
                         <div id="formation-container" style="position: relative; width: 100%; height: 100%;">
                             <!-- Players injected here by JS -->
                         </div>
+                    </div>
+                    <div style="font-size: 11px; text-align: center; color: #ccc;">
+                        【戦術志向】 <span style="color: #3498db;">■ポゼッション</span> <span style="color: #e74c3c;">■カウンター</span> <span style="color: #f1c40f;">■ハイプレス</span> <span style="color: #2ecc71;">■リトリート</span>
                     </div>
                 </div>
 
@@ -725,58 +738,77 @@ class ManagementUI {
         const career = player.careerStats || { appearances: 0, goals: 0, assists: 0, avgRating: 0.0 };
 
 
+        let comparisonHtml = '';
+        if (this.swapSourceIndex !== null && this.swapSourceIndex !== index) {
+            const team = window.gameState.playerTeam;
+            const srcPlayer = this.swapSourceIndex < 11 ? team.starting11[this.swapSourceIndex] : team.bench[this.swapSourceIndex - 11];
+            comparisonHtml = `
+            <div style="background: #111; border: 2px dashed #e74c3c; border-radius: 8px; padding: 10px; flex: 1; display: flex; flex-direction: column; text-align: left; overflow-y: auto; margin-top: 10px;">
+                <h4 style="color: #e74c3c; margin-bottom: 5px; font-size: 12px;">入れ替え元: ${srcPlayer.name}</h4>
+                <div style="font-size: 14px; font-weight: bold; color: #f1c40f; margin-bottom: 5px;">OVR ${srcPlayer.getOvr()} <span style="font-size: 10px; color: #aaa;">[${srcPlayer.preference}]</span></div>
+                <div style="display: flex; justify-content: space-between; font-size: 11px; color: #ccc; margin-bottom: 5px;">
+                    <div><strong>主:</strong> ${srcPlayer.position}</div>
+                    <div><strong>副:</strong> ${srcPlayer.subPositions && srcPlayer.subPositions.length > 0 ? srcPlayer.subPositions.join(', ') : 'なし'}</div>
+                </div>
+            </div>`;
+        }
+
         detailPanel.innerHTML = `
-            <button onclick="managementUI.toggleSwapMode(${index})" style="margin-bottom: 10px; width: 100%; padding: 8px; font-size: 14px; background: ${this.swapSourceIndex === index ? '#c0392b' : '#2980b9'}; border: 1px solid #fff; border-radius: 4px; cursor: pointer; color: white;">
+            <button onclick="managementUI.toggleSwapMode(${index})" style="margin-bottom: 5px; width: 100%; padding: 6px; font-size: 12px; background: ${this.swapSourceIndex === index ? '#c0392b' : '#2980b9'}; border: 1px solid #fff; border-radius: 4px; cursor: pointer; color: white;">
                 ${this.swapSourceIndex === index ? '取消' : '🔄 この選手を入れ替え対象にする'}
             </button>
-            <div style="background: #222; border: 2px solid ${rarityColor}; border-radius: 8px; padding: 15px; flex: 1; display: flex; flex-direction: column; text-align: left; overflow-y: auto;">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #555; padding-bottom: 10px; margin-bottom: 10px;">
+            <div style="background: #222; border: 2px solid ${rarityColor}; border-radius: 8px; padding: 10px; flex: 1; display: flex; flex-direction: column; text-align: left; overflow-y: auto;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #555; padding-bottom: 5px; margin-bottom: 5px;">
                     <div>
-                        <span style="background: ${rarityColor}; color: ${player.rarity === 'SSR' ? '#000' : '#fff'}; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 12px;">${player.rarity}</span>
-                        <span style="font-size: 14px; margin-left: 5px;">${player.nationality || ''}</span>
-                        <h3 style="margin-top: 5px;">${player.name}</h3>
+                        <span style="background: ${rarityColor}; color: ${player.rarity === 'SSR' ? '#000' : '#fff'}; padding: 2px 4px; border-radius: 4px; font-weight: bold; font-size: 10px;">${player.rarity}</span>
+                        <span style="font-size: 12px; margin-left: 5px;">${player.nationality || ''}</span>
+                        <h3 style="margin-top: 2px; font-size: 14px;">${player.name}</h3>
                     </div>
                     <div style="text-align: right;">
-                        <div style="font-size: 20px; font-weight: bold; color: #f1c40f;">OVR ${player.getOvr()}</div>
-                        <div style="font-size: 12px;">${isMax ? 'Lv.MAX' : 'Lv.'+player.level}</div>
+                        <div style="font-size: 16px; font-weight: bold; color: #f1c40f;">OVR ${player.getOvr()}</div>
+                        <div style="font-size: 10px;">${isMax ? 'Lv.MAX' : 'Lv.'+player.level} <span style="color:#aaa;">[${player.preference}]</span></div>
                     </div>
                 </div>
 
-                <div style="margin-bottom: 10px;">
-                    <div style="font-size: 10px; margin-bottom: 2px;">EXP ${isMax ? 'MAX' : player.exp + ' / ' + player.maxExp}</div>
-                    <div style="width: 100%; background: #333; height: 6px; border-radius: 3px; overflow: hidden;">
+                <div style="margin-bottom: 5px;">
+                    <div style="font-size: 9px; margin-bottom: 2px;">EXP ${isMax ? 'MAX' : player.exp + ' / ' + player.maxExp}</div>
+                    <div style="width: 100%; background: #333; height: 4px; border-radius: 2px; overflow: hidden;">
                         <div style="width: ${expPercent}%; background: #9b59b6; height: 100%;"></div>
                     </div>
                 </div>
 
-                <div style="margin-bottom: 15px;">
-                    <div style="font-size: 12px; margin-bottom: 2px; display: flex; justify-content: space-between;">
+                <div style="margin-bottom: 5px;">
+                    <div style="font-size: 10px; margin-bottom: 2px; display: flex; justify-content: space-between;">
                         <span>体力</span><span>${player.condition}%</span>
                     </div>
-                    <div style="width: 100%; background: #333; height: 8px; border-radius: 4px; overflow: hidden;">
+                    <div style="width: 100%; background: #333; height: 6px; border-radius: 3px; overflow: hidden;">
                         <div style="width: ${player.condition}%; background: ${player.condition > 50 ? '#2ecc71' : '#e74c3c'}; height: 100%;"></div>
                     </div>
                 </div>
 
-                <div style="margin-bottom: 10px; font-size: 12px;">
-                    <span style="color: #bbb;">メイン適性:</span> <span style="font-weight: bold; color: #fff;">${player.position}</span><br>
-                    <span style="color: #bbb;">サブ適性:</span> ${player.subPositions.length > 0 ? player.subPositions.join(', ') : 'なし'}<br>
+                <div style="display: flex; justify-content: space-between; font-size: 11px; color: #ccc; margin-bottom: 5px;">
+                    <div><strong>主適性:</strong> ${player.position}</div>
+                    <div><strong>副適性:</strong> ${player.subPositions && player.subPositions.length > 0 ? player.subPositions.join(', ') : 'なし'}</div>
+                </div>
+
+                <div style="margin-bottom: 5px; font-size: 11px;">
                     <span style="color: #bbb;">役割(ロール):</span> ${roleJp}
                 </div>
 
-                <div style="margin-bottom: 10px; font-size: 11px; background: rgba(0,0,0,0.3); padding: 5px; border-radius: 4px;">
+                <div style="margin-bottom: 5px; font-size: 11px; background: rgba(0,0,0,0.3); padding: 5px; border-radius: 4px;">
                     <span style="color: #f39c12;">通算成績:</span> 出場 ${career.appearances} / G ${career.goals} / A ${career.assists} / 評 ${career.avgRating.toFixed(2)}
                 </div>
-                <div style="margin-bottom: 15px;">
-                    <h4 style="border-bottom: 1px solid #444; padding-bottom: 2px; margin-bottom: 5px; font-size: 13px;">ステータス</h4>
+                <div style="margin-bottom: 5px;">
+                    <h4 style="border-bottom: 1px solid #444; padding-bottom: 2px; margin-bottom: 2px; font-size: 11px;">ステータス</h4>
                     ${statBarsHtml}
                 </div>
 
                 <div>
-                    <h4 style="border-bottom: 1px solid #444; padding-bottom: 2px; margin-bottom: 5px; font-size: 13px;">スキル</h4>
+                    <h4 style="border-bottom: 1px solid #444; padding-bottom: 2px; margin-bottom: 2px; font-size: 11px;">スキル</h4>
                     ${skillsHtml}
                 </div>
             </div>
+            ${comparisonHtml}
             <button style="margin-top: 15px; width: 100%; padding: 12px; background: #27ae60;" onclick="managementUI.showDashboard()">戻る (編成確定)</button>
         `;
     }
@@ -831,9 +863,12 @@ class ManagementUI {
             pDiv.innerHTML = `
                 ${newBadge}
                 <span style="font-weight: bold;">${isMob ? '⚠️ ' : ''}${p.position}${isSubPos ? '*' : ''}</span>
-                <span style="font-size: 7px; color: #f1c40f;">${roleText}</span>
                 <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40px;">${p.name.substring(0,4)}</span>
+                <span style="font-size: 8px; color: #f1c40f;">OVR: ${p.getOvr()}</span>
                 <span style="font-size: 8px;">${p.level>=10?'Lv.MAX':'Lv.'+p.level}</span>
+                <div style="width: 80%; height: 3px; background: #555; margin-top: 2px; border-radius: 2px; overflow: hidden;">
+                    <div style="width: ${p.currentStamina}%; height: 100%; background: #2ecc71;"></div>
+                </div>
             `;
             pDiv.onclick = () => this.handlePlayerClick(idx, true);
             container.appendChild(pDiv);
@@ -918,7 +953,8 @@ class ManagementUI {
             ]
         };
 
-        return formationsCoords[formation] || formationsCoords["4-4-2"];
+        let coords = formationsCoords[formation] || formationsCoords["4-4-2"];
+        return coords.map(c => ({ x: c.x, y: 1.0 - c.y }));
     }
 
     drawChemistryLinks(canvas, posMap, team) {
@@ -1147,8 +1183,8 @@ class ManagementUI {
                         <div style="background: #333; padding: 8px; margin-top: 5px; border-radius: 4px; display: flex; align-items: center; gap: 10px;">
                             <input type="radio" name="draft_select_${eventId}_${idx}" value="${candIdx}" id="cand_${eventId}_${idx}_${candIdx}" ${candIdx === 0 ? 'checked' : ''}>
                             <label for="cand_${eventId}_${idx}_${candIdx}" style="cursor: pointer; font-size: 12px; display: inline-block;">
-                                <strong>[${cand.position}${cand.subPositions.length>0?'/'+cand.subPositions.join(','):''}] ${cand.name}</strong> <br>
-                                <span style="color: #f1c40f;">OVR: ${cand.getOvr()}</span> / Lv.${cand.level} / スキル: ${skillsStr}
+                                <strong>[${cand.position}${cand.subPositions.length>0?'/'+cand.subPositions.join(','):''}] [${cand.rarity}] ${cand.name} (Lv.${cand.level} / OVR: ${cand.getOvr()})</strong> <br>
+                                <span style="color: #bbb;">スキル: ${skillsStr}</span>
                             </label>
                         </div>
                     `;
@@ -1160,11 +1196,14 @@ class ManagementUI {
                 for (let tc = 0; tc < choice.tradeCount; tc++) {
                     extraUI += `<select id="trade_select_${eventId}_${idx}_${tc}" style="width: 100%; margin-top: 3px; background: #222; color: #fff; padding: 3px; border: 1px solid #555;">`;
                     // Generate options prioritizing bench
+                    let optionIndex = 0;
                     team.bench.forEach(p => {
-                        extraUI += `<option value="${p.id}">[${p.position}] ${p.name} (Lv.${p.level})</option>`;
+                        extraUI += `<option value="${p.id}" ${optionIndex === tc ? 'selected' : ''}>[ベンチ] [${p.rarity}] [${p.position}] ${p.name} (Lv.${p.level} / OVR: ${p.getOvr()})</option>`;
+                        optionIndex++;
                     });
                     team.starting11.forEach(p => {
-                        extraUI += `<option value="${p.id}">スタメン: [${p.position}] ${p.name} (Lv.${p.level})</option>`;
+                        extraUI += `<option value="${p.id}" ${optionIndex === tc ? 'selected' : ''}>[スタメン] [${p.rarity}] [${p.position}] ${p.name} (Lv.${p.level} / OVR: ${p.getOvr()})</option>`;
+                        optionIndex++;
                     });
                     extraUI += `</select>`;
                 }
@@ -1297,15 +1336,15 @@ class ManagementUI {
                     eventObj.title = '特別覚醒イベント';
                     eventObj.flavorText = '「特定の選手の潜在能力を引き出すチャンスです！」';
                     eventObj.choices.push({
-                        desc: `資金¥${Math.floor(300000 * costMultiplier).toLocaleString()}で、指定選手1名を大幅レベルアップ`,
+                        desc: `資金¥${Math.floor(300000 * costMultiplier).toLocaleString()}で、指定選手1名を大幅レベルアップ (EXP +300 / コンディション回復)`,
                         fundCost: Math.floor(300000 * costMultiplier),
                         action: 'awaken'
                     });
                 } else {
                     eventObj.title = '全体練習メニュー';
                     eventObj.flavorText = '「今日の練習はどうしますか？」';
-                    eventObj.choices.push({ desc: '軽めの調整 (無償)', fundCost: 0, action: 'light' });
-                    eventObj.choices.push({ desc: `特別合宿 (資金¥${Math.floor(150000 * costMultiplier).toLocaleString()})`, fundCost: Math.floor(150000 * costMultiplier), action: 'heavy' });
+                    eventObj.choices.push({ desc: '軽めの調整 (無償) - 全員の体力+30 / EXP+10', fundCost: 0, action: 'light' });
+                    eventObj.choices.push({ desc: `特別合宿 (資金¥${Math.floor(150000 * costMultiplier).toLocaleString()}) - 全員のEXP+50 / 体力-20`, fundCost: Math.floor(150000 * costMultiplier), action: 'heavy' });
                 }
             } else if (type === 'relic') {
                 eventObj.title = '怪しい商人';
