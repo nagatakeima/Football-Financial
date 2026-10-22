@@ -663,7 +663,7 @@ class MatchScene extends Phaser.Scene {
                     const backMates = teammates.filter(p => isPlayer ? p.x < this.ball.owner.x - 10 : p.x > this.ball.owner.x + 10);
                     let targetMate = backMates.length > 0 ? backMates[Math.floor(Math.random() * backMates.length)] : teammates[0];
                     this.ballTarget = {x: targetMate.x, y: targetMate.y};
-                    this.ballSpeed = 15; this.isHighBall = false; this.ball.owner = null;
+                    this.ballSpeed = Math.min(11, Math.max(5, Phaser.Math.Distance.Between(this.ball.x, this.ball.y, targetMate.x, targetMate.y) / 22)); this.isHighBall = false; this.ball.owner = null;
                 }
             }
         } else if (this.matchState === 'setpiece') {
@@ -1770,8 +1770,8 @@ class MatchScene extends Phaser.Scene {
             const myScoreDiff = p.isPlayerTeam ? scoreDiff : -scoreDiff;
             if (timeRemaining < 15) { if (myScoreDiff < 0) urgency = 1.5; if (myScoreDiff > 0) urgency = 0.8; }
 
-            // Increase base speed by 1.5x
-            const maxSpeed = (2.0 + (p.playerData.stats.speed / 50)) * staminaFactor * urgency * 1.5;
+            // Increase base speed by 1.7x overall
+            const maxSpeed = (1.8 + (p.playerData.stats.speed / 100) * 1.6) * staminaFactor * urgency * 1.7;
 
             let isAttacking = false; let isDefending = false;
             if (this.ball.owner) { isAttacking = this.ball.owner.isPlayerTeam === p.isPlayerTeam; isDefending = !isAttacking; }
@@ -2093,7 +2093,7 @@ class MatchScene extends Phaser.Scene {
                 const angle = this.ballTarget ? Phaser.Math.Angle.Between(this.ball.x, this.ball.y, targetX, targetY) : (this.ball.angle || 0);
                 this.ball.angle = angle;
                 this.ball.x += Math.cos(angle) * this.ballSpeed; this.ball.y += Math.sin(angle) * this.ballSpeed;
-                let friction = (this.currentGimmick === 'badWeather') ? 0.99 : 0.98;
+                let friction = (this.currentGimmick === 'badWeather') ? 0.97 : 0.96;
                 if (this.isHighBall && !isBouncing) friction = 0.99;
                 this.ballSpeed *= friction;
             }
@@ -2110,15 +2110,15 @@ class MatchScene extends Phaser.Scene {
             // Let the closest 2 players from each team break formation to chase
             let pTeamChasers = 0; let oTeamChasers = 0;
             closestPlayers.forEach(p => {
-                if (p.isPlayerTeam && pTeamChasers < 2 && p.playerData.position !== 'GK') { p.chasingLooseBall = true; pTeamChasers++; }
-                else if (!p.isPlayerTeam && oTeamChasers < 2 && p.playerData.position !== 'GK') { p.chasingLooseBall = true; oTeamChasers++; }
+                if (p.isPlayerTeam && pTeamChasers < 2 && p.playerData.position !== 'GK') { p.chasingLooseBall = true; p.targetMaintainTimer = 0; pTeamChasers++; }
+                else if (!p.isPlayerTeam && oTeamChasers < 2 && p.playerData.position !== 'GK') { p.chasingLooseBall = true; p.targetMaintainTimer = 0; oTeamChasers++; }
                 else { p.chasingLooseBall = false; }
             });
 
             let interceptor = null;
             for (let p of allPlayers) {
                 const bDist = Phaser.Math.Distance.Between(p.x, p.y, this.ball.x, this.ball.y);
-                let interceptRadius = 20;
+                let interceptRadius = 22;
                 if (this.activeBuff && this.activeBuff.target === 'intercept' && p.isPlayerTeam) interceptRadius += 20;
                 const activeConditions = this.getActiveConditions(p);
                 const interceptRangeSkill = window.Player.getSkillEffectFor(p.playerData, "RANGE_UP", "intercept", activeConditions);
