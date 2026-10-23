@@ -983,7 +983,7 @@ class ManagementUI {
         });
     }
 
-    handlePlayerClick(index, isStarter) {
+    handlePlayerClick(index, executeSwap = false) {
         const team = window.gameState.playerTeam;
         const player = index < 11 ? team.starting11[index] : team.bench[index - 11];
 
@@ -992,11 +992,16 @@ class ManagementUI {
         }
 
         if (this.swapSourceIndex !== null) {
-            // We are in swap mode
-            const idx1 = this.swapSourceIndex;
-            const idx2 = index;
-
-            if (idx1 !== idx2) {
+            if (this.swapSourceIndex === index) {
+                // Cancel swap mode if clicking the same player
+                this.swapSourceIndex = null;
+                this.selectedPlayerIndex = index;
+                this.renderFormation();
+                this.renderPlayerDetailCard(player, index);
+            } else if (executeSwap) {
+                // Execute the actual swap
+                const idx1 = this.swapSourceIndex;
+                const idx2 = index;
                 const p1 = idx1 < 11 ? team.starting11[idx1] : team.bench[idx1 - 11];
                 const p2 = idx2 < 11 ? team.starting11[idx2] : team.bench[idx2 - 11];
 
@@ -1008,15 +1013,12 @@ class ManagementUI {
 
                 window.ChemistrySystem.calculateTeamChemistry(team);
 
-                // Exit swap mode
-                this.swapSourceIndex = null;
-                this.selectedPlayerIndex = index; // Keep selection on the newly clicked player position
-                this.renderFormation();
-                this.renderPlayerDetailCard(p1, index); // p1 is the player that moved to this slot
-            } else {
-                // Exit swap mode
                 this.swapSourceIndex = null;
                 this.selectedPlayerIndex = index;
+                this.renderFormation();
+                this.renderPlayerDetailCard(p1, index);
+            } else {
+                // Just viewing the comparison (clicked the target player)
                 this.renderFormation();
                 this.renderPlayerDetailCard(player, index);
             }
