@@ -57,15 +57,10 @@ class MatchScene extends Phaser.Scene {
     tickMatch() {
         if (this.matchState === 'gameover' || this.matchState === 'celebration' || !this.logicTimer || this.logicTimer.paused) return;
 
-        if (this.matchState === 'kickoff') {
-            this.kickoffTimer -= 1 * this.timeScale;
-            if (this.kickoffTimer <= 0) {
-                this.matchState = 'playing';
-            }
-            return;
-        }
 
-        this.matchTime += 0.05 * this.timeScale;
+        if (this.matchState === 'playing') {
+            this.matchTime += 0.05 * this.timeScale;
+        }
         const displayMin = Math.floor(this.matchTime);
         const displaySec = Math.floor((this.matchTime % 1) * 60);
         this.timeText.setText(`${displayMin.toString().padStart(2, '0')}:${displaySec.toString().padStart(2, '0')}`);

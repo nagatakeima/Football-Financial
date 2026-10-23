@@ -51,7 +51,7 @@ class ManagementUI {
             <div class="top-bar-row">
                 <div class="top-bar-info">
                     <strong>${window.gameState.playerTeam.name}</strong> |
-                    Tier ${window.gameState.currentTier} - 第${window.gameState.currentMatchday}節 |
+                    Tier ${window.gameState.currentTier} - 第${window.gameState.league ? window.gameState.league.currentMatchday : 1}節 |
                     <span style="color: ${isSafe ? '#2ecc71' : '#e74c3c'}">順位: ${rank}位 (解任: ${targetRank}位以下)</span> |
                     <span class="funds">資金: ¥${window.gameState.funds.toLocaleString()}</span> |
                     <span class="ap">⚡ AP: ${window.gameState.ap}/10</span>
@@ -620,7 +620,7 @@ class ManagementUI {
                         ${[0, 1, 2, 3].map(i => {
                             const currentCmdId = team.microCommands[i];
                             const availableCmds = window.MasterData.MicroCommands.filter(c =>
-                                !team.microCommands.includes(c.id) || c.id === currentCmdId
+                                team.ownedMicroCommands.includes(c.id) && (!team.microCommands.includes(c.id) || c.id === currentCmdId)
                             );
                             const currentCmd = window.MasterData.MicroCommands.find(c => c.id === currentCmdId);
                             const desc = currentCmd ? currentCmd.description : '未設定';
@@ -1134,7 +1134,7 @@ class ManagementUI {
             const canAfford = canAffordFunds && canAffordAP;
 
             if (choice.candidates) {
-                detailHtml += `<div style="width: 100%;"><h3 style="color: #27ae60; margin-bottom: 10px;">${choice.text} (¥${choice.fundCost.toLocaleString()})</h3><div style="display: flex; gap: 10px; margin-bottom: 15px;">`;
+                detailHtml += `<div style="width: 100%;"><h3 style="color: #27ae60; margin-bottom: 10px;">${choice.text || choice.desc} (¥${choice.fundCost.toLocaleString()})</h3><div style="display: flex; gap: 10px; margin-bottom: 15px;">`;
                 choice.candidates.forEach((cand, candIdx) => {
                     const skillsStr = cand.skills.map(sid => window.MasterData.PlayerSkills.find(s=>s.id===sid)?.name).filter(Boolean).join(', ') || 'なし';
                     detailHtml += `
@@ -1158,7 +1158,7 @@ class ManagementUI {
             } else {
                 detailHtml += `
                     <div style="flex: 1; min-width: 250px; background: #333; padding: 15px; border-radius: 8px; border: 1px solid #555;">
-                        <h3 style="margin-bottom: 10px; font-size: 16px;">${choice.text}</h3>
+                        <h3 style="margin-bottom: 10px; font-size: 16px;">${choice.text || choice.desc}</h3>
                         ${choice.flavorText ? `<p style="font-size: 12px; color: #aaa; margin-bottom: 10px;">${choice.flavorText}</p>` : ''}
                         ${choice.detailHtml || ''}
                     </div>
@@ -1186,7 +1186,7 @@ class ManagementUI {
                 <div style="width: 100%;">
                     <button onclick="managementUI.executeEvent('${eventId}', ${idx})" ${!canAfford ? 'disabled' : ''}
                             style="width: 100%; padding: 12px; font-size: 16px; background: ${canAfford ? '#3498db' : '#555'}; margin-top: 10px;">
-                        ${choice.text}を実行 (コスト: ¥${choice.fundCost.toLocaleString()} / AP: 1)
+                        ${choice.text || choice.desc}を実行 (コスト: ¥${choice.fundCost.toLocaleString()} / AP: 1)
                     </button>
                 </div>
             `;
