@@ -28,9 +28,13 @@ class ManagementUI {
     updateMicroCommand(slotIndex, cmdId, fromScreen) {
         if (!window.gameState.playerTeam) return;
         window.gameState.playerTeam.microCommands[slotIndex] = cmdId ? Number(cmdId) : null;
-        if (fromScreen === 'squad') this.showSquad();
-        else if (fromScreen === 'prematch') this.showPreMatch();
-        else this.showDashboard();
+        if (fromScreen === 'squad') {
+            this.showSquad();
+        } else if (fromScreen === 'prematch') {
+            this.showPreMatch();
+        } else {
+            this.showDashboard();
+        }
     }
 
     updateTopBar() {
@@ -718,6 +722,11 @@ class ManagementUI {
                     <div style="width: ${expPercent}%; background: #2ecc71; height: 100%;"></div>
                 </div>
 
+                <div style="margin-bottom: 10px; font-size: 12px; background: rgba(46, 204, 113, 0.2); padding: 5px; border-radius: 3px; display: flex; justify-content: space-between; border-left: 3px solid #2ecc71;">
+                    <span style="color: #bbb;">体力:</span>
+                    <span style="color: #2ecc71; font-weight: bold;">${player.condition ?? 100}%</span>
+                </div>
+
                 <div style="display: flex; gap: 10px;">
                     <!-- Left: Stats -->
                     <div style="flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
@@ -741,12 +750,41 @@ class ManagementUI {
             const team = window.gameState.playerTeam;
             const srcPlayer = this.swapSourceIndex < 11 ? team.starting11[this.swapSourceIndex] : team.bench[this.swapSourceIndex - 11];
 
-            html += `
-                <div style="border-top: 2px dashed #f1c40f; padding-top: 10px; margin-top: 5px; display: flex; flex-direction: column; gap: 5px;">
-                    <div style="text-align: center; font-size: 12px; color: #f1c40f;">🔄 ${srcPlayer.name} (OVR ${srcPlayer.getOvr()}) と入れ替えますか？</div>
+            const renderMiniCard = (p, otherP = null) => {
+                if (!p) return '<div style="flex:1; padding: 10px; text-align: center;">Empty</div>';
+                const diffHtml = (stat1, stat2) => {
+                    const diff = stat1 - stat2;
+                    if (diff > 0) return `<span style="color: #2ecc71;">(+${diff})</span>`;
+                    if (diff < 0) return `<span style="color: #e74c3c;">(${diff})</span>`;
+                    return `<span style="color: #888;">(±0)</span>`;
+                };
+
+                return `
+                    <div style="flex: 1; background: #333; padding: 10px; border-radius: 5px;">
+                        <div style="font-weight: bold; margin-bottom: 5px; font-size: 12px;">[${p.position}] ${p.name}</div>
+                        <div style="font-size: 12px; margin-bottom: 10px;">OVR: <span style="color: #f1c40f;">${p.getOvr()}</span> ${otherP ? diffHtml(p.getOvr(), otherP.getOvr()) : ''}</div>
+                        ${['pass', 'shoot', 'defense', 'physical', 'speed', 'mental', 'stamina'].map(s => `
+                            <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 2px;">
+                                <span>${s.toUpperCase()}</span>
+                                <span>${p.stats[s]} ${otherP ? diffHtml(p.stats[s], otherP.stats[s]) : ''}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            };
+
+            detailPanel.innerHTML = `
+                <div style="background: #222; padding: 15px; border-radius: 8px; border: 1px solid #444; margin-bottom: 15px;">
+                    <h3 style="margin-bottom: 15px; color: #f1c40f; text-align: center;">🔄 入れ替え確認</h3>
+                    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                        ${renderMiniCard(srcPlayer, player)}
+                        <div style="display: flex; align-items: center; justify-content: center; font-size: 20px;">➔</div>
+                        ${renderMiniCard(player, srcPlayer)}
+                    </div>
                     <button style="width: 100%; padding: 10px; font-size: 16px; background: #e74c3c; font-weight: bold; border-radius: 4px;" onclick="managementUI.handlePlayerClick(${index}, true)">⚡ この2人を入れ替える</button>
                 </div>
             `;
+            return;
         } else {
             html += `
                 <button onclick="managementUI.toggleSwapMode(${index})" style="margin-top: 10px; width: 100%; padding: 10px; font-size: 14px; background: ${this.swapSourceIndex === index ? '#c0392b' : '#2980b9'}; border-radius: 4px; color: white; cursor: pointer;">
@@ -815,7 +853,7 @@ class ManagementUI {
                     <div style="width: ${p.condition ?? 100}%; height: 100%; background: ${p.condition > 50 ? '#2ecc71' : (p.condition > 20 ? '#f1c40f' : '#e74c3c')};"></div>
                 </div>
             `;
-            pDiv.onclick = () => this.handlePlayerClick(idx, true);
+            pDiv.onclick = () => this.handlePlayerClick(idx, false);
             container.appendChild(pDiv);
         });
 
@@ -1019,6 +1057,7 @@ class ManagementUI {
                 this.renderPlayerDetailCard(p1, index);
             } else {
                 // Just viewing the comparison (clicked the target player)
+                this.selectedPlayerIndex = index;
                 this.renderFormation();
                 this.renderPlayerDetailCard(player, index);
             }
@@ -1182,6 +1221,30 @@ class ManagementUI {
                     detailHtml += `</select>`;
                 }
                 detailHtml += `</div>`;
+            } else if (choice.action === 'awaken') {
+                detailHtml += `<div style="width: 100%; margin-top: 5px; background: rgba(52, 152, 219, 0.1); border-left: 3px solid #3498db; padding: 10px;">
+                    <div style="font-size: 13px; color: #3498db; margin-bottom: 5px; font-weight: bold;">覚醒対象を選択:</div>
+                    <select id="awaken_select_${eventId}_${idx}" style="width: 100%; background: #222; color: #fff; padding: 8px; border: 1px solid #555; font-size: 13px;">
+                        ${team.starting11.map(p => `<option value="${p.id}">[スタメン] [${p.rarity}] [${p.position}] ${p.name} (Lv.${p.level} / OVR: ${p.getOvr()})</option>`).join('')}
+                        ${team.bench.map(p => `<option value="${p.id}">[ベンチ] [${p.rarity}] [${p.position}] ${p.name} (Lv.${p.level} / OVR: ${p.getOvr()})</option>`).join('')}
+                    </select>
+                </div>`;
+            } else if (choice.action === 'teach_skill') {
+                const validTargets = team.players.filter(p => p.skills.length < 3 && choice.skill.allowedPositions.includes(p.position) && !p.skills.includes(choice.skill.id));
+                detailHtml += `<div style="width: 100%; margin-top: 5px; background: rgba(52, 152, 219, 0.1); border-left: 3px solid #3498db; padding: 10px;">
+                    <div style="font-size: 13px; color: #3498db; margin-bottom: 5px; font-weight: bold;">スキルを伝授する選手を選択:</div>
+                    <select id="teach_select_${eventId}_${idx}" style="width: 100%; background: #222; color: #fff; padding: 8px; border: 1px solid #555; font-size: 13px;">
+                        ${validTargets.length === 0 ? `<option value="">対象選手がいません</option>` : validTargets.map(p => `<option value="${p.id}">[${p.rarity}] [${p.position}] ${p.name} (Lv.${p.level} / OVR: ${p.getOvr()})</option>`).join('')}
+                    </select>
+                </div>`;
+            } else if (choice.action === 'mad_science') {
+                detailHtml += `<div style="width: 100%; margin-top: 5px; background: rgba(155, 89, 182, 0.1); border-left: 3px solid #9b59b6; padding: 10px;">
+                    <div style="font-size: 13px; color: #9b59b6; margin-bottom: 5px; font-weight: bold;">手術対象を選択:</div>
+                    <select id="mad_select_${eventId}_${idx}" style="width: 100%; background: #222; color: #fff; padding: 8px; border: 1px solid #555; font-size: 13px;">
+                        ${team.starting11.map(p => `<option value="${p.id}">[スタメン] [${p.rarity}] [${p.position}] ${p.name} (Lv.${p.level} / OVR: ${p.getOvr()})</option>`).join('')}
+                        ${team.bench.map(p => `<option value="${p.id}">[ベンチ] [${p.rarity}] [${p.position}] ${p.name} (Lv.${p.level} / OVR: ${p.getOvr()})</option>`).join('')}
+                    </select>
+                </div>`;
             }
 
             detailHtml += `
