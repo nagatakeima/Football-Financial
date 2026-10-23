@@ -54,6 +54,83 @@ class MatchScene extends Phaser.Scene {
     }
 
 
+    tickMatch() {
+        if (this.matchState === 'gameover' || this.matchState === 'celebration' || !this.logicTimer || this.logicTimer.paused) return;
+
+        if (this.matchState === 'kickoff') {
+            this.kickoffTimer -= 1 * this.timeScale;
+            if (this.kickoffTimer <= 0) {
+                this.matchState = 'playing';
+            }
+            return;
+        }
+
+        this.matchTime += 0.05 * this.timeScale;
+        const displayMin = Math.floor(this.matchTime);
+        const displaySec = Math.floor((this.matchTime % 1) * 60);
+        this.timeText.setText(`${displayMin.toString().padStart(2, '0')}:${displaySec.toString().padStart(2, '0')}`);
+
+        const isFirstHalf = this.matchTime >= 45 && this.matchTime < 46;
+        const isFullTime = this.matchTime >= 90;
+
+        if (isFirstHalf || isFullTime) {
+            const stoppage = isFirstHalf ? this.firstHalfStoppage : this.secondHalfStoppage;
+            if (this.matchTime >= (isFirstHalf ? 45 : 90) + stoppage) {
+                const isPlayerAttackingThird = this.ball.x > 533;
+                const isOppAttackingThird = this.ball.x < 266;
+                const ballInDangerZone = (this.ball.owner && this.ball.owner.isPlayerTeam && isPlayerAttackingThird) ||
+                                         (this.ball.owner && !this.ball.owner.isPlayerTeam && isOppAttackingThird);
+
+                if (!ballInDangerZone) {
+                    if (isFirstHalf && !this.inStoppageTime) {
+                        this.inStoppageTime = true;
+                        this.matchTime = 45;
+                        this.matchState = 'halftime';
+                        if (typeof this.openSubstitutionUI === 'function') {
+                            this.openSubstitutionUI('halftime');
+                        } else {
+                            this.scoreText.setText("2nd Half Started");
+                            this.resetPositions();
+                            this.inStoppageTime = false;
+                            this.matchTime = 46;
+                            this.firstHalfStoppage = 0;
+                        }
+                        return;
+                    } else if (isFullTime) {
+                        this.matchState = 'gameover';
+                        this.endMatch(this.score.player, this.score.opponent);
+                        return;
+                    }
+                }
+            }
+        }
+
+        // Auto trigger micro commands
+        this.commandSlots.forEach((slot, idx) => {
+            if (slot.currentCd > 0) {
+                slot.currentCd -= 0.1 * this.timeScale;
+                const cdBar = document.getElementById(`cmd-cd-${idx}`);
+                if (cdBar) {
+                    const pct = Math.max(0, (slot.currentCd / slot.data.cooldown) * 100);
+                    cdBar.style.width = `${pct}%`;
+                }
+            } else if (slot.auto && slot.usesLeft > 0) {
+                let canTrigger = true;
+                if (slot.data.condition) {
+                    const isBehind = this.score.player < this.score.opponent;
+                    const isLead = this.score.player > this.score.opponent;
+                    if (slot.data.condition === "behind" && !isBehind) canTrigger = false;
+                    if (slot.data.condition === "lead" && !isLead) canTrigger = false;
+                }
+                if (canTrigger) {
+                    this.triggerCommand(idx);
+                }
+            }
+        });
+
+        this.simulateAction();
+    }
+
     getOffsideLineX(isPlayerTeamDefense) {
         // isPlayerTeamDefense is TRUE if Player Team is defending (opponent is attacking)
         // For Player Team Defense: Goal is at 0. Offside line is max(secondToLast, 400).
@@ -486,7 +563,7 @@ class MatchScene extends Phaser.Scene {
             });
             cmdData.cooldown = cmdData.cooldown * (1 - cdReduction);
 
-            const slotData = { cmdId: cmdId, data: cmdData, currentCd: 0, usesLeft: cmdData.maxUses !== undefined ? cmdData.maxUses : Infinity };
+            const slotData = { cmdId: cmdId, data: cmdData, currentCd: 0, usesLeft: cmdData.maxUses !== undefined ? cmdData.maxUses : Infinity, auto: false };
             this.commandSlots.push(slotData);
 
             if (container) {
@@ -498,6 +575,13 @@ class MatchScene extends Phaser.Scene {
                 nameEl.className = 'command-name';
                 nameEl.innerText = cmdData.name;
 
+                const explEl = document.createElement('div');
+                explEl.className = 'command-expl';
+                explEl.innerText = cmdData.description || (cmdData.type === 'buff' ? `${cmdData.target} ${cmdData.value}UP` : cmdData.actionType);
+                explEl.style.fontSize = '10px';
+                explEl.style.color = '#ccc';
+                explEl.style.marginBottom = '2px';
+
                 const descEl = document.createElement('div');
                 descEl.className = 'command-desc';
                 descEl.innerText = `残り: ${slotData.usesLeft === Infinity ? '∞' : slotData.usesLeft}`;
@@ -506,8 +590,29 @@ class MatchScene extends Phaser.Scene {
                 cdBar.className = 'command-cd-bar';
                 cdBar.id = `cmd-cd-${i}`;
 
+                const autoBtn = document.createElement('button');
+                autoBtn.className = 'auto-toggle-btn';
+                autoBtn.innerText = 'AUTO: OFF';
+                autoBtn.style.fontSize = '9px';
+                autoBtn.style.padding = '2px 5px';
+                autoBtn.style.marginTop = '4px';
+                autoBtn.style.background = '#e74c3c';
+                autoBtn.style.border = 'none';
+                autoBtn.style.borderRadius = '3px';
+                autoBtn.style.color = 'white';
+                autoBtn.style.cursor = 'pointer';
+
+                autoBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    slotData.auto = !slotData.auto;
+                    autoBtn.innerText = slotData.auto ? 'AUTO: ON' : 'AUTO: OFF';
+                    autoBtn.style.background = slotData.auto ? '#2ecc71' : '#e74c3c';
+                });
+
                 slotEl.appendChild(nameEl);
+                slotEl.appendChild(explEl);
                 slotEl.appendChild(descEl);
+                slotEl.appendChild(autoBtn);
                 slotEl.appendChild(cdBar);
 
                 slotEl.addEventListener('click', () => {
@@ -518,7 +623,6 @@ class MatchScene extends Phaser.Scene {
             }
         });
 
-        // Also initialize tactic buttons state
         this.realTimeTactic = 'Balance';
 
         // Add listeners to tactic toggles
@@ -563,7 +667,7 @@ class MatchScene extends Phaser.Scene {
             if (slot.data.condition === "lead" && !isLead) return;
         }
         slot.usesLeft -= 1;
-
+        slot.currentCd = slot.data.cooldown; // Set CD
         const slotEl = document.getElementById(`cmd-slot-${slotIndex}`);
         if (slotEl) {
             const descEl = slotEl.querySelector('.command-desc');
