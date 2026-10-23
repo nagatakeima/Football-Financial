@@ -37,36 +37,41 @@ class ManagementUI {
         if (!window.gameState.playerTeam) return;
         this.topBar.style.display = 'flex';
 
-        this.topBarInfo.innerHTML = `
-            チーム: ${window.gameState.playerTeam.name}
-            <span class="funds">資金: ¥${window.gameState.funds.toLocaleString()}</span>
-            <span class="ap">AP: ${window.gameState.ap}/10</span>
-            <div class="global-nav">
-                <button onclick="managementUI.showDashboard()">🏠 ダッシュボード</button>
-                <button onclick="managementUI.showSquad()">📋 編成・戦術</button>
-                <button onclick="managementUI.showEvents()">⚡ イベント (AP)</button>
-                <button onclick="managementUI.showStandings()">🏆 順位表</button>
-                <button onclick="managementUI.showPreMatch()">⚽ 試合へ進む</button>
-            </div>
-        `;
+        const rank = this.getCurrentRank();
+        const targetRank = window.gameState.currentTier === 1 ? 1 : 2;
+        const isSafe = rank <= targetRank;
 
-        // Render relics bar
-        const relicsHtml = window.gameState.playerTeam.relics.map(relicId => {
+        let relicsHtml = window.gameState.playerTeam.relics.map(relicId => {
             const relic = window.MasterData.Relics.find(r => r.id === relicId);
             if (!relic) return '';
-            return `<div class="relic-badge" data-tooltip="${relic.description}">${relic.name}</div>`;
+            return \`<div class="relic-badge" data-tooltip="\${relic.description}">\${relic.name}</div>\`;
         }).join('');
 
-        let relicsContainer = document.getElementById('top-bar-relics');
-        if (!relicsContainer) {
-            relicsContainer = document.createElement('div');
-            relicsContainer.id = 'top-bar-relics';
-            relicsContainer.style = 'display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap;';
-            this.topBar.appendChild(relicsContainer);
-        }
-        relicsContainer.innerHTML = relicsHtml;
-
-        this.topBarSchedule.textContent = `第${window.gameState.currentTier}部 第${window.gameState.league ? window.gameState.league.currentMatchday : 1}節`;
+        this.topBar.innerHTML = \`
+            <div class="top-bar-row">
+                <div class="top-bar-info">
+                    <strong>\${window.gameState.playerTeam.name}</strong> |
+                    Tier \${window.gameState.currentTier} - 第\${window.gameState.currentMatchday}節 |
+                    <span style="color: \${isSafe ? '#2ecc71' : '#e74c3c'}">順位: \${rank}位 (解任: \${targetRank}位以下)</span> |
+                    <span class="funds">資金: ¥\${window.gameState.funds.toLocaleString()}</span> |
+                    <span class="ap">⚡ AP: \${window.gameState.ap}/10</span>
+                </div>
+                <div class="top-bar-actions">
+                    <button onclick="managementUI.restTeam()" \${window.gameState.hasRestedThisTurn || window.gameState.ap < 1 ? 'disabled' : ''} class="rest-btn">🛌 休養する (AP:1 / 全員体力+30)</button>
+                </div>
+            </div>
+            <div class="top-bar-row" style="margin-top: 10px;">
+                <div class="top-bar-relics" style="display: flex; gap: 5px; flex: 1;">
+                    \${relicsHtml}
+                </div>
+                <div class="global-nav">
+                    <button onclick="managementUI.showSquad()">📋 編成・戦術ビルド</button>
+                    <button onclick="managementUI.showEvents()">⚡ スカウト・強化 (AP)</button>
+                    <button onclick="managementUI.showStandings()">🏆 順位表</button>
+                    <button onclick="managementUI.showPreMatch()" style="background-color: #c0392b;">⚽ 次節へ（試合準備）</button>
+                </div>
+            </div>
+        \`;
     }
 
     showManagerSelection() {
@@ -293,42 +298,7 @@ class ManagementUI {
     }
 
     showDashboard() {
-        if (window.gameState.isGameOver) {
-            this.showGameOver();
-            return;
-        }
-
-        this.updateTopBar();
-        this.phaserGame.style.display = 'none';
-        this.gameContainer.classList.remove('match-mode');
-
-        const opponent = this.getNextOpponent();
-        const rank = this.getCurrentRank();
-        const targetRank = window.gameState.currentTier === 1 ? 1 : 2;
-
-        let html = `
-            <div class="menu-box">
-                <h2>監督室 - マネジメント</h2>
-                <div style="margin: 20px 0; padding: 15px; background: #34495e; border-radius: 5px;">
-                    <h3 style="margin-bottom: 5px;">次戦: ${opponent ? opponent.name : 'シーズン終了'}</h3>
-                    <p style="font-size: 18px; color: ${rank > targetRank ? '#e74c3c' : '#2ecc71'};">
-                        リーグ順位: ${rank}位 <span style="font-size: 14px; color: #ccc;">(解任ライン: ${targetRank}位以下)</span>
-                    </p>
-                </div>
-
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <button onclick="managementUI.showPreMatch()" style="background-color: #c0392b; border-color: #a93226; font-size: 18px;">試合へ進む</button>
-                    <button onclick="managementUI.showEvents()" style="background-color: #2980b9; border-color: #2471a3;">イベント (AP消費)</button>
-                    <button onclick="managementUI.showSquad()">編成・戦術</button>
-                    <button onclick="managementUI.showStandings()">リーグ順位表</button>
-                </div>
-
-                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #555;">
-                    <button onclick="managementUI.restTeam()" ${window.gameState.hasRestedThisTurn || window.gameState.ap < 1 ? 'disabled' : ''} style="width: 100%; background: #27ae60;">休養する (AP: 1)</button>
-                </div>
-            </div>
-        `;
-        this.uiContent.innerHTML = html;
+        this.showSquad();
     }
 
     restTeam() {
@@ -619,55 +589,79 @@ class ManagementUI {
         const team = window.gameState.playerTeam;
         window.ChemistrySystem.calculateTeamChemistry(team); // Ensure chemistry is calculated
 
-        let html = `
+        let html = \`
             <div class="menu-box ui-layout-container" style="background: transparent; border: none; padding: 0;">
-                <div class="ui-left-panel" style="flex: 2; padding: 20px; border-radius: 8px; background: rgba(40,40,40,0.95); display: flex; flex-direction: column; gap: 15px;">
-                    <h2>編成・ケミストリー</h2>
 
-                    <div style="text-align: left; display: flex; justify-content: space-between; align-items: center;">
-                        <label>フォーメーション:
-                            <select onchange="managementUI.changeFormation(this.value)" style="background: #333; color: white; padding: 5px; font-size: 16px;">
-                                ${team.manager.formations.map(f => `<option value="${f}" ${f === team.formation ? 'selected' : ''}>${f}</option>`).join('')}
+                <!-- Left Column: Pitch -->
+                <div class="ui-panel" style="flex: 0 0 380px; padding: 15px; display: flex; flex-direction: column;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px;">
+                        <label>
+                            <select onchange="managementUI.changeFormation(this.value)" style="background: #333; color: white; padding: 5px; font-size: 14px; border-radius: 4px;">
+                                \${team.manager.formations.map(f => \`<option value="\${f}" \${f === team.formation ? 'selected' : ''}>\${f}</option>\`).join('')}
                             </select>
                         </label>
-                        <span style="font-size: 14px; color: #bbb;">※選手をタップして入れ替え</span>
-                    </div>
-
-                    <div style="flex: 1; background: #1e3a29; border: 2px solid #27ae60; position: relative; border-radius: 5px; overflow: hidden; min-height: 300px;" id="pitch-area">
-                        <!-- Links canvas -->
-                        <canvas id="chem-canvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></canvas>
-
-                        <div style="position:absolute; top: 10px; width: 100%; text-align: center; color: rgba(255,255,255,0.5); font-weight: bold; font-size: 14px; pointer-events: none; z-index: 1;">▲ ATTACK (FW)</div>
-                        <div style="position:absolute; bottom: 10px; width: 100%; text-align: center; color: rgba(255,255,255,0.5); font-weight: bold; font-size: 14px; pointer-events: none; z-index: 1;">▼ DEFENSE (GK)</div>
-
-                        <div id="formation-container" style="position: relative; width: 100%; height: 100%;">
-                            <!-- Players injected here by JS -->
+                        <div style="font-size: 12px; text-align: right;">
+                            <span style="color: #f1c40f; font-weight: bold;">スタメン平均OVR: \${Math.floor(team.starting11.reduce((sum, p) => sum + p.getOvr(), 0) / 11)}</span><br>
+                            <span style="color: #3498db;">発動ケミストリー数: \${team.chemistryLinks.length}本</span>
                         </div>
                     </div>
-                    <div style="font-size: 11px; text-align: center; color: #ccc;">
+
+                    <div style="flex: 1; background: #1e3a29; border: 2px solid #27ae60; position: relative; border-radius: 5px; overflow: hidden; min-height: 400px;" id="pitch-area">
+                        <canvas id="chem-canvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></canvas>
+                        <div style="position:absolute; top: 5px; width: 100%; text-align: center; color: rgba(255,255,255,0.5); font-weight: bold; font-size: 12px; pointer-events: none; z-index: 1;">▲ FW / ATTACK</div>
+                        <div style="position:absolute; bottom: 5px; width: 100%; text-align: center; color: rgba(255,255,255,0.5); font-weight: bold; font-size: 12px; pointer-events: none; z-index: 1;">▼ GK / DEFENSE</div>
+                        <div id="formation-container" style="position: relative; width: 100%; height: 100%;"></div>
+                    </div>
+
+                    <div style="font-size: 10px; text-align: center; margin-top: 5px;">
                         【戦術志向】 <span style="color: #3498db;">■ポゼッション</span> <span style="color: #e74c3c;">■カウンター</span> <span style="color: #f1c40f;">■ハイプレス</span> <span style="color: #2ecc71;">■リトリート</span>
                     </div>
                 </div>
 
-                <div class="ui-middle-panel" style="flex: 1; gap: 10px; border-radius: 8px; margin-left: 10px;">
-                    <h3 style="background: #2c3e50; padding: 8px; border-radius: 4px;">ベンチ</h3>
-                    <div id="bench-container" style="display: flex; flex-direction: column; gap: 5px; overflow-y: auto; flex: 1;">
+                <!-- Center Column: Bench & Commands -->
+                <div class="ui-panel" style="flex: 1; display: flex; flex-direction: column;">
+                    <h3 style="background: #2c3e50; padding: 5px 10px; font-size: 14px; border-radius: 4px;">ベンチ (7名)</h3>
+                    <div id="bench-container" style="display: flex; flex-direction: column; gap: 4px; padding: 5px 0;">
                         <!-- Bench players injected here -->
+                    </div>
+
+                    <h3 style="background: #9b59b6; padding: 5px 10px; font-size: 14px; border-radius: 4px; margin-top: auto;">戦術コマンド編成</h3>
+                    <div style="display: flex; flex-direction: column; gap: 5px; padding: 5px 0;">
+                        \${[0, 1, 2, 3].map(i => {
+                            const currentCmdId = team.microCommands[i];
+                            const availableCmds = window.MasterData.MicroCommands.filter(c =>
+                                !team.microCommands.includes(c.id) || c.id === currentCmdId
+                            );
+                            const currentCmd = window.MasterData.MicroCommands.find(c => c.id === currentCmdId);
+                            const desc = currentCmd ? currentCmd.description : '未設定';
+
+                            return \`
+                                <div style="background: #333; padding: 5px; border-radius: 4px; display: flex; align-items: center; gap: 10px;">
+                                    <span style="font-weight: bold; width: 50px;">Slot \${i+1}</span>
+                                    <select style="background: #222; color: #fff; padding: 2px; flex: 1;" onchange="managementUI.updateMicroCommand(\${i}, this.value, 'squad')">
+                                        <option value="">-- 外す --</option>
+                                        \${availableCmds.map(c => \`<option value="\${c.id}" \${c.id === currentCmdId ? 'selected' : ''}>\${c.name}</option>\`).join('')}
+                                    </select>
+                                    <div style="font-size: 10px; color: #aaa; width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="\${desc}">\${desc}</div>
+                                </div>
+                            \`;
+                        }).join('')}
                     </div>
                 </div>
 
-                <div class="ui-right-panel" id="player-detail-panel" style="flex: 1.5; gap: 10px; border-radius: 8px; margin-left: 10px; display: flex; flex-direction: column;">
+                <!-- Right Column: Details & Comparison -->
+                <div class="ui-panel" id="player-detail-panel" style="flex: 1.2; display: flex; flex-direction: column;">
                     <div style="flex: 1; display: flex; align-items: center; justify-content: center; color: #aaa;">
                         選手を選択すると詳細が表示されます
                     </div>
-                    <button style="margin-top: 15px; width: 100%; padding: 12px; background: #27ae60;" onclick="managementUI.showDashboard()">戻る (編成確定)</button>
                 </div>
+
             </div>
-        `;
+        \`;
 
         this.uiContent.innerHTML = html;
         this.selectedPlayerIndex = null;
-        this.swapSourceIndex = null; // explicitly track swap mode
+        this.swapSourceIndex = null;
         this.renderFormation();
     }
 
@@ -675,175 +669,97 @@ class ManagementUI {
         const detailPanel = document.getElementById('player-detail-panel');
         if (!detailPanel) return;
         if (!player) {
-            detailPanel.innerHTML = `
-                <div style="flex: 1; display: flex; align-items: center; justify-content: center; color: #aaa;">
-                    選手を選択すると詳細が表示されます
-                </div>
-                <button style="margin-top: 15px; width: 100%; padding: 12px; background: #27ae60;" onclick="managementUI.showDashboard()">戻る (編成確定)</button>
-            `;
+            detailPanel.innerHTML = \`<div style="flex: 1; display: flex; align-items: center; justify-content: center; color: #aaa;">選手を選択すると詳細が表示されます</div>\`;
             return;
         }
 
-        // Color mapping for rarity
-        const rarityColors = {
-            'N': '#7f8c8d', // Gray
-            'R': '#3498db', // Blue
-            'SR': '#9b59b6', // Purple
-            'SSR': '#f1c40f' // Gold
-        };
+        const rarityColors = { 'N': '#7f8c8d', 'R': '#3498db', 'SR': '#9b59b6', 'SSR': '#f1c40f' };
         const rarityColor = rarityColors[player.rarity] || rarityColors['N'];
         const isMax = player.level >= 10;
 
         const statBarsHtml = Object.entries(player.stats).map(([key, val]) => {
-            let color = '#e74c3c'; // red
-            if(val >= 80) color = '#f1c40f'; // gold
-            else if(val >= 60) color = '#2ecc71'; // green
-            else if(val >= 40) color = '#3498db'; // blue
+            let color = '#e74c3c';
+            if(val >= 80) color = '#f1c40f';
+            else if(val >= 60) color = '#2ecc71';
+            else if(val >= 40) color = '#3498db';
 
             const label = {pass: 'Pass', shoot: 'Shoot', defense: 'Defense', physical: 'Physical', speed: 'Speed', mental: 'Mental', stamina: 'Stamina'}[key];
-            return `
-                <div style="display: flex; align-items: center; font-size: 12px; margin-bottom: 3px;">
-                    <span style="width: 55px;">${label}</span>
-                    <div style="flex: 1; background: #333; height: 10px; border-radius: 5px; margin: 0 5px; overflow: hidden;">
-                        <div style="width: ${val}%; background: ${color}; height: 100%;"></div>
+            return \`
+                <div style="display: flex; align-items: center; font-size: 11px; margin-bottom: 2px;">
+                    <span style="width: 45px;">\${label}</span>
+                    <div style="flex: 1; background: #333; height: 8px; border-radius: 4px; margin: 0 4px; overflow: hidden;">
+                        <div style="width: \${val}%; background: \${color}; height: 100%;"></div>
                     </div>
-                    <span style="width: 20px; text-align: right;">${val}</span>
+                    <span style="width: 18px; text-align: right;">\${val}</span>
                 </div>
-            `;
+            \`;
         }).join('');
 
         const skillsHtml = player.skills.length > 0 ? player.skills.map(sId => {
             const s = window.MasterData.PlayerSkills.find(sk => sk.id === sId);
             if (!s) return '';
-            return `<div style="background: #2c3e50; padding: 4px; margin-bottom: 2px; border-radius: 4px; font-size: 11px;">
-                <strong>${s.name}</strong> - ${s.description || '効果なし'}
-            </div>`;
-        }).join('') : '<div style="font-size: 12px; color: #777;">なし</div>';
+            return \`<div style="background: #2c3e50; padding: 3px; margin-bottom: 2px; border-radius: 3px; font-size: 10px;">
+                <strong>\${s.name}</strong>: \${s.description}
+            </div>\`;
+        }).join('') : '<div style="font-size: 11px; color: #777;">なし</div>';
 
         const expPercent = isMax ? 100 : (player.exp / player.maxExp) * 100;
+        const roleJp = player.role || 'なし';
 
-        const roleMap = {
-            'Classic': 'クラシック', 'Inverted': 'インバーテッド', 'Poacher': 'ポーチャー',
-            'Ball-Playing': 'ボールプレイング', 'Stopper': 'ストッパー', 'Covering': 'カバーリング',
-            'Defensive': 'ディフェンシブ', 'Attacking': 'アタッキング', 'Wing-Back': 'ウイングバック',
-            'Anchor': 'アンカー', 'Destroyer': 'デストロイヤー', 'Deep-Lying': 'ディープライイング',
-            'Box-to-Box': 'BtoB', 'Advanced-Playmaker': 'アドバンスドPM', 'Ball-Winning': 'ボールウィニング',
-            'Shadow-Striker': 'シャドーストライカー', 'Enganche': 'エンガンチェ', 'Dynamo': 'ダイナモ',
-            'Classic-Winger': 'ウインガー', 'Crosser': 'クロサー', 'Inside-Forward': 'インサイドFW',
-            'Wide-Playmaker': 'ワイドPM', 'Wide-Target-Man': 'ワイドターゲット', 'Hard-Worker': 'ハードワーカー',
-            'Target-Man': 'ターゲットマン', 'False-9': 'フォルス9', 'Complete': 'コンプリートFW'
-        };
-        const roleJp = player.role ? (roleMap[player.role] || player.role) : 'なし';
+        let html = \`
+            <h3 style="background: #27ae60; padding: 5px 10px; font-size: 14px; border-radius: 4px;">\${this.swapSourceIndex !== null ? '入れ替え候補' : '選手詳細'}</h3>
+            <div style="display: flex; flex-direction: column; flex: 1; overflow-y: auto; padding: 5px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px; border-bottom: 1px solid #444; padding-bottom: 5px;">
+                    <div>
+                        <span style="font-size: 10px; font-weight: bold; background: \${rarityColor}; color: \${player.rarity === 'SSR' ? '#000' : '#fff'}; padding: 1px 3px; border-radius: 2px; margin-right: 4px;">\${player.rarity}</span>
+                        <span style="font-size: 16px; font-weight: bold;">[\${player.position}] \${player.name}</span>
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="font-size: 18px; font-weight: bold; color: #f1c40f;">OVR: \${player.getOvr()}</span>
+                    </div>
+                </div>
 
-        const career = player.careerStats || { appearances: 0, goals: 0, assists: 0, avgRating: 0.0 };
+                <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 5px;">
+                    <span>Lv.\${player.level} \${isMax ? '(MAX)' : ''}</span>
+                    <span style="color: #3498db;">\${player.preference || 'バランス'}</span>
+                </div>
 
+                <div style="background: #333; height: 4px; border-radius: 2px; margin-bottom: 10px; overflow: hidden;">
+                    <div style="width: \${expPercent}%; background: #2ecc71; height: 100%;"></div>
+                </div>
 
-        let comparisonHtml = '';
+                <div style="display: flex; gap: 10px;">
+                    <!-- Left: Stats -->
+                    <div style="flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+                        \${statBarsHtml}
+                    </div>
+
+                    <!-- Right: Info -->
+                    <div style="flex: 1;">
+                        <div style="margin-bottom: 5px; font-size: 11px;">
+                            <strong>適性:</strong> \${player.subPositions.length > 0 ? player.subPositions.join(', ') : 'なし'}<br>
+                            <strong>役割:</strong> \${roleJp}
+                        </div>
+                        <h4 style="border-bottom: 1px solid #444; padding-bottom: 2px; margin-bottom: 2px; font-size: 11px;">スキル</h4>
+                        \${skillsHtml}
+                    </div>
+                </div>
+            </div>
+        \`;
+
         if (this.swapSourceIndex !== null && this.swapSourceIndex !== index) {
             const team = window.gameState.playerTeam;
             const srcPlayer = this.swapSourceIndex < 11 ? team.starting11[this.swapSourceIndex] : team.bench[this.swapSourceIndex - 11];
 
-            const srcStatBarsHtml = Object.entries(srcPlayer.stats).map(([key, val]) => {
-                let color = '#e74c3c';
-                if(val >= 80) color = '#f1c40f';
-                else if(val >= 60) color = '#2ecc71';
-                else if(val >= 40) color = '#3498db';
-
-                const label = {pass: 'Pass', shoot: 'Shoot', defense: 'Defense', physical: 'Physical', speed: 'Speed', mental: 'Mental', stamina: 'Stamina'}[key];
-                return `
-                    <div style="display: flex; align-items: center; font-size: 9px; margin-bottom: 2px;">
-                        <span style="width: 45px;">${label}</span>
-                        <div style="flex: 1; background: #333; height: 6px; border-radius: 3px; margin: 0 4px; overflow: hidden;">
-                            <div style="width: ${val}%; background: ${color}; height: 100%;"></div>
-                        </div>
-                        <span style="width: 15px; text-align: right;">${val}</span>
-                    </div>
-                `;
-            }).join('');
-
-            const srcSkillsHtml = srcPlayer.skills.length > 0 ? srcPlayer.skills.map(sId => {
-                const s = window.MasterData.PlayerSkills.find(sk => sk.id === sId);
-                if (!s) return '';
-                return `<span style="background: #2c3e50; padding: 2px 4px; margin: 1px; border-radius: 3px; font-size: 9px; display: inline-block;">${s.name}</span>`;
-            }).join('') : '<span style="font-size: 9px; color: #777;">なし</span>';
-
-            comparisonHtml = `
-            <div style="background: #111; border: 2px dashed #e74c3c; border-radius: 8px; padding: 10px; flex: 1; display: flex; flex-direction: column; text-align: left; overflow-y: auto; margin-top: 10px;">
-                <h4 style="color: #e74c3c; margin-bottom: 5px; font-size: 12px;">入れ替え元: ${srcPlayer.name}</h4>
-                <div style="font-size: 14px; font-weight: bold; color: #f1c40f; margin-bottom: 5px;">OVR ${srcPlayer.getOvr()} <span style="font-size: 10px; color: #aaa;">[${srcPlayer.preference}]</span></div>
-                <div style="display: flex; justify-content: space-between; font-size: 11px; color: #ccc; margin-bottom: 5px;">
-                    <div><strong>主:</strong> ${srcPlayer.position}</div>
-                    <div><strong>副:</strong> ${srcPlayer.subPositions && srcPlayer.subPositions.length > 0 ? srcPlayer.subPositions.join(', ') : 'なし'}</div>
+            html += \`
+                <div style="border-top: 2px dashed #f1c40f; padding-top: 10px; margin-top: 5px; display: flex; flex-direction: column; gap: 5px;">
+                    <div style="text-align: center; font-size: 12px; color: #f1c40f;">🔄 \${srcPlayer.name} (OVR \${srcPlayer.getOvr()}) と入れ替えますか？</div>
+                    <button style="width: 100%; padding: 10px; font-size: 16px; background: #e74c3c; font-weight: bold; border-radius: 4px;" onclick="managementUI.handlePlayerClick(\${index}, true)">⚡ この2人を入れ替える</button>
                 </div>
-                <div style="margin-bottom: 5px;">
-                    <h4 style="border-bottom: 1px solid #444; padding-bottom: 2px; margin-bottom: 2px; font-size: 10px; color: #aaa;">ステータス</h4>
-                    ${srcStatBarsHtml}
-                </div>
-                <div>
-                    <h4 style="border-bottom: 1px solid #444; padding-bottom: 2px; margin-bottom: 2px; font-size: 10px; color: #aaa;">スキル</h4>
-                    <div>${srcSkillsHtml}</div>
-                </div>
-            </div>`;
+            \`;
         }
 
-        detailPanel.innerHTML = `
-            <button onclick="managementUI.toggleSwapMode(${index})" style="margin-bottom: 5px; width: 100%; padding: 6px; font-size: 12px; background: ${this.swapSourceIndex === index ? '#c0392b' : '#2980b9'}; border: 1px solid #fff; border-radius: 4px; cursor: pointer; color: white;">
-                ${this.swapSourceIndex === index ? '取消' : '🔄 この選手を入れ替え対象にする'}
-            </button>
-            <div style="background: #222; border: 2px solid ${rarityColor}; border-radius: 8px; padding: 10px; flex: 1; display: flex; flex-direction: column; text-align: left; overflow-y: auto;">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #555; padding-bottom: 5px; margin-bottom: 5px;">
-                    <div>
-                        <span style="background: ${rarityColor}; color: ${player.rarity === 'SSR' ? '#000' : '#fff'}; padding: 2px 4px; border-radius: 4px; font-weight: bold; font-size: 10px;">${player.rarity}</span>
-                        <span style="font-size: 12px; margin-left: 5px;">${player.nationality || ''}</span>
-                        <h3 style="margin-top: 2px; font-size: 14px;">${player.name}</h3>
-                    </div>
-                    <div style="text-align: right;">
-                        <div style="font-size: 16px; font-weight: bold; color: #f1c40f;">OVR ${player.getOvr()}</div>
-                        <div style="font-size: 10px;">${isMax ? 'Lv.MAX' : 'Lv.'+player.level} <span style="color:#aaa;">[${player.preference}]</span></div>
-                    </div>
-                </div>
-
-                <div style="margin-bottom: 5px;">
-                    <div style="font-size: 9px; margin-bottom: 2px;">EXP ${isMax ? 'MAX' : player.exp + ' / ' + player.maxExp}</div>
-                    <div style="width: 100%; background: #333; height: 4px; border-radius: 2px; overflow: hidden;">
-                        <div style="width: ${expPercent}%; background: #9b59b6; height: 100%;"></div>
-                    </div>
-                </div>
-
-                <div style="margin-bottom: 5px;">
-                    <div style="font-size: 10px; margin-bottom: 2px; display: flex; justify-content: space-between;">
-                        <span>体力</span><span>${player.condition}%</span>
-                    </div>
-                    <div style="width: 100%; background: #333; height: 6px; border-radius: 3px; overflow: hidden;">
-                        <div style="width: ${player.condition}%; background: ${player.condition > 50 ? '#2ecc71' : '#e74c3c'}; height: 100%;"></div>
-                    </div>
-                </div>
-
-                <div style="display: flex; justify-content: space-between; font-size: 11px; color: #ccc; margin-bottom: 5px;">
-                    <div><strong>主適性:</strong> ${player.position}</div>
-                    <div><strong>副適性:</strong> ${player.subPositions && player.subPositions.length > 0 ? player.subPositions.join(', ') : 'なし'}</div>
-                </div>
-
-                <div style="margin-bottom: 5px; font-size: 11px;">
-                    <span style="color: #bbb;">役割(ロール):</span> ${roleJp}
-                </div>
-
-                <div style="margin-bottom: 5px; font-size: 11px; background: rgba(0,0,0,0.3); padding: 5px; border-radius: 4px;">
-                    <span style="color: #f39c12;">通算成績:</span> 出場 ${career.appearances} / G ${career.goals} / A ${career.assists} / 評 ${career.avgRating.toFixed(2)}
-                </div>
-                <div style="margin-bottom: 5px;">
-                    <h4 style="border-bottom: 1px solid #444; padding-bottom: 2px; margin-bottom: 2px; font-size: 11px;">ステータス</h4>
-                    ${statBarsHtml}
-                </div>
-
-                <div>
-                    <h4 style="border-bottom: 1px solid #444; padding-bottom: 2px; margin-bottom: 2px; font-size: 11px;">スキル</h4>
-                    ${skillsHtml}
-                </div>
-            </div>
-            ${comparisonHtml}
-            <button style="margin-top: 15px; width: 100%; padding: 12px; background: #27ae60;" onclick="managementUI.showDashboard()">戻る (編成確定)</button>
-        `;
+        detailPanel.innerHTML = html;
     }
 
     renderFormation() {
