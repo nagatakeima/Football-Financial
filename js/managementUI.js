@@ -596,7 +596,7 @@ class ManagementUI {
                         </label>
                         <div style="font-size: 12px; text-align: right;">
                             <span style="color: #f1c40f; font-weight: bold;">スタメン平均OVR: ${Math.floor(team.starting11.reduce((sum, p) => sum + p.getOvr(), 0) / 11)}</span><br>
-                            <span style="color: #3498db;">発動ケミストリー数: ${team.chemistryLinks.length}本</span>
+                            <span style="color: #3498db;">発動ケミストリー数: ${team.chemistryLinks?.length || 0}本</span>
                         </div>
                     </div>
 
