@@ -28,45 +28,54 @@ class ManagementUI {
     updateMicroCommand(slotIndex, cmdId, fromScreen) {
         if (!window.gameState.playerTeam) return;
         window.gameState.playerTeam.microCommands[slotIndex] = cmdId ? Number(cmdId) : null;
-        if (fromScreen === 'squad') this.showSquad();
-        else if (fromScreen === 'prematch') this.showPreMatch();
-        else this.showDashboard();
+        if (fromScreen === 'squad') {
+            this.showSquad();
+        } else if (fromScreen === 'prematch') {
+            this.showPreMatch();
+        } else {
+            this.showDashboard();
+        }
     }
 
     updateTopBar() {
         if (!window.gameState.playerTeam) return;
         this.topBar.style.display = 'flex';
 
-        this.topBarInfo.innerHTML = `
-            チーム: ${window.gameState.playerTeam.name}
-            <span class="funds">資金: ¥${window.gameState.funds.toLocaleString()}</span>
-            <span class="ap">AP: ${window.gameState.ap}/10</span>
-            <div class="global-nav">
-                <button onclick="managementUI.showDashboard()">🏠 ダッシュボード</button>
-                <button onclick="managementUI.showSquad()">📋 編成・戦術</button>
-                <button onclick="managementUI.showEvents()">⚡ イベント (AP)</button>
-                <button onclick="managementUI.showStandings()">🏆 順位表</button>
-                <button onclick="managementUI.showPreMatch()">⚽ 試合へ進む</button>
-            </div>
-        `;
+        const rank = this.getCurrentRank();
+        const targetRank = window.gameState.currentTier === 1 ? 1 : 2;
+        const isSafe = rank <= targetRank;
 
-        // Render relics bar
-        const relicsHtml = window.gameState.playerTeam.relics.map(relicId => {
+        let relicsHtml = window.gameState.playerTeam.relics.map(relicId => {
             const relic = window.MasterData.Relics.find(r => r.id === relicId);
             if (!relic) return '';
             return `<div class="relic-badge" data-tooltip="${relic.description}">${relic.name}</div>`;
         }).join('');
 
-        let relicsContainer = document.getElementById('top-bar-relics');
-        if (!relicsContainer) {
-            relicsContainer = document.createElement('div');
-            relicsContainer.id = 'top-bar-relics';
-            relicsContainer.style = 'display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap;';
-            this.topBar.appendChild(relicsContainer);
-        }
-        relicsContainer.innerHTML = relicsHtml;
-
-        this.topBarSchedule.textContent = `第${window.gameState.currentTier}部 第${window.gameState.league ? window.gameState.league.currentMatchday : 1}節`;
+        this.topBar.innerHTML = `
+            <div class="top-bar-row">
+                <div class="top-bar-info">
+                    <strong>${window.gameState.playerTeam.name}</strong> |
+                    Tier ${window.gameState.currentTier} - 第${window.gameState.league ? window.gameState.league.currentMatchday : 1}節 |
+                    <span style="color: ${isSafe ? '#2ecc71' : '#e74c3c'}">順位: ${rank}位 (解任: ${targetRank}位以下)</span> |
+                    <span class="funds">資金: ¥${window.gameState.funds.toLocaleString()}</span> |
+                    <span class="ap">⚡ AP: ${window.gameState.ap}/10</span>
+                </div>
+                <div class="top-bar-actions">
+                    <button onclick="managementUI.restTeam()" ${window.gameState.hasRestedThisTurn || window.gameState.ap < 1 ? 'disabled' : ''} class="rest-btn">🛌 休養する (AP:1 / 全員体力+30)</button>
+                </div>
+            </div>
+            <div class="top-bar-row" style="margin-top: 10px;">
+                <div class="top-bar-relics" style="display: flex; gap: 5px; flex: 1;">
+                    ${relicsHtml}
+                </div>
+                <div class="global-nav">
+                    <button onclick="managementUI.showSquad()">📋 編成・戦術ビルド</button>
+                    <button onclick="managementUI.showEvents()">⚡ スカウト・強化 (AP)</button>
+                    <button onclick="managementUI.showStandings()">🏆 順位表</button>
+                    <button onclick="managementUI.showPreMatch()" style="background-color: #c0392b;">⚽ 次節へ（試合準備）</button>
+                </div>
+            </div>
+        `;
     }
 
     showManagerSelection() {
@@ -293,42 +302,7 @@ class ManagementUI {
     }
 
     showDashboard() {
-        if (window.gameState.isGameOver) {
-            this.showGameOver();
-            return;
-        }
-
-        this.updateTopBar();
-        this.phaserGame.style.display = 'none';
-        this.gameContainer.classList.remove('match-mode');
-
-        const opponent = this.getNextOpponent();
-        const rank = this.getCurrentRank();
-        const targetRank = window.gameState.currentTier === 1 ? 1 : 2;
-
-        let html = `
-            <div class="menu-box">
-                <h2>監督室 - マネジメント</h2>
-                <div style="margin: 20px 0; padding: 15px; background: #34495e; border-radius: 5px;">
-                    <h3 style="margin-bottom: 5px;">次戦: ${opponent ? opponent.name : 'シーズン終了'}</h3>
-                    <p style="font-size: 18px; color: ${rank > targetRank ? '#e74c3c' : '#2ecc71'};">
-                        リーグ順位: ${rank}位 <span style="font-size: 14px; color: #ccc;">(解任ライン: ${targetRank}位以下)</span>
-                    </p>
-                </div>
-
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <button onclick="managementUI.showPreMatch()" style="background-color: #c0392b; border-color: #a93226; font-size: 18px;">試合へ進む</button>
-                    <button onclick="managementUI.showEvents()" style="background-color: #2980b9; border-color: #2471a3;">イベント (AP消費)</button>
-                    <button onclick="managementUI.showSquad()">編成・戦術</button>
-                    <button onclick="managementUI.showStandings()">リーグ順位表</button>
-                </div>
-
-                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #555;">
-                    <button onclick="managementUI.restTeam()" ${window.gameState.hasRestedThisTurn || window.gameState.ap < 1 ? 'disabled' : ''} style="width: 100%; background: #27ae60;">休養する (AP: 1)</button>
-                </div>
-            </div>
-        `;
-        this.uiContent.innerHTML = html;
+        this.showSquad();
     }
 
     restTeam() {
@@ -345,7 +319,6 @@ class ManagementUI {
         const opponent = this.getNextOpponent();
         if (!opponent) return;
 
-        // Generate random upcoming gimmicks for flavor/mechanics
         const weathers = ['晴れ', '雨 (スリップ増加)', '雪 (スタミナ消費増)'];
         let weather = '晴れ';
         if (window.gameState.upcomingGimmick === 'badWeather') weather = '悪天候 (パス・トラップ精度低下)';
@@ -402,46 +375,37 @@ class ManagementUI {
                 <div class="ui-right-panel" style="flex: 1; display: flex; flex-direction: column; gap: 15px; margin-left: 10px; padding: 0; background: transparent;">
                     <div style="background: rgba(40,40,40,0.95); padding: 15px; border-radius: 8px; text-align: left; flex: 1; overflow-y: auto;">
                         <h3 style="color: #2ecc71; margin-bottom: 10px;">所持マクロ (宝物)</h3>
-                        <ul style="list-style: none; padding: 0; font-size: 14px;">
-                            ${window.gameState.playerTeam.relics.length === 0 ? '<li style="color: #7f8c8d;">なし</li>' : ''}
+                        <div style="display: flex; flex-wrap: wrap; gap: 5px; font-size: 14px;">
+                            ${window.gameState.playerTeam.relics.length === 0 ? '<span style="color: #7f8c8d;">なし</span>' : ''}
                             ${window.gameState.playerTeam.relics.map(rId => {
                                 const r = window.MasterData.Relics.find(x => x.id === rId);
-                                return `<li style="padding: 5px 0; border-bottom: 1px solid #34495e;">・${r ? `<span class="relic-badge" data-tooltip="${r.description}">${r.name}</span>` : 'Unknown'}</li>`;
+                                return r ? `<div class="relic-badge" data-tooltip="${r.description}" style="border: 1px solid #2ecc71; padding: 5px;">${r.name}</div>` : '';
                             }).join('')}
-                        </ul>
+                        </div>
                     </div>
 
                     <div style="background: rgba(40,40,40,0.95); padding: 15px; border-radius: 8px; text-align: left; flex: 1.5; overflow-y: auto;">
                         <h3 style="color: #f1c40f; margin-bottom: 10px;">セット中ミクロ (戦術コマンド)</h3>
-                        <p style="font-size: 12px; color: #ccc; margin-bottom: 10px;">※試合中、手動または自動で発動可能 (最大4つ)</p>
-                        <div style="display: flex; flex-direction: column; gap: 8px; flex-wrap: wrap; max-height: 200px; overflow-y: auto;">
+                        <p style="font-size: 12px; color: #ccc; margin-bottom: 10px;">※編成画面で入れ替え可能</p>
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
                             ${[0, 1, 2, 3].map(i => {
                                 const cmdId = window.gameState.playerTeam.microCommands[i];
-                                const allCmds = window.MasterData.MicroCommands.filter(c => window.gameState.playerTeam.ownedMicroCommands.includes(c.id));
-                                let optionsHtml = `<option value="">未セット</option>`;
-                                allCmds.forEach(c => {
-                                    const isSelectedElsewhere = window.gameState.playerTeam.microCommands.includes(c.id) && window.gameState.playerTeam.microCommands[i] !== c.id;
-                                    if (!isSelectedElsewhere) {
-                                        const desc = c.description || (c.type === 'buff' ? `${c.target} ${c.value}UP` : c.actionType);
-                                        optionsHtml += `<option value="${c.id}" ${cmdId === c.id ? 'selected' : ''}>${c.name} (CD:${c.cooldown}s) - ${desc}</option>`;
-                                    }
-                                });
+                                if (!cmdId) return `<div style="background: #222; padding: 10px; border: 1px solid #555; border-radius: 4px; color: #777;">Slot ${i+1} : 未設定</div>`;
+                                const c = window.MasterData.MicroCommands.find(cmd => cmd.id === cmdId);
+                                if (!c) return '';
+                                const desc = c.description || (c.type === 'buff' ? `${c.target} ${c.value}UP` : c.actionType);
                                 return `
-                                    <div style="background: #222; padding: 10px; border: 1px solid #555; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
-                                        <span style="margin-right: 10px;">Slot ${i+1}</span>
-                                        <select style="flex: 1; padding: 5px; background: #333; color: white; border: 1px solid #777;"
-                                            onchange="managementUI.updateMicroCommand(${i}, this.value, 'prematch')">
-                                            ${optionsHtml}
-                                        </select>
+                                    <div style="background: #222; padding: 10px; border: 1px solid #9b59b6; border-radius: 4px;">
+                                        <strong>[Slot ${i+1}] ${c.name}</strong> (CD: ${c.cooldown}s)<br>
+                                        <span style="font-size: 12px; color: #aaa;">${desc}</span>
                                     </div>
                                 `;
                             }).join('')}
                         </div>
                     </div>
 
-                    <div style="display: flex; gap: 15px;">
-                        <button style="flex: 1; padding: 15px; font-size: 18px;" onclick="managementUI.showDashboard()">戻る</button>
-                        <button style="flex: 2; padding: 15px; font-size: 18px; background: #c0392b; border-color: #a93226;" onclick="managementUI.startMatch()">KICK OFF</button>
+                    <div style="display: flex; gap: 15px; margin-top: auto;">
+                        <button style="flex: 1; padding: 20px; font-size: 20px; background: #c0392b; border-color: #a93226; font-weight: bold;" onclick="managementUI.startMatch()">KICK OFF</button>
                     </div>
                 </div>
             </div>
@@ -621,53 +585,77 @@ class ManagementUI {
 
         let html = `
             <div class="menu-box ui-layout-container" style="background: transparent; border: none; padding: 0;">
-                <div class="ui-left-panel" style="flex: 2; padding: 20px; border-radius: 8px; background: rgba(40,40,40,0.95); display: flex; flex-direction: column; gap: 15px;">
-                    <h2>編成・ケミストリー</h2>
 
-                    <div style="text-align: left; display: flex; justify-content: space-between; align-items: center;">
-                        <label>フォーメーション:
-                            <select onchange="managementUI.changeFormation(this.value)" style="background: #333; color: white; padding: 5px; font-size: 16px;">
+                <!-- Left Column: Pitch -->
+                <div class="ui-panel" style="flex: 0 0 380px; padding: 15px; display: flex; flex-direction: column;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px;">
+                        <label>
+                            <select onchange="managementUI.changeFormation(this.value)" style="background: #333; color: white; padding: 5px; font-size: 14px; border-radius: 4px;">
                                 ${team.manager.formations.map(f => `<option value="${f}" ${f === team.formation ? 'selected' : ''}>${f}</option>`).join('')}
                             </select>
                         </label>
-                        <span style="font-size: 14px; color: #bbb;">※選手をタップして入れ替え</span>
-                    </div>
-
-                    <div style="flex: 1; background: #1e3a29; border: 2px solid #27ae60; position: relative; border-radius: 5px; overflow: hidden; min-height: 300px;" id="pitch-area">
-                        <!-- Links canvas -->
-                        <canvas id="chem-canvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></canvas>
-
-                        <div style="position:absolute; top: 10px; width: 100%; text-align: center; color: rgba(255,255,255,0.5); font-weight: bold; font-size: 14px; pointer-events: none; z-index: 1;">▲ ATTACK (FW)</div>
-                        <div style="position:absolute; bottom: 10px; width: 100%; text-align: center; color: rgba(255,255,255,0.5); font-weight: bold; font-size: 14px; pointer-events: none; z-index: 1;">▼ DEFENSE (GK)</div>
-
-                        <div id="formation-container" style="position: relative; width: 100%; height: 100%;">
-                            <!-- Players injected here by JS -->
+                        <div style="font-size: 12px; text-align: right;">
+                            <span style="color: #f1c40f; font-weight: bold;">スタメン平均OVR: ${Math.floor(team.starting11.reduce((sum, p) => sum + p.getOvr(), 0) / 11)}</span><br>
+                            <span style="color: #3498db;">発動ケミストリー数: ${team.chemistryLinks.length}本</span>
                         </div>
                     </div>
-                    <div style="font-size: 11px; text-align: center; color: #ccc;">
+
+                    <div style="flex: 1; background: #1e3a29; border: 2px solid #27ae60; position: relative; border-radius: 5px; overflow: hidden; min-height: 400px;" id="pitch-area">
+                        <canvas id="chem-canvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></canvas>
+                        <div style="position:absolute; top: 5px; width: 100%; text-align: center; color: rgba(255,255,255,0.5); font-weight: bold; font-size: 12px; pointer-events: none; z-index: 1;">▲ FW / ATTACK</div>
+                        <div style="position:absolute; bottom: 5px; width: 100%; text-align: center; color: rgba(255,255,255,0.5); font-weight: bold; font-size: 12px; pointer-events: none; z-index: 1;">▼ GK / DEFENSE</div>
+                        <div id="formation-container" style="position: relative; width: 100%; height: 100%;"></div>
+                    </div>
+
+                    <div style="font-size: 10px; text-align: center; margin-top: 5px;">
                         【戦術志向】 <span style="color: #3498db;">■ポゼッション</span> <span style="color: #e74c3c;">■カウンター</span> <span style="color: #f1c40f;">■ハイプレス</span> <span style="color: #2ecc71;">■リトリート</span>
                     </div>
                 </div>
 
-                <div class="ui-middle-panel" style="flex: 1; gap: 10px; border-radius: 8px; margin-left: 10px;">
-                    <h3 style="background: #2c3e50; padding: 8px; border-radius: 4px;">ベンチ</h3>
-                    <div id="bench-container" style="display: flex; flex-direction: column; gap: 5px; overflow-y: auto; flex: 1;">
+                <!-- Center Column: Bench & Commands -->
+                <div class="ui-panel" style="flex: 1; display: flex; flex-direction: column;">
+                    <h3 style="background: #2c3e50; padding: 5px 10px; font-size: 14px; border-radius: 4px;">ベンチ (7名)</h3>
+                    <div id="bench-container" style="display: flex; flex-direction: column; gap: 4px; padding: 5px 0;">
                         <!-- Bench players injected here -->
+                    </div>
+
+                    <h3 style="background: #9b59b6; padding: 5px 10px; font-size: 14px; border-radius: 4px; margin-top: auto;">戦術コマンド編成</h3>
+                    <div style="display: flex; flex-direction: column; gap: 5px; padding: 5px 0;">
+                        ${[0, 1, 2, 3].map(i => {
+                            const currentCmdId = team.microCommands[i];
+                            const availableCmds = window.MasterData.MicroCommands.filter(c =>
+                                team.ownedMicroCommands.includes(c.id) && (!team.microCommands.includes(c.id) || c.id === currentCmdId)
+                            );
+                            const currentCmd = window.MasterData.MicroCommands.find(c => c.id === currentCmdId);
+                            const desc = currentCmd ? currentCmd.description : '未設定';
+
+                            return `
+                                <div style="background: #333; padding: 5px; border-radius: 4px; display: flex; align-items: center; gap: 10px;">
+                                    <span style="font-weight: bold; width: 50px;">Slot ${i+1}</span>
+                                    <select style="background: #222; color: #fff; padding: 2px; flex: 1;" onchange="managementUI.updateMicroCommand(${i}, this.value, 'squad')">
+                                        <option value="">-- 外す --</option>
+                                        ${availableCmds.map(c => `<option value="${c.id}" ${c.id === currentCmdId ? 'selected' : ''}>${c.name}</option>`).join('')}
+                                    </select>
+                                    <div style="font-size: 10px; color: #aaa; width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${desc}">${desc}</div>
+                                </div>
+                            `;
+                        }).join('')}
                     </div>
                 </div>
 
-                <div class="ui-right-panel" id="player-detail-panel" style="flex: 1.5; gap: 10px; border-radius: 8px; margin-left: 10px; display: flex; flex-direction: column;">
+                <!-- Right Column: Details & Comparison -->
+                <div class="ui-panel" id="player-detail-panel" style="flex: 1.2; display: flex; flex-direction: column;">
                     <div style="flex: 1; display: flex; align-items: center; justify-content: center; color: #aaa;">
                         選手を選択すると詳細が表示されます
                     </div>
-                    <button style="margin-top: 15px; width: 100%; padding: 12px; background: #27ae60;" onclick="managementUI.showDashboard()">戻る (編成確定)</button>
                 </div>
+
             </div>
         `;
 
         this.uiContent.innerHTML = html;
         this.selectedPlayerIndex = null;
-        this.swapSourceIndex = null; // explicitly track swap mode
+        this.swapSourceIndex = null;
         this.renderFormation();
     }
 
@@ -675,39 +663,28 @@ class ManagementUI {
         const detailPanel = document.getElementById('player-detail-panel');
         if (!detailPanel) return;
         if (!player) {
-            detailPanel.innerHTML = `
-                <div style="flex: 1; display: flex; align-items: center; justify-content: center; color: #aaa;">
-                    選手を選択すると詳細が表示されます
-                </div>
-                <button style="margin-top: 15px; width: 100%; padding: 12px; background: #27ae60;" onclick="managementUI.showDashboard()">戻る (編成確定)</button>
-            `;
+            detailPanel.innerHTML = `<div style="flex: 1; display: flex; align-items: center; justify-content: center; color: #aaa;">選手を選択すると詳細が表示されます</div>`;
             return;
         }
 
-        // Color mapping for rarity
-        const rarityColors = {
-            'N': '#7f8c8d', // Gray
-            'R': '#3498db', // Blue
-            'SR': '#9b59b6', // Purple
-            'SSR': '#f1c40f' // Gold
-        };
+        const rarityColors = { 'N': '#7f8c8d', 'R': '#3498db', 'SR': '#9b59b6', 'SSR': '#f1c40f' };
         const rarityColor = rarityColors[player.rarity] || rarityColors['N'];
         const isMax = player.level >= 10;
 
         const statBarsHtml = Object.entries(player.stats).map(([key, val]) => {
-            let color = '#e74c3c'; // red
-            if(val >= 80) color = '#f1c40f'; // gold
-            else if(val >= 60) color = '#2ecc71'; // green
-            else if(val >= 40) color = '#3498db'; // blue
+            let color = '#e74c3c';
+            if(val >= 80) color = '#f1c40f';
+            else if(val >= 60) color = '#2ecc71';
+            else if(val >= 40) color = '#3498db';
 
             const label = {pass: 'Pass', shoot: 'Shoot', defense: 'Defense', physical: 'Physical', speed: 'Speed', mental: 'Mental', stamina: 'Stamina'}[key];
             return `
-                <div style="display: flex; align-items: center; font-size: 12px; margin-bottom: 3px;">
-                    <span style="width: 55px;">${label}</span>
-                    <div style="flex: 1; background: #333; height: 10px; border-radius: 5px; margin: 0 5px; overflow: hidden;">
+                <div style="display: flex; align-items: center; font-size: 11px; margin-bottom: 2px;">
+                    <span style="width: 45px;">${label}</span>
+                    <div style="flex: 1; background: #333; height: 8px; border-radius: 4px; margin: 0 4px; overflow: hidden;">
                         <div style="width: ${val}%; background: ${color}; height: 100%;"></div>
                     </div>
-                    <span style="width: 20px; text-align: right;">${val}</span>
+                    <span style="width: 18px; text-align: right;">${val}</span>
                 </div>
             `;
         }).join('');
@@ -715,135 +692,108 @@ class ManagementUI {
         const skillsHtml = player.skills.length > 0 ? player.skills.map(sId => {
             const s = window.MasterData.PlayerSkills.find(sk => sk.id === sId);
             if (!s) return '';
-            return `<div style="background: #2c3e50; padding: 4px; margin-bottom: 2px; border-radius: 4px; font-size: 11px;">
-                <strong>${s.name}</strong> - ${s.description || '効果なし'}
+            return `<div style="background: #2c3e50; padding: 3px; margin-bottom: 2px; border-radius: 3px; font-size: 10px;">
+                <strong>${s.name}</strong>: ${s.description}
             </div>`;
-        }).join('') : '<div style="font-size: 12px; color: #777;">なし</div>';
+        }).join('') : '<div style="font-size: 11px; color: #777;">なし</div>';
 
         const expPercent = isMax ? 100 : (player.exp / player.maxExp) * 100;
+        const roleJp = player.role || 'なし';
 
-        const roleMap = {
-            'Classic': 'クラシック', 'Inverted': 'インバーテッド', 'Poacher': 'ポーチャー',
-            'Ball-Playing': 'ボールプレイング', 'Stopper': 'ストッパー', 'Covering': 'カバーリング',
-            'Defensive': 'ディフェンシブ', 'Attacking': 'アタッキング', 'Wing-Back': 'ウイングバック',
-            'Anchor': 'アンカー', 'Destroyer': 'デストロイヤー', 'Deep-Lying': 'ディープライイング',
-            'Box-to-Box': 'BtoB', 'Advanced-Playmaker': 'アドバンスドPM', 'Ball-Winning': 'ボールウィニング',
-            'Shadow-Striker': 'シャドーストライカー', 'Enganche': 'エンガンチェ', 'Dynamo': 'ダイナモ',
-            'Classic-Winger': 'ウインガー', 'Crosser': 'クロサー', 'Inside-Forward': 'インサイドFW',
-            'Wide-Playmaker': 'ワイドPM', 'Wide-Target-Man': 'ワイドターゲット', 'Hard-Worker': 'ハードワーカー',
-            'Target-Man': 'ターゲットマン', 'False-9': 'フォルス9', 'Complete': 'コンプリートFW'
-        };
-        const roleJp = player.role ? (roleMap[player.role] || player.role) : 'なし';
+        let html = `
+            <h3 style="background: #27ae60; padding: 5px 10px; font-size: 14px; border-radius: 4px;">${this.swapSourceIndex !== null ? '入れ替え候補' : '選手詳細'}</h3>
+            <div style="display: flex; flex-direction: column; flex: 1; overflow-y: auto; padding: 5px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px; border-bottom: 1px solid #444; padding-bottom: 5px;">
+                    <div>
+                        <span style="font-size: 10px; font-weight: bold; background: ${rarityColor}; color: ${player.rarity === 'SSR' ? '#000' : '#fff'}; padding: 1px 3px; border-radius: 2px; margin-right: 4px;">${player.rarity}</span>
+                        <span style="font-size: 16px; font-weight: bold;">[${player.position}] ${player.name}</span>
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="font-size: 18px; font-weight: bold; color: #f1c40f;">OVR: ${player.getOvr()}</span>
+                    </div>
+                </div>
 
-        const career = player.careerStats || { appearances: 0, goals: 0, assists: 0, avgRating: 0.0 };
+                <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 5px;">
+                    <span>Lv.${player.level} ${isMax ? '(MAX)' : ''}</span>
+                    <span style="color: #3498db;">${player.preference || 'バランス'}</span>
+                </div>
 
+                <div style="background: #333; height: 4px; border-radius: 2px; margin-bottom: 10px; overflow: hidden;">
+                    <div style="width: ${expPercent}%; background: #2ecc71; height: 100%;"></div>
+                </div>
 
-        let comparisonHtml = '';
+                <div style="margin-bottom: 10px; font-size: 12px; background: rgba(46, 204, 113, 0.2); padding: 5px; border-radius: 3px; display: flex; justify-content: space-between; border-left: 3px solid #2ecc71;">
+                    <span style="color: #bbb;">体力:</span>
+                    <span style="color: #2ecc71; font-weight: bold;">${player.condition ?? 100}%</span>
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                    <!-- Left: Stats -->
+                    <div style="flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+                        ${statBarsHtml}
+                    </div>
+
+                    <!-- Right: Info -->
+                    <div style="flex: 1;">
+                        <div style="margin-bottom: 5px; font-size: 11px;">
+                            <strong>適性:</strong> ${player.subPositions.length > 0 ? player.subPositions.join(', ') : 'なし'}<br>
+                            <strong>役割:</strong> ${roleJp}
+                        </div>
+                        <h4 style="border-bottom: 1px solid #444; padding-bottom: 2px; margin-bottom: 2px; font-size: 11px;">スキル</h4>
+                        ${skillsHtml}
+                    </div>
+                </div>
+            </div>
+        `;
+
         if (this.swapSourceIndex !== null && this.swapSourceIndex !== index) {
             const team = window.gameState.playerTeam;
             const srcPlayer = this.swapSourceIndex < 11 ? team.starting11[this.swapSourceIndex] : team.bench[this.swapSourceIndex - 11];
 
-            const srcStatBarsHtml = Object.entries(srcPlayer.stats).map(([key, val]) => {
-                let color = '#e74c3c';
-                if(val >= 80) color = '#f1c40f';
-                else if(val >= 60) color = '#2ecc71';
-                else if(val >= 40) color = '#3498db';
+            const renderMiniCard = (p, otherP = null) => {
+                if (!p) return '<div style="flex:1; padding: 10px; text-align: center;">Empty</div>';
+                const diffHtml = (stat1, stat2) => {
+                    const diff = stat1 - stat2;
+                    if (diff > 0) return `<span style="color: #2ecc71;">(+${diff})</span>`;
+                    if (diff < 0) return `<span style="color: #e74c3c;">(${diff})</span>`;
+                    return `<span style="color: #888;">(±0)</span>`;
+                };
 
-                const label = {pass: 'Pass', shoot: 'Shoot', defense: 'Defense', physical: 'Physical', speed: 'Speed', mental: 'Mental', stamina: 'Stamina'}[key];
                 return `
-                    <div style="display: flex; align-items: center; font-size: 9px; margin-bottom: 2px;">
-                        <span style="width: 45px;">${label}</span>
-                        <div style="flex: 1; background: #333; height: 6px; border-radius: 3px; margin: 0 4px; overflow: hidden;">
-                            <div style="width: ${val}%; background: ${color}; height: 100%;"></div>
-                        </div>
-                        <span style="width: 15px; text-align: right;">${val}</span>
+                    <div style="flex: 1; background: #333; padding: 10px; border-radius: 5px;">
+                        <div style="font-weight: bold; margin-bottom: 5px; font-size: 12px;">[${p.position}] ${p.name}</div>
+                        <div style="font-size: 12px; margin-bottom: 10px;">OVR: <span style="color: #f1c40f;">${p.getOvr()}</span> ${otherP ? diffHtml(p.getOvr(), otherP.getOvr()) : ''}</div>
+                        ${['pass', 'shoot', 'defense', 'physical', 'speed', 'mental', 'stamina'].map(s => `
+                            <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 2px;">
+                                <span>${s.toUpperCase()}</span>
+                                <span>${p.stats[s]} ${otherP ? diffHtml(p.stats[s], otherP.stats[s]) : ''}</span>
+                            </div>
+                        `).join('')}
                     </div>
                 `;
-            }).join('');
+            };
 
-            const srcSkillsHtml = srcPlayer.skills.length > 0 ? srcPlayer.skills.map(sId => {
-                const s = window.MasterData.PlayerSkills.find(sk => sk.id === sId);
-                if (!s) return '';
-                return `<span style="background: #2c3e50; padding: 2px 4px; margin: 1px; border-radius: 3px; font-size: 9px; display: inline-block;">${s.name}</span>`;
-            }).join('') : '<span style="font-size: 9px; color: #777;">なし</span>';
-
-            comparisonHtml = `
-            <div style="background: #111; border: 2px dashed #e74c3c; border-radius: 8px; padding: 10px; flex: 1; display: flex; flex-direction: column; text-align: left; overflow-y: auto; margin-top: 10px;">
-                <h4 style="color: #e74c3c; margin-bottom: 5px; font-size: 12px;">入れ替え元: ${srcPlayer.name}</h4>
-                <div style="font-size: 14px; font-weight: bold; color: #f1c40f; margin-bottom: 5px;">OVR ${srcPlayer.getOvr()} <span style="font-size: 10px; color: #aaa;">[${srcPlayer.preference}]</span></div>
-                <div style="display: flex; justify-content: space-between; font-size: 11px; color: #ccc; margin-bottom: 5px;">
-                    <div><strong>主:</strong> ${srcPlayer.position}</div>
-                    <div><strong>副:</strong> ${srcPlayer.subPositions && srcPlayer.subPositions.length > 0 ? srcPlayer.subPositions.join(', ') : 'なし'}</div>
+            detailPanel.innerHTML = `
+                <div style="background: #222; padding: 15px; border-radius: 8px; border: 1px solid #444; margin-bottom: 15px;">
+                    <h3 style="margin-bottom: 15px; color: #f1c40f; text-align: center;">🔄 入れ替え確認</h3>
+                    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                        ${renderMiniCard(srcPlayer, player)}
+                        <div style="display: flex; align-items: center; justify-content: center; font-size: 20px;">➔</div>
+                        ${renderMiniCard(player, srcPlayer)}
+                    </div>
+                    <button style="width: 100%; padding: 10px; font-size: 16px; background: #e74c3c; font-weight: bold; border-radius: 4px;" onclick="managementUI.handlePlayerClick(${index}, true)">⚡ この2人を入れ替える</button>
                 </div>
-                <div style="margin-bottom: 5px;">
-                    <h4 style="border-bottom: 1px solid #444; padding-bottom: 2px; margin-bottom: 2px; font-size: 10px; color: #aaa;">ステータス</h4>
-                    ${srcStatBarsHtml}
-                </div>
-                <div>
-                    <h4 style="border-bottom: 1px solid #444; padding-bottom: 2px; margin-bottom: 2px; font-size: 10px; color: #aaa;">スキル</h4>
-                    <div>${srcSkillsHtml}</div>
-                </div>
-            </div>`;
+            `;
+            return;
+        } else {
+            html += `
+                <button onclick="managementUI.toggleSwapMode(${index})" style="margin-top: 10px; width: 100%; padding: 10px; font-size: 14px; background: ${this.swapSourceIndex === index ? '#c0392b' : '#2980b9'}; border-radius: 4px; color: white; cursor: pointer;">
+                    ${this.swapSourceIndex === index ? '取消' : '🔄 この選手を入れ替え対象にする'}
+                </button>
+            `;
         }
 
-        detailPanel.innerHTML = `
-            <button onclick="managementUI.toggleSwapMode(${index})" style="margin-bottom: 5px; width: 100%; padding: 6px; font-size: 12px; background: ${this.swapSourceIndex === index ? '#c0392b' : '#2980b9'}; border: 1px solid #fff; border-radius: 4px; cursor: pointer; color: white;">
-                ${this.swapSourceIndex === index ? '取消' : '🔄 この選手を入れ替え対象にする'}
-            </button>
-            <div style="background: #222; border: 2px solid ${rarityColor}; border-radius: 8px; padding: 10px; flex: 1; display: flex; flex-direction: column; text-align: left; overflow-y: auto;">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #555; padding-bottom: 5px; margin-bottom: 5px;">
-                    <div>
-                        <span style="background: ${rarityColor}; color: ${player.rarity === 'SSR' ? '#000' : '#fff'}; padding: 2px 4px; border-radius: 4px; font-weight: bold; font-size: 10px;">${player.rarity}</span>
-                        <span style="font-size: 12px; margin-left: 5px;">${player.nationality || ''}</span>
-                        <h3 style="margin-top: 2px; font-size: 14px;">${player.name}</h3>
-                    </div>
-                    <div style="text-align: right;">
-                        <div style="font-size: 16px; font-weight: bold; color: #f1c40f;">OVR ${player.getOvr()}</div>
-                        <div style="font-size: 10px;">${isMax ? 'Lv.MAX' : 'Lv.'+player.level} <span style="color:#aaa;">[${player.preference}]</span></div>
-                    </div>
-                </div>
-
-                <div style="margin-bottom: 5px;">
-                    <div style="font-size: 9px; margin-bottom: 2px;">EXP ${isMax ? 'MAX' : player.exp + ' / ' + player.maxExp}</div>
-                    <div style="width: 100%; background: #333; height: 4px; border-radius: 2px; overflow: hidden;">
-                        <div style="width: ${expPercent}%; background: #9b59b6; height: 100%;"></div>
-                    </div>
-                </div>
-
-                <div style="margin-bottom: 5px;">
-                    <div style="font-size: 10px; margin-bottom: 2px; display: flex; justify-content: space-between;">
-                        <span>体力</span><span>${player.condition}%</span>
-                    </div>
-                    <div style="width: 100%; background: #333; height: 6px; border-radius: 3px; overflow: hidden;">
-                        <div style="width: ${player.condition}%; background: ${player.condition > 50 ? '#2ecc71' : '#e74c3c'}; height: 100%;"></div>
-                    </div>
-                </div>
-
-                <div style="display: flex; justify-content: space-between; font-size: 11px; color: #ccc; margin-bottom: 5px;">
-                    <div><strong>主適性:</strong> ${player.position}</div>
-                    <div><strong>副適性:</strong> ${player.subPositions && player.subPositions.length > 0 ? player.subPositions.join(', ') : 'なし'}</div>
-                </div>
-
-                <div style="margin-bottom: 5px; font-size: 11px;">
-                    <span style="color: #bbb;">役割(ロール):</span> ${roleJp}
-                </div>
-
-                <div style="margin-bottom: 5px; font-size: 11px; background: rgba(0,0,0,0.3); padding: 5px; border-radius: 4px;">
-                    <span style="color: #f39c12;">通算成績:</span> 出場 ${career.appearances} / G ${career.goals} / A ${career.assists} / 評 ${career.avgRating.toFixed(2)}
-                </div>
-                <div style="margin-bottom: 5px;">
-                    <h4 style="border-bottom: 1px solid #444; padding-bottom: 2px; margin-bottom: 2px; font-size: 11px;">ステータス</h4>
-                    ${statBarsHtml}
-                </div>
-
-                <div>
-                    <h4 style="border-bottom: 1px solid #444; padding-bottom: 2px; margin-bottom: 2px; font-size: 11px;">スキル</h4>
-                    ${skillsHtml}
-                </div>
-            </div>
-            ${comparisonHtml}
-            <button style="margin-top: 15px; width: 100%; padding: 12px; background: #27ae60;" onclick="managementUI.showDashboard()">戻る (編成確定)</button>
-        `;
+        detailPanel.innerHTML = html;
     }
 
     renderFormation() {
@@ -903,7 +853,7 @@ class ManagementUI {
                     <div style="width: ${p.condition ?? 100}%; height: 100%; background: ${p.condition > 50 ? '#2ecc71' : (p.condition > 20 ? '#f1c40f' : '#e74c3c')};"></div>
                 </div>
             `;
-            pDiv.onclick = () => this.handlePlayerClick(idx, true);
+            pDiv.onclick = () => this.handlePlayerClick(idx, false);
             container.appendChild(pDiv);
         });
 
@@ -1071,7 +1021,7 @@ class ManagementUI {
         });
     }
 
-    handlePlayerClick(index, isStarter) {
+    handlePlayerClick(index, executeSwap = false) {
         const team = window.gameState.playerTeam;
         const player = index < 11 ? team.starting11[index] : team.bench[index - 11];
 
@@ -1080,11 +1030,16 @@ class ManagementUI {
         }
 
         if (this.swapSourceIndex !== null) {
-            // We are in swap mode
-            const idx1 = this.swapSourceIndex;
-            const idx2 = index;
-
-            if (idx1 !== idx2) {
+            if (this.swapSourceIndex === index) {
+                // Cancel swap mode if clicking the same player
+                this.swapSourceIndex = null;
+                this.selectedPlayerIndex = index;
+                this.renderFormation();
+                this.renderPlayerDetailCard(player, index);
+            } else if (executeSwap) {
+                // Execute the actual swap
+                const idx1 = this.swapSourceIndex;
+                const idx2 = index;
                 const p1 = idx1 < 11 ? team.starting11[idx1] : team.bench[idx1 - 11];
                 const p2 = idx2 < 11 ? team.starting11[idx2] : team.bench[idx2 - 11];
 
@@ -1096,14 +1051,12 @@ class ManagementUI {
 
                 window.ChemistrySystem.calculateTeamChemistry(team);
 
-                // Exit swap mode
                 this.swapSourceIndex = null;
-                this.selectedPlayerIndex = index; // Keep selection on the newly clicked player position
+                this.selectedPlayerIndex = index;
                 this.renderFormation();
-                this.renderPlayerDetailCard(p1, index); // p1 is the player that moved to this slot
+                this.renderPlayerDetailCard(p1, index);
             } else {
-                // Exit swap mode
-                this.swapSourceIndex = null;
+                // Just viewing the comparison (clicked the target player)
                 this.selectedPlayerIndex = index;
                 this.renderFormation();
                 this.renderPlayerDetailCard(player, index);
@@ -1146,38 +1099,31 @@ class ManagementUI {
         this.selectedEventId = null;
 
         let html = `
-            <div class="menu-box ui-layout-container" style="background: transparent; border: none; padding: 0;">
+            <div class="menu-box ui-layout-container" style="background: transparent; border: none; padding: 0; flex-direction: column;">
 
-                <div class="ui-left-panel" style="flex: 2; padding: 20px; border-radius: 8px; background: rgba(40,40,40,0.95); display: flex; flex-direction: column;">
-                    <h2>イベント選択 (AP: ${window.gameState.ap})</h2>
-                    <p style="font-size: 14px; margin-bottom: 15px;">実行したいイベントをタップし、内容を確認して確定してください。</p>
+                <!-- Top Row: Event Cards -->
+                <div style="display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px; border-bottom: 2px solid #444; margin-bottom: 10px; flex-shrink: 0;">
+                    ${events.map(e => {
+                        let borderColor = '#555';
+                        if(e.type === 'scout') borderColor = '#27ae60';
+                        if(e.type === 'relic') borderColor = '#f39c12';
+                        if(e.type === 'training') borderColor = '#3498db';
+                        if(e.type === 'command') borderColor = '#9b59b6';
+                        if(e.type === 'mystery') borderColor = '#95a5a6';
 
-                    <div style="flex: 1; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(3, 1fr); gap: 10px; overflow-y: auto;">
-                        ${events.map(e => {
-                            let borderColor = '#555';
-                            if(e.type === 'scout') borderColor = '#27ae60';
-                            if(e.type === 'relic') borderColor = '#f39c12';
-                            if(e.type === 'training') borderColor = '#3498db';
-                            if(e.type === 'command') borderColor = '#9b59b6';
-                            if(e.type === 'mystery') borderColor = '#95a5a6';
-
-                            return `
-                                <div id="card_${e.id}" class="event-card" onclick="managementUI.selectEvent('${e.id}')"
-                                     style="background: #333; border: 2px solid ${borderColor}; border-radius: 8px; padding: 15px; cursor: pointer; display: flex; flex-direction: column; justify-content: space-between;">
-                                    <h3 style="font-size: 16px; margin-bottom: 5px;">${e.title}</h3>
-                                    <div style="font-size: 12px; color: #bbb;">${e.flavorText}</div>
-                                </div>
-                            `;
-                        }).join('')}
-                    </div>
+                        return `
+                            <div id="card_${e.id}" class="event-card" onclick="managementUI.selectEvent('${e.id}')"
+                                 style="background: rgba(40,40,40,0.95); border: 2px solid ${borderColor}; border-radius: 8px; padding: 10px; cursor: pointer; min-width: 200px; display: flex; flex-direction: column;">
+                                <h3 style="font-size: 14px; margin-bottom: 5px; color: ${borderColor};">${e.title}</h3>
+                                <div style="font-size: 11px; color: #bbb;">${e.flavorText}</div>
+                            </div>
+                        `;
+                    }).join('')}
                 </div>
 
-                <div class="ui-right-panel" style="flex: 1; display: flex; flex-direction: column; margin-left: 10px; padding: 0; background: transparent;">
-                    <div id="event-detail-panel" style="flex: 1; background: #2c3e50; border: 2px solid #34495e; border-radius: 8px; padding: 20px; display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch; text-align: left; overflow-y: auto;">
-                        <p style="color: #bbb; text-align: center; margin-top: 50px;">イベントを選択してください</p>
-                    </div>
-
-                    <button style="margin-top: 15px; width: 100%; padding: 15px; font-size: 16px; background: #c0392b;" onclick="managementUI.showDashboard()">戻る (マネジメント完了)</button>
+                <!-- Bottom Row: Selected Event Details -->
+                <div id="event-detail-panel" style="flex: 1; background: rgba(30,30,30,0.95); border-radius: 8px; padding: 15px; display: flex; flex-direction: column; overflow-y: auto;">
+                    <p style="color: #bbb; text-align: center; margin-top: 50px;">上のリストからイベントを選択してください</p>
                 </div>
             </div>
         `;
@@ -1189,90 +1135,123 @@ class ManagementUI {
         const e = window.gameState.currentEvents.find(ev => ev.id === eventId);
         if (!e) return;
 
-        // Highlight selected card
-        document.querySelectorAll('.event-card').forEach(c => c.style.boxShadow = 'none');
-        document.getElementById(`card_${eventId}`).style.boxShadow = '0 0 15px #f1c40f';
+        document.querySelectorAll('.event-card').forEach(c => {
+            c.style.boxShadow = 'none';
+            c.style.transform = 'scale(1)';
+        });
+        const activeCard = document.getElementById(`card_${eventId}`);
+        activeCard.style.boxShadow = '0 0 15px #f1c40f';
+        activeCard.style.transform = 'scale(1.05)';
 
         const detailPanel = document.getElementById('event-detail-panel');
         const team = window.gameState.playerTeam;
 
+        const posCounts = { GK:0, DF:0, MF:0, FW:0 };
+        team.players.forEach(p => {
+            if(p.position === 'GK') posCounts.GK++;
+            else if(['CB','SB'].includes(p.position)) posCounts.DF++;
+            else if(['CDM','CM','CAM','SH'].includes(p.position)) posCounts.MF++;
+            else posCounts.FW++;
+        });
+
         let detailHtml = `
-            <h3 style="margin-bottom: 10px; border-bottom: 1px solid #555; padding-bottom: 5px; text-align: center;">${e.title}</h3>
-            <p style="font-size: 13px; color: #ddd; margin-bottom: 15px; font-style: italic;">${e.flavorText}</p>
-            <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #555; padding-bottom: 10px; margin-bottom: 15px;">
+                <div>
+                    <h2 style="margin-bottom: 5px;">${e.title}</h2>
+                    <p style="font-size: 13px; color: #ddd; font-style: italic;">${e.flavorText}</p>
+                </div>
+                <div style="text-align: right; font-size: 12px; background: #222; padding: 5px 10px; border-radius: 5px; border: 1px solid #444;">
+                    <strong style="color: #f1c40f;">現在のポジション別人数</strong><br>
+                    GK: ${posCounts.GK} | DF: ${posCounts.DF} | MF: ${posCounts.MF} | FW: ${posCounts.FW}
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
         `;
 
         e.choices.forEach((choice, idx) => {
             const canAffordFunds = window.gameState.funds >= choice.fundCost;
-            const canAffordAP = window.gameState.ap >= 1; // Assuming 1 AP per event for now
+            const canAffordAP = window.gameState.ap >= 1;
             const canAfford = canAffordFunds && canAffordAP;
 
-            let extraUI = '';
             if (choice.candidates) {
-                extraUI += `<div style="margin-top: 10px; font-size: 13px; font-weight: bold; color: #2ecc71;">獲得する候補を選択:</div>`;
+                detailHtml += `<div style="width: 100%;"><h3 style="color: #27ae60; margin-bottom: 10px;">${choice.text || choice.desc} (¥${choice.fundCost.toLocaleString()})</h3><div style="display: flex; gap: 10px; margin-bottom: 15px;">`;
                 choice.candidates.forEach((cand, candIdx) => {
                     const skillsStr = cand.skills.map(sid => window.MasterData.PlayerSkills.find(s=>s.id===sid)?.name).filter(Boolean).join(', ') || 'なし';
-                    extraUI += `
-                        <div style="background: #333; padding: 8px; margin-top: 5px; border-radius: 4px; display: flex; align-items: center; gap: 10px;">
-                            <input type="radio" name="draft_select_${eventId}_${idx}" value="${candIdx}" id="cand_${eventId}_${idx}_${candIdx}" ${candIdx === 0 ? 'checked' : ''}>
-                            <label for="cand_${eventId}_${idx}_${candIdx}" style="cursor: pointer; font-size: 12px; display: inline-block;">
-                                <strong>[${cand.position}${cand.subPositions.length>0?'/'+cand.subPositions.join(','):''}] [${cand.rarity}] ${cand.name} (Lv.${cand.level} / OVR: ${cand.getOvr()})</strong> <br>
-                                <span style="color: #bbb;">スキル: ${skillsStr}</span>
+                    detailHtml += `
+                        <div style="flex: 1; background: #333; padding: 10px; border-radius: 8px; border: 1px solid #555;">
+                            <label style="cursor: pointer; display: flex; flex-direction: column; height: 100%;">
+                                <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 5px;">
+                                    <input type="radio" name="draft_select_${eventId}_${idx}" value="${candIdx}" ${candIdx === 0 ? 'checked' : ''}>
+                                    <strong>[${cand.position}${cand.subPositions.length>0?'/'+cand.subPositions.join(','):''}] ${cand.name}</strong>
+                                </div>
+                                <div style="font-size: 12px; margin-bottom: 5px;">
+                                    <span style="background: ${cand.rarity==='SSR'?'#f1c40f':cand.rarity==='SR'?'#9b59b6':'#3498db'}; color: ${cand.rarity==='SSR'?'#000':'#fff'}; padding: 1px 3px; border-radius: 2px;">${cand.rarity}</span>
+                                    OVR: ${cand.getOvr()} | Lv.${cand.level}
+                                </div>
+                                <div style="font-size: 11px; color: #ccc;">志向: ${cand.preference||'バランス'} | 役割: ${cand.role||'なし'}</div>
+                                <div style="font-size: 11px; color: #aaa; margin-top: auto; padding-top: 5px; border-top: 1px solid #444;">スキル: ${skillsStr}</div>
                             </label>
                         </div>
                     `;
                 });
+                detailHtml += `</div></div>`;
+            } else {
+                detailHtml += `
+                    <div style="flex: 1; min-width: 250px; background: #333; padding: 15px; border-radius: 8px; border: 1px solid #555;">
+                        <h3 style="margin-bottom: 10px; font-size: 16px;">${choice.text || choice.desc}</h3>
+                        ${choice.flavorText ? `<p style="font-size: 12px; color: #aaa; margin-bottom: 10px;">${choice.flavorText}</p>` : ''}
+                        ${choice.detailHtml || ''}
+                    </div>
+                `;
             }
 
             if (choice.tradeCount > 0) {
-                extraUI += `<div style="margin-top: 5px; font-size: 12px; color: #e74c3c;">放出対象を選択 (${choice.tradeCount}人):</div>`;
+                detailHtml += `<div style="width: 100%; margin-top: 5px; background: rgba(231, 76, 60, 0.1); border-left: 3px solid #e74c3c; padding: 10px;"><div style="font-size: 13px; color: #e74c3c; margin-bottom: 5px; font-weight: bold;">放出対象を選択 (${choice.tradeCount}人):</div>`;
                 for (let tc = 0; tc < choice.tradeCount; tc++) {
-                    extraUI += `<select id="trade_select_${eventId}_${idx}_${tc}" style="width: 100%; margin-top: 3px; background: #222; color: #fff; padding: 3px; border: 1px solid #555;">`;
-                    // Generate options prioritizing bench
+                    detailHtml += `<select id="trade_select_${eventId}_${idx}_${tc}" style="width: 100%; margin-top: 5px; background: #222; color: #fff; padding: 8px; border: 1px solid #555; font-size: 13px;">`;
                     let optionIndex = 0;
                     team.bench.forEach(p => {
-                        extraUI += `<option value="${p.id}" ${optionIndex === tc ? 'selected' : ''}>[ベンチ] [${p.rarity}] [${p.position}] ${p.name} (Lv.${p.level} / OVR: ${p.getOvr()})</option>`;
+                        detailHtml += `<option value="${p.id}" ${optionIndex === tc ? 'selected' : ''}>[ベンチ] [${p.rarity}] [${p.position}] ${p.name} (Lv.${p.level} / OVR: ${p.getOvr()} / ${p.preference||'バランス'})</option>`;
                         optionIndex++;
                     });
                     team.starting11.forEach(p => {
-                        extraUI += `<option value="${p.id}" ${optionIndex === tc ? 'selected' : ''}>[スタメン] [${p.rarity}] [${p.position}] ${p.name} (Lv.${p.level} / OVR: ${p.getOvr()})</option>`;
-                        optionIndex++;
+                        detailHtml += `<option value="${p.id}">[スタメン] [${p.rarity}] [${p.position}] ${p.name} (Lv.${p.level} / OVR: ${p.getOvr()})</option>`;
                     });
-                    extraUI += `</select>`;
+                    detailHtml += `</select>`;
                 }
+                detailHtml += `</div>`;
             } else if (choice.action === 'awaken') {
-                extraUI += `<div style="margin-top: 5px; font-size: 12px; color: #3498db;">覚醒対象を選択:</div>`;
-                extraUI += `<select id="awaken_select_${eventId}_${idx}" style="width: 100%; margin-top: 3px; background: #222; color: #fff; padding: 3px; border: 1px solid #555;">`;
-                team.starting11.forEach(p => { extraUI += `<option value="${p.id}">[${p.position}] ${p.name} (Lv.${p.level})</option>`; });
-                team.bench.forEach(p => { extraUI += `<option value="${p.id}">ベンチ: [${p.position}] ${p.name} (Lv.${p.level})</option>`; });
-                extraUI += `</select>`;
+                detailHtml += `<div style="width: 100%; margin-top: 5px; background: rgba(52, 152, 219, 0.1); border-left: 3px solid #3498db; padding: 10px;">
+                    <div style="font-size: 13px; color: #3498db; margin-bottom: 5px; font-weight: bold;">覚醒対象を選択:</div>
+                    <select id="awaken_select_${eventId}_${idx}" style="width: 100%; background: #222; color: #fff; padding: 8px; border: 1px solid #555; font-size: 13px;">
+                        ${team.starting11.map(p => `<option value="${p.id}">[スタメン] [${p.rarity}] [${p.position}] ${p.name} (Lv.${p.level} / OVR: ${p.getOvr()})</option>`).join('')}
+                        ${team.bench.map(p => `<option value="${p.id}">[ベンチ] [${p.rarity}] [${p.position}] ${p.name} (Lv.${p.level} / OVR: ${p.getOvr()})</option>`).join('')}
+                    </select>
+                </div>`;
             } else if (choice.action === 'teach_skill') {
-                extraUI += `<div style="margin-top: 5px; font-size: 12px; color: #3498db;">伝授する選手を選択:</div>`;
-                extraUI += `<select id="teach_select_${eventId}_${idx}" style="width: 100%; margin-top: 3px; background: #222; color: #fff; padding: 3px; border: 1px solid #555;">`;
-
                 const validTargets = team.players.filter(p => p.skills.length < 3 && choice.skill.allowedPositions.includes(p.position) && !p.skills.includes(choice.skill.id));
-                if (validTargets.length === 0) {
-                    extraUI += `<option value="">対象選手がいません</option>`;
-                } else {
-                    validTargets.forEach(p => { extraUI += `<option value="${p.id}">[${p.position}] ${p.name} (Lv.${p.level})</option>`; });
-                }
-                extraUI += `</select>`;
+                detailHtml += `<div style="width: 100%; margin-top: 5px; background: rgba(52, 152, 219, 0.1); border-left: 3px solid #3498db; padding: 10px;">
+                    <div style="font-size: 13px; color: #3498db; margin-bottom: 5px; font-weight: bold;">スキルを伝授する選手を選択:</div>
+                    <select id="teach_select_${eventId}_${idx}" style="width: 100%; background: #222; color: #fff; padding: 8px; border: 1px solid #555; font-size: 13px;">
+                        ${validTargets.length === 0 ? `<option value="">対象選手がいません</option>` : validTargets.map(p => `<option value="${p.id}">[${p.rarity}] [${p.position}] ${p.name} (Lv.${p.level} / OVR: ${p.getOvr()})</option>`).join('')}
+                    </select>
+                </div>`;
             } else if (choice.action === 'mad_science') {
-                extraUI += `<div style="margin-top: 5px; font-size: 12px; color: #3498db;">手術対象を選択:</div>`;
-                extraUI += `<select id="mad_select_${eventId}_${idx}" style="width: 100%; margin-top: 3px; background: #222; color: #fff; padding: 3px; border: 1px solid #555;">`;
-                team.starting11.forEach(p => { extraUI += `<option value="${p.id}">[${p.position}] ${p.name} (Lv.${p.level})</option>`; });
-                team.bench.forEach(p => { extraUI += `<option value="${p.id}">ベンチ: [${p.position}] ${p.name} (Lv.${p.level})</option>`; });
-                extraUI += `</select>`;
+                detailHtml += `<div style="width: 100%; margin-top: 5px; background: rgba(155, 89, 182, 0.1); border-left: 3px solid #9b59b6; padding: 10px;">
+                    <div style="font-size: 13px; color: #9b59b6; margin-bottom: 5px; font-weight: bold;">手術対象を選択:</div>
+                    <select id="mad_select_${eventId}_${idx}" style="width: 100%; background: #222; color: #fff; padding: 8px; border: 1px solid #555; font-size: 13px;">
+                        ${team.starting11.map(p => `<option value="${p.id}">[スタメン] [${p.rarity}] [${p.position}] ${p.name} (Lv.${p.level} / OVR: ${p.getOvr()})</option>`).join('')}
+                        ${team.bench.map(p => `<option value="${p.id}">[ベンチ] [${p.rarity}] [${p.position}] ${p.name} (Lv.${p.level} / OVR: ${p.getOvr()})</option>`).join('')}
+                    </select>
+                </div>`;
             }
 
             detailHtml += `
-                <div style="background: #1a252f; border: 1px solid ${canAfford ? '#3498db' : '#555'}; padding: 10px; border-radius: 5px;">
-                    <div style="font-size: 13px; margin-bottom: 5px; line-height: 1.4;">${choice.desc}</div>
-                    ${extraUI}
-                    <button onclick="managementUI.executeEvent('${e.id}', ${idx})"
-                            ${!canAfford ? 'disabled' : ''}
-                            style="margin-top: 10px; width: 100%; padding: 8px; font-size: 14px; background: ${canAfford ? '#2980b9' : '#555'};">
-                        実行 (AP: 1)
+                <div style="width: 100%;">
+                    <button onclick="managementUI.executeEvent('${eventId}', ${idx})" ${!canAfford ? 'disabled' : ''}
+                            style="width: 100%; padding: 12px; font-size: 16px; background: ${canAfford ? '#3498db' : '#555'}; margin-top: 10px;">
+                        ${choice.text || choice.desc}を実行 (コスト: ¥${choice.fundCost.toLocaleString()} / AP: 1)
                     </button>
                 </div>
             `;
@@ -1287,45 +1266,31 @@ class ManagementUI {
         const baseTypes = ['command', 'scout', 'training', 'relic', 'mystery'];
         window.gameState.turnRelicPool = null;
 
-        // Randomly determine number of events: 4 to 7
         const numEvents = Math.floor(Math.random() * 4) + 4;
-
-        // Count how many of each type we've added to enforce max 2 per category
-        const typeCounts = {
-            command: 0, scout: 0, training: 0, relic: 0, mystery: 0
-        };
-
+        const typeCounts = { command: 0, scout: 0, training: 0, relic: 0, mystery: 0 };
         const tier = window.gameState.currentTier;
         const matchday = window.gameState.league ? window.gameState.league.currentMatchday : 1;
         const costMultiplier = (4 - tier) + (matchday * 0.1);
         const currentSquadSize = window.gameState.playerTeam.players.length;
 
-        // Guarantee at least one of each main type
         const guaranteedTypes = ['scout', 'training', 'relic', 'command'];
         const numEventsToGenerate = Math.max(numEvents, 4);
 
         for (let i = 0; i < numEventsToGenerate; i++) {
             let type;
-            if (i < 4) {
-                type = guaranteedTypes[i];
-            } else {
+            if (i < 4) type = guaranteedTypes[i];
+            else {
                 let availableTypes = baseTypes.filter(t => typeCounts[t] < 2);
                 if (availableTypes.length === 0) availableTypes = ['mystery'];
                 type = availableTypes[Math.floor(Math.random() * availableTypes.length)];
             }
             typeCounts[type]++;
 
-            let eventObj = {
-                id: `evt_${Date.now()}_${i}`,
-                type: type,
-                choices: []
-            };
+            let eventObj = { id: `evt_${Date.now()}_${i}`, type: type, choices: [] };
 
             if (type === 'scout') {
                 eventObj.title = 'スカウトからの提案';
                 eventObj.flavorText = '「監督、有望な選手を見つけました。チームの補強にいかがですか？」';
-
-                // Draft options creation
                 const generateDraftChoice = (costBase, tradeCount, rarity) => {
                     const cost = Math.floor(costBase * costMultiplier);
                     const candidates = [
@@ -1333,11 +1298,10 @@ class ManagementUI {
                         window.Player.generateRandom("draft_1", null, rarity),
                         window.Player.generateRandom("draft_2", null, rarity)
                     ];
-                    let descStr = tradeCount > 0 ? `資金¥${cost.toLocaleString()} ＋ 選手${tradeCount}人放出` : `資金¥${cost.toLocaleString()}`;
-                    descStr += `で ${rarity}候補から1人獲得`;
+                    let textStr = tradeCount > 0 ? `${rarity}選手獲得（${tradeCount}人放出）` : `${rarity}選手獲得`;
 
                     eventObj.choices.push({
-                        desc: descStr,
+                        text: textStr,
                         fundCost: cost,
                         tradeCount: tradeCount,
                         rewardRarity: rarity,
@@ -1345,39 +1309,25 @@ class ManagementUI {
                     });
                 };
 
-                // Choice 1: Standard
-                if (currentSquadSize >= 18) {
-                    generateDraftChoice(100000, 1, 'N');
-                } else {
-                    generateDraftChoice(100000, 0, 'N');
-                }
-
-                // Choice 2: Trade 1
-                if (currentSquadSize - 1 + 1 >= 11) {
-                    generateDraftChoice(200000, 1, 'R');
-                } else {
-                    generateDraftChoice(300000, 0, 'R');
-                }
-
-                // Choice 3: Premium
-                if (currentSquadSize - 2 + 1 >= 11) {
-                    generateDraftChoice(400000, 2, Math.random() > 0.8 ? 'SSR' : 'SR');
-                }
+                if (currentSquadSize >= 18) { generateDraftChoice(100000, 1, 'N'); } else { generateDraftChoice(100000, 0, 'N'); }
+                if (currentSquadSize - 1 + 1 >= 11) { generateDraftChoice(200000, 1, 'R'); } else { generateDraftChoice(300000, 0, 'R'); }
+                if (currentSquadSize - 2 + 1 >= 11) { generateDraftChoice(400000, 2, Math.random() > 0.8 ? 'SSR' : 'SR'); }
             } else if (type === 'training') {
                 const isAwakening = Math.random() > 0.7;
                 if (isAwakening) {
                     eventObj.title = '特別覚醒イベント';
                     eventObj.flavorText = '「特定の選手の潜在能力を引き出すチャンスです！」';
                     eventObj.choices.push({
-                        desc: `資金¥${Math.floor(300000 * costMultiplier).toLocaleString()}で、指定選手1名を大幅レベルアップ (EXP +300 / コンディション回復)`,
+                        text: '個別指導',
+                        detailHtml: '<p style="color: #2ecc71;">指定選手1名を大幅レベルアップ (EXP +300 / コンディション回復)</p>',
                         fundCost: Math.floor(300000 * costMultiplier),
                         action: 'awaken'
                     });
                 } else {
                     eventObj.title = '全体練習メニュー';
                     eventObj.flavorText = '「今日の練習はどうしますか？」';
-                    eventObj.choices.push({ desc: '軽めの調整 (無償) - 全員の体力+30 / EXP+10', fundCost: 0, action: 'light' });
-                    eventObj.choices.push({ desc: `特別合宿 (資金¥${Math.floor(150000 * costMultiplier).toLocaleString()}) - 全員のEXP+50 / 体力-20`, fundCost: Math.floor(150000 * costMultiplier), action: 'heavy' });
+                    eventObj.choices.push({ text: '軽めの調整', detailHtml: '<p style="color: #2ecc71;">全員の体力+30 / EXP+10</p>', fundCost: 0, action: 'light' });
+                    eventObj.choices.push({ text: '特別合宿', detailHtml: '<p style="color: #f1c40f;">全員のEXP+50 / 体力-20</p>', fundCost: Math.floor(150000 * costMultiplier), action: 'heavy' });
                 }
             } else if (type === 'relic') {
                 eventObj.title = '怪しい商人';

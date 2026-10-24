@@ -87,13 +87,35 @@ body {
 }
 
 .top-bar {
-    background-color: rgba(30, 30, 30, 0.9);
+    background-color: rgba(30, 30, 30, 0.95);
     padding: 10px 20px;
     display: flex;
     flex-direction: column;
     border-bottom: 2px solid #444;
     pointer-events: auto; /* Enable clicks on UI */
     z-index: 20;
+    width: 100%;
+}
+
+.top-bar-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.top-bar-info {
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.top-bar-actions .rest-btn {
+    background-color: #27ae60;
+    padding: 5px 10px;
+    font-size: 14px;
+    border-radius: 4px;
 }
 
 .top-bar-main {
@@ -369,9 +391,9 @@ button:disabled {
 
 .deck-bottom-row {
     display: flex;
+    gap: 10px;
     justify-content: center;
-    gap: 15px;
-    flex-grow: 1;
+    flex: 1;
 }
 
 .command-slot {
