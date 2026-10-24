@@ -718,6 +718,36 @@ class MatchScene extends Phaser.Scene {
         });
     }
 
+    calculateThreat(x, y, isPlayerTeam) {
+        const goalX = isPlayerTeam ? 800 : 0;
+        const distToGoal = Phaser.Math.Distance.Between(x, y, goalX, 300);
+        // Normalize distance (max distance is roughly 800)
+        let threat = 100 - (distToGoal / 800) * 100;
+        return Math.max(0, Math.min(100, threat));
+    }
+
+    calculatePassRisk(x1, y1, x2, y2, isPlayerTeam) {
+        const enemies = isPlayerTeam ? this.opponentSprites : this.playerSprites;
+        let risk = 0;
+        let closestDist = Infinity;
+
+        enemies.forEach(e => {
+            const dist = Phaser.Math.Distance.Between(x2, y2, e.x, e.y);
+            if (dist < closestDist) closestDist = dist;
+
+            // Check if enemy is near the target
+            if (dist < 80) {
+                risk += (80 - dist);
+            }
+        });
+
+        // Also consider pass distance (longer passes are riskier)
+        const passDist = Phaser.Math.Distance.Between(x1, y1, x2, y2);
+        risk += (passDist / 400) * 20;
+
+        return Math.min(100, risk);
+    }
+
     evaluateActions(p, context) {
         let actionScores = { Keep: 0, Dribble: 0, Pass: 0, Shoot: 0, Clear: 0, Support: 0, RunIntoSpace: 0, HoldPosition: 0, Press: 0, Mark: 0, Cover: 0, Delay: 0, Retreat: 0 };
         const pos = p.playerData.position; const role = p.playerData.role; const tactic = context.tactic;
