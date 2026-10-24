@@ -718,6 +718,39 @@ class MatchScene extends Phaser.Scene {
         });
     }
 
+
+    getActiveConditions(player) {
+        let conditions = ['always'];
+        if (player.isPlayerTeam) {
+            if (this.score.player < this.score.opponent) conditions.push('behind');
+            else if (this.score.player > this.score.opponent) conditions.push('lead');
+        } else {
+            if (this.score.opponent < this.score.player) conditions.push('behind');
+            else if (this.score.opponent > this.score.player) conditions.push('lead');
+        }
+        if (this.matchTime >= 75) conditions.push('lateGame');
+        return conditions;
+    }
+
+    getEffectiveStat(player, statName, activeConditions) {
+        let baseStat = player.playerData.dynamicStats ? player.playerData.dynamicStats[statName] : player.playerData.stats[statName];
+        if (baseStat === undefined) baseStat = 50; // fallback
+
+        let finalStat = baseStat;
+        if (window.Player && window.Player.getSkillEffectFor) {
+            const skillEffect = window.Player.getSkillEffectFor(player.playerData, "STAT_UP", statName, activeConditions);
+            if (skillEffect && skillEffect.value) {
+                finalStat += skillEffect.value;
+            }
+            const allStatEffect = window.Player.getSkillEffectFor(player.playerData, "STAT_UP", "all", activeConditions);
+            if (allStatEffect && allStatEffect.value) {
+                finalStat += allStatEffect.value;
+            }
+        }
+
+        return Math.max(0, Math.min(100, finalStat));
+    }
+
     calculateThreat(x, y, isPlayerTeam) {
         const goalX = isPlayerTeam ? 800 : 0;
         const distToGoal = Phaser.Math.Distance.Between(x, y, goalX, 300);
