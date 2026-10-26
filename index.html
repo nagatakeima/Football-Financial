@@ -10,7 +10,7 @@
 </head>
 <body>
     <div id="game-container">
-        <!-- UI Overlay for Management Phase / Match UI -->
+        <!-- Out-Game Management Layer -->
         <div id="ui-layer">
             <header class="top-bar" id="top-bar" style="display: none;">
                 <div class="top-bar-main">
@@ -19,25 +19,102 @@
                 </div>
             </header>
             <main class="ui-content" id="ui-content">
-                <!-- UI injected here by managementUI.js -->
+                <!-- Out-game UI injected by managementUI.js -->
             </main>
         </div>
 
-        <!-- Phaser Canvas Container (only visible during match) -->
-        <div id="phaser-game" style="display: none;"></div>
-
-        <!-- Micro Command Deck (visible during match) -->
-        <div id="micro-command-bar" style="display: none;">
-            <div class="deck-top-row">
-                <div class="tactic-toggles">
-                    <button class="tactic-btn active" data-tactic="Balance">⚖️ バランス</button>
-                    <button class="tactic-btn" data-tactic="Attack">🔥 猛攻</button>
-                    <button class="tactic-btn" data-tactic="Defend">🛡️ 全員守備</button>
+        <!-- FC27-Style In-Game Tactical Simulation Screen -->
+        <div id="match-screen-wrapper" style="display: none;">
+            <!-- Top Broadcast Header -->
+            <header class="fc-match-header">
+                <div class="fc-league-pill" id="fc-league-pill">LEAGUE THREE</div>
+                <div class="fc-scoreboard-row">
+                    <div class="fc-team-block home">
+                        <span class="fc-team-name" id="fc-home-name">Your Club</span>
+                        <div class="fc-team-crest home-crest" id="fc-home-crest">YC</div>
+                    </div>
+                    <div class="fc-score-center">
+                        <div class="fc-score-box">
+                            <span id="fc-score-home">0</span>
+                            <span class="fc-score-colon">:</span>
+                            <span id="fc-score-away">0</span>
+                        </div>
+                        <div class="fc-match-clock" id="fc-match-clock">00:00</div>
+                    </div>
+                    <div class="fc-team-block away">
+                        <div class="fc-team-crest away-crest" id="fc-away-crest">OPP</div>
+                        <span class="fc-team-name" id="fc-away-name">Opponent</span>
+                    </div>
                 </div>
-                <button id="btn-sub-tactic" class="sub-btn">🔄 交代・戦術 (枠: 3)</button>
+                <div class="fc-scorers-row">
+                    <div class="fc-scorers-list home" id="fc-scorers-home"></div>
+                    <div class="fc-gimmick-label" id="fc-gimmick-label">環境: 通常</div>
+                    <div class="fc-scorers-list away" id="fc-scorers-away"></div>
+                </div>
+                <div class="fc-speed-controls">
+                    <button class="fc-speed-btn active" id="btn-speed-1x" data-speed="1">1x</button>
+                    <button class="fc-speed-btn" id="btn-speed-2x" data-speed="2">2x</button>
+                    <button class="fc-speed-btn" id="btn-speed-4x" data-speed="4">4x</button>
+                    <button class="fc-speed-btn" id="btn-pause-match">⏸ 一時停止</button>
+                    <button class="fc-speed-btn skip" id="btn-skip-match">⏭ 結果までジャンプ</button>
+                </div>
+            </header>
+
+            <!-- Center 3-Column Arena (Left Team Panel | Center Pitch | Right Team Panel) -->
+            <div class="fc-arena-body">
+                <!-- Left Side Panel (Player Team) -->
+                <aside class="fc-side-panel left" id="fc-left-panel">
+                    <div class="fc-roster-tabs" id="fc-left-roster-tabs">
+                        <button class="fc-roster-tab active" data-side="home" data-group="starters">スタメン</button>
+                        <button class="fc-roster-tab" data-side="home" data-group="bench">ベンチ</button>
+                    </div>
+                    <div class="fc-side-content" id="fc-left-content"></div>
+                </aside>
+
+                <!-- Center Tactical Pitch -->
+                <div class="fc-pitch-stage">
+                    <div id="phaser-game"></div>
+
+                    <!-- FC27 Goal Banner Popup -->
+                    <div id="fc-goal-banner" class="fc-goal-banner" style="display: none;">
+                        <div class="fc-goal-title">ゴール</div>
+                        <div class="fc-goal-details" id="fc-goal-details">15' | #9 F. Silva (CF)</div>
+                    </div>
+                </div>
+
+                <!-- Right Side Panel (Opponent Team) -->
+                <aside class="fc-side-panel right" id="fc-right-panel">
+                    <div class="fc-roster-tabs" id="fc-right-roster-tabs">
+                        <button class="fc-roster-tab active" data-side="away" data-group="starters">スタメン</button>
+                        <button class="fc-roster-tab" data-side="away" data-group="bench">ベンチ</button>
+                    </div>
+                    <div class="fc-side-content" id="fc-right-content"></div>
+                </aside>
             </div>
-            <div class="deck-bottom-row" id="command-slots-container">
-                <!-- Command slots injected dynamically -->
+
+            <!-- FC27 View Mode Tabs (Stamina | Rating | Stats | Game Plan) -->
+            <div class="fc-view-switcher">
+                <span class="fc-key-hint">L2</span>
+                <button class="fc-view-tab active" data-view="stamina">体力</button>
+                <button class="fc-view-tab" data-view="rating">レート</button>
+                <button class="fc-view-tab" data-view="stats">スタッツ</button>
+                <button class="fc-view-tab" data-view="gameplan">ゲームプラン</button>
+                <span class="fc-key-hint">R2</span>
+            </div>
+
+            <!-- Bottom Tactical Command & Control Deck -->
+            <div id="micro-command-bar">
+                <div class="deck-left-controls">
+                    <div class="tactic-toggles">
+                        <button class="tactic-btn active" data-tactic="Balance">⚖️ バランス</button>
+                        <button class="tactic-btn" data-tactic="Attack">🔥 猛攻</button>
+                        <button class="tactic-btn" data-tactic="Defend">🛡️ 全員守備</button>
+                    </div>
+                    <button id="btn-sub-tactic" class="sub-btn">🔄 チーム管理・交代 (枠: 3)</button>
+                </div>
+                <div class="deck-bottom-row" id="command-slots-container">
+                    <!-- 4 Micro Command slots injected dynamically -->
+                </div>
             </div>
         </div>
     </div>
