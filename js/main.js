@@ -1304,4 +1304,135 @@ class MatchScene extends Phaser.Scene {
 
     attemptTrapOrSave(interceptor) {
         const isGK = interceptor.playerData.position === 'GK';
-        const conds
+        const conds = this.getActiveConditions(interceptor);
+        const skillBonus = window.Player.getSkillEffectFor(interceptor.playerData, "SUCCESS_RATE_UP", isGK ? "save" : "trap", conds);
+        const stat = this.getEffectiveStat(interceptor, isGK ? 'defense' : 'dribble', conds) + (skillBonus.value || 0);
+
+        let successChance = stat * (isGK ? 0.8 : 0.9);
+        if (this.ball.isShot && !isGK) successChance *= 0.3; // Hard to trap a shot
+
+        if (Math.random() * 100 < successChance) {
+            this.ball.owner = interceptor;
+            this.ball.z = 0;
+            this.ball.isShot = false;
+            interceptor.actionCooldown = 15;
+            if (isGK) {
+                this.matchStats.playerPossession += (interceptor.isPlayerTeam ? 1 : 0);
+            }
+        }
+    }
+
+    triggerGoal(isPlayerTeam) {
+        if (isPlayerTeam) this.score.player++; else this.score.opponent++;
+        this.scoreText.setText(`${this.playerTeamData.name} ${this.score.player} - ${this.score.opponent} ${this.opponentTeamData.name}`);
+
+        this.matchState = 'celebration';
+
+        const text = this.add.text(400, 300, 'GOAL!!!', {
+            fontSize: '80px',
+            fill: '#f1c40f',
+            fontStyle: 'bold',
+            stroke: '#c0392b',
+            strokeThickness: 8
+        }).setOrigin(0.5).setDepth(2000).setScale(0.1);
+
+        this.tweens.add({
+            targets: text,
+            scale: 1.5,
+            duration: 800,
+            ease: 'Bounce.easeOut',
+            onComplete: () => {
+                this.tweens.add({
+                    targets: text,
+                    alpha: 0,
+                    delay: 2000,
+                    duration: 500,
+                    onComplete: () => {
+                        text.destroy();
+                        this.resetPositions();
+                    }
+                });
+            }
+        });
+
+        // Find the scorer (last touched) and make them jump
+        let scorer = this.ball.owner;
+        if (!scorer) {
+            // Find closest player to goal
+            const team = isPlayerTeam ? this.playerSprites : this.opponentSprites;
+            const goalX = isPlayerTeam ? 800 : 0;
+            scorer = team.reduce((closest, p) => Math.abs(p.x - goalX) < Math.abs(closest.x - goalX) ? p : closest, team[0]);
+        }
+
+        if (scorer) {
+            this.tweens.add({
+                targets: scorer.bodyParts,
+                y: '-=15',
+                yoyo: true,
+                repeat: 5,
+                duration: 300,
+                ease: 'Sine.easeInOut'
+            });
+        }
+    }
+
+    finishMatchInstantly() {
+        while (this.matchTime < 90) {
+            this.matchTime += 1;
+            const playerStr = this.playerTeamData.getOverallStrength();
+            const oppStr = this.opponentTeamData.getOverallStrength();
+            if (Math.random() < 0.05) { if (Math.random() * 100 < playerStr / 2) this.score.player++; }
+            if (Math.random() < 0.05) { if (Math.random() * 100 < oppStr / 2) this.score.opponent++; }
+        }
+        this.logicTimer.remove();
+        this.endMatch(this.score.player, this.score.opponent);
+    }
+
+    endMatch(playerScore, oppScore) {
+        this.scene.pause();
+        const resultBg = this.add.rectangle(400, 300, 400, 200, 0x000000, 0.9);
+        resultBg.setStrokeStyle(4, 0xffffff);
+        this.add.text(400, 250, 'MATCH FINISHED', { fontSize: '32px', fill: '#fff' }).setOrigin(0.5);
+        this.add.text(400, 300, `${playerScore} - ${oppScore}`, { fontSize: '48px', fill: '#f1c40f', fontStyle: 'bold' }).setOrigin(0.5);
+        const btn = this.add.rectangle(400, 360, 150, 40, 0x3498db).setInteractive();
+        this.add.text(400, 360, 'ロッカールームへ', { fontSize: '16px', fill: '#fff' }).setOrigin(0.5);
+        btn.on('pointerdown', () => {
+            window.gameState.processPostMatch(playerScore, oppScore);
+            document.getElementById('ui-content').style.display = 'flex';
+            document.querySelector('header.top-bar').style.display = 'flex';
+
+            if (window.gameState.pendingVictoryReward) {
+                managementUI.showVictoryReward();
+            } else {
+                managementUI.showDashboard();
+            }
+            this.scene.stop();
+        });
+    }
+}
+
+// ==========================================
+// Game Configuration
+// ==========================================
+const config = {
+    type: Phaser.AUTO,
+    width: 800,
+    height: 600,
+    parent: 'phaser-game',
+    scene: [MatchScene],
+    transparent: true
+};
+
+let game;
+
+function startGame() {
+    document.getElementById('ui-content').style.display = 'none';
+    document.querySelector('header.top-bar').style.display = 'none';
+
+    if (!game) {
+        game = new Phaser.Game(config);
+    } else {
+        game.scene.start('MatchScene');
+    }
+}
+window.startGame = startGame;
