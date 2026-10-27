@@ -1406,6 +1406,9 @@ class MatchScene extends Phaser.Scene {
             } else {
                 managementUI.showDashboard();
             }
+            this.game.canvas.style.display = 'none';
+            const fcUiLayer = document.getElementById('fc-match-ui-layer');
+            if (fcUiLayer) fcUiLayer.style.display = 'none';
             this.scene.stop();
         });
     }
