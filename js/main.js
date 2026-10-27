@@ -188,7 +188,7 @@ class MatchScene extends Phaser.Scene {
         this.ballSpeed = 0;
     }
 
-    createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
+createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
         const container = this.add.container(400, 300);
         container.setDepth(20);
 
@@ -771,7 +771,7 @@ class MatchScene extends Phaser.Scene {
         };
     }
 
-getDynamicBasePosition(p, isAttacking, isPlayerTeam) {
+    getDynamicBasePosition(p, isAttacking, isPlayerTeam) {
         const base = this.getBasePosition(p, isPlayerTeam);
         let tx = base.x;
         let ty = base.y;
@@ -783,37 +783,40 @@ getDynamicBasePosition(p, isAttacking, isPlayerTeam) {
             return { x: isPlayerTeam ? 42 : 758, y: Phaser.Math.Clamp(300 + (this.ball.y - 300) * 0.15, 265, 335) };
         }
 
-        const ballRelX = isPlayerTeam ? this.ball.x : (800 - this.ball.x);
-        let phaseShift = 0; let widthMult = 1.0;
+        // Dynamic team block shift based on ball X (FC27 cohesive block movement)
+        const ballShift = (this.ball.x - 400) * 0.42;
+        const phaseShift = isAttacking ? 65 * dir : -55 * dir;
+        tx += ballShift + phaseShift;
 
-        if (isAttacking) {
-            if (ballRelX < 266) { phaseShift = 20 * dir; widthMult = 1.3; }
-            else if (ballRelX < 533) { phaseShift = 60 * dir; widthMult = 1.1; }
-            else { phaseShift = 100 * dir; widthMult = 0.9; }
-            if (this.realTimeTactic === 'Attack') phaseShift += 40 * dir;
-        } else {
-            if (ballRelX > 533) { phaseShift = -30 * dir; widthMult = 0.8; }
-            else if (ballRelX > 266) { phaseShift = -55 * dir; widthMult = 0.7; }
-            else { phaseShift = -90 * dir; widthMult = 0.5; }
-            if (this.realTimeTactic === 'Defend') phaseShift -= 40 * dir;
-        }
+        if (this.realTimeTactic === 'Attack' && isPlayerTeam) tx += 35;
+        if (this.realTimeTactic === 'Defend' && isPlayerTeam) tx -= 40;
+        if (this.activeBuff && this.activeBuff.target === 'defenseLine' && isPlayerTeam) tx += 45;
 
-        tx += phaseShift;
-        ty = 300 + ((ty - 300) * widthMult);
-
+        // Role overrides (Required by test_phase3_ai.js)
         if (!p.playerData?.isMob) {
-            if (pos === 'SB') {
-                if (isAttacking && role === 'Attacking') { tx += 40 * dir; ty = ty < 300 ? Math.max(65, ty - 20) : Math.min(535, ty + 20); }
-                else if (isAttacking && role === 'Inverted') { ty = ty < 300 ? 230 : 370; tx += 30 * dir; }
-            } else if (pos === 'WG') {
-                if (isAttacking && role === 'Inside-Forward') { ty = ty < 300 ? 240 : 360; tx += 40 * dir; }
-            } else if (pos === 'CF') {
-                if (isAttacking && role === 'False-9') { tx -= 30 * dir; }
-                else if (isAttacking && role === 'Poacher') { tx += 30 * dir; }
+            if (pos === 'SB' && role === 'Inverted' && isAttacking) {
+                ty = ty < 300 ? 220 : 380;
+                tx += 25 * dir;
+            } else if (pos === 'SB' && role === 'Attacking' && isAttacking) {
+                tx += 55 * dir;
+            } else if (pos === 'CF' && role === 'False-9' && isAttacking) {
+                tx -= 45 * dir;
+            } else if (pos === 'CF' && role === 'Poacher' && isAttacking) {
+                tx += 30 * dir;
+            } else if (pos === 'WG' && role === 'Inside-Forward' && isAttacking) {
+                ty = ty < 300 ? 235 : 365;
+                tx += 25 * dir;
             }
         }
-        ty += (this.ball.y - 300) * (isAttacking ? 0.2 : 0.35);
-        return { x: Phaser.Math.Clamp(tx, 65, 735), y: Phaser.Math.Clamp(ty, 58, 542) };
+
+        // Width compression when defending
+        if (!isAttacking) {
+            ty = ty + (this.ball.y - ty) * 0.22;
+        }
+
+        tx = Phaser.Math.Clamp(tx, 65, 735);
+        ty = Phaser.Math.Clamp(ty, 58, 542);
+        return { x: tx, y: ty };
     }
 
     calculateThreat(x, y, isPlayerTeam) {
@@ -959,7 +962,8 @@ getDynamicBasePosition(p, isAttacking, isPlayerTeam) {
                     if (titleEl) titleEl.innerText = 'HALF TIME';
                     if (descEl) descEl.innerText = '前半終了';
                     banner.style.display = 'flex';
-                    setTimeout(() => banner.style.display = 'none', 2000);
+                    if (this.bannerTimeout) clearTimeout(this.bannerTimeout);
+                    this.bannerTimeout = setTimeout(() => banner.style.display = 'none', 2000);
                 }
                 this.openSubstitutionUI('halftime');
                 return;
@@ -986,7 +990,6 @@ getDynamicBasePosition(p, isAttacking, isPlayerTeam) {
         });
 
         this.simulateAction();
-        if (this.syncBallVisuals) this.syncBallVisuals();
     }
 
     simulateAction() {
@@ -1199,6 +1202,7 @@ getDynamicBasePosition(p, isAttacking, isPlayerTeam) {
         });
 
         this.syncBallVisuals();
+        if (this.syncPlayerVisuals) this.syncPlayerVisuals();
     }
 
     decideBallOwnerAction(owner) {
@@ -1326,7 +1330,7 @@ getDynamicBasePosition(p, isAttacking, isPlayerTeam) {
     }
 
 
-    syncBallVisuals() {
+    syncPlayerVisuals() {
         const allPlayers = [...this.playerSprites, ...this.opponentSprites];
         allPlayers.forEach(p => {
             const depthRatio = Phaser.Math.Clamp((p.y - 45) / 510, 0, 1);
@@ -1342,14 +1346,25 @@ getDynamicBasePosition(p, isAttacking, isPlayerTeam) {
             }
         });
     }
+
     triggerGoal(isPlayerTeam) {
         if (isPlayerTeam) this.score.player++; else this.score.opponent++;
         this.scoreText.setText(`${this.playerTeamData.name} ${this.score.player} - ${this.score.opponent} ${this.opponentTeamData.name}`);
 
         this.matchState = 'celebration';
 
-        const bannerTitle = document.querySelector('.fc-goal-title');
-        if (bannerTitle) bannerTitle.innerText = 'ゴール';
+        const banner = document.getElementById('fc-goal-banner');
+        if (banner) {
+            const titleEl = document.querySelector('.fc-goal-title');
+            const descEl = document.getElementById('fc-goal-details');
+            if (titleEl) titleEl.innerText = 'ゴール';
+            const popupScorer = this.ball.lastShooter ? this.ball.lastShooter.playerData : { name: 'Unknown', position: 'FW', jerseyNumber: 9 };
+            if (descEl) descEl.innerText = `${Math.floor(this.matchTime)}' | #${popupScorer.jerseyNumber} ${popupScorer.name} (${popupScorer.position})`;
+            banner.style.display = 'flex';
+            if (this.bannerTimeout) clearTimeout(this.bannerTimeout);
+            this.bannerTimeout = setTimeout(() => banner.style.display = 'none', 3000);
+        }
+
         const text = this.add.text(400, 300, 'GOAL!!!', {
             fontSize: '80px',
             fill: '#f1c40f',
