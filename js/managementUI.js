@@ -202,100 +202,49 @@ class ManagementUI {
     // =========================================================
     // 1. 編成・戦術ビルド画面 (3カラム・スクロールゼロ)
     // =========================================================
-    showSquad() {
+showSquad() {
         if (window.gameState.isGameOver) {
             this.showGameOver();
             return;
         }
         this.activeTab = 'squad';
-        if (this.matchWrapper) this.matchWrapper.style.display = 'none';
-        if (this.uiLayer) this.uiLayer.style.display = 'flex';
-        this.gameContainer.classList.remove('match-mode');
 
         const team = window.gameState.playerTeam;
-        const activeLinksCount = window.ChemistrySystem.calculateTeamChemistry(team) || 0;
-        this.updateTopBar();
+        let html = `
+            <div class="ui-layout-container" style="display: flex; flex-direction: row; width: 100%; height: calc(100vh - 100px); overflow: hidden; gap: 15px; padding: 10px;">
+                <div class="ui-panel left-panel" style="flex: 1; display: flex; flex-direction: column; gap: 10px; height: 100%; background: transparent; border: none; box-shadow: none;">
 
-        const avgOvr = Math.floor(team.starting11.reduce((sum, p) => sum + p.getOvr(), 0) / 11);
-
-        const html = `
-            <div class="ui-layout-container">
-                <!-- Left Column: Tactical Pitch -->
-                <div class="ui-panel" style="flex: 0 0 410px;">
-                    <div class="panel-header-title">
+                    <div style="background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px; display: flex; gap: 10px; align-items: center; justify-content: space-between;">
                         <div>
-                            フォーメーション:
-                            <select onchange="managementUI.changeFormation(this.value)" style="background: #163028; color: #fff; border: 1px solid #2ecc71; padding: 3px 8px; border-radius: 4px; font-weight: 700;">
-                                ${team.manager.formations.map(f => `<option value="${f}" ${f === team.formation ? 'selected' : ''}>${f}</option>`).join('')}
+                            <span style="color:#aaa; font-size: 12px;">フォーメーション:</span>
+                            <select id="formation-select" onchange="managementUI.changeFormation(this.value)" style="background:#222; color:#fff; border:1px solid #444; padding:4px;">
+                                ${Object.keys(window.MasterData.Formations).map(f => `<option value="${f}" ${team.formation === f ? 'selected' : ''}>${f}</option>`).join('')}
                             </select>
                         </div>
-                        <div style="text-align: right; font-size: 11px;">
-                            <span style="color: #f1c40f;">平均OVR: ${avgOvr}</span> |
-                            <span style="color: #2ecc71;">連携線: ${team.chemistryLinks?.length || activeLinksCount}本</span>
+                        <div style="display:flex; gap: 5px;">
+                            ${[0,1,2,3].map(i => `
+                                <select id="micro-cmd-${i}" onchange="managementUI.updateMicroCommand(${i}, this.value, 'squad')" style="background:#222; color:#fff; border:1px solid #444; padding:4px; max-width: 100px;">
+                                    <option value="">--未設定--</option>
+                                    ${window.MasterData.MicroCommands.map(cmd => `<option value="${cmd.id}" ${team.microCommands[i] === cmd.id ? 'selected' : ''}>${cmd.name}</option>`).join('')}
+                                </select>
+                            `).join('')}
                         </div>
                     </div>
 
-                    <div id="pitch-area" style="flex: 1; background: linear-gradient(180deg, #0d281e 0%, #123528 50%, #0d281e 100%); border: 2px solid rgba(255,255,255,0.25); position: relative; border-radius: 6px; overflow: hidden;">
-                        <canvas id="chem-canvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></canvas>
-                        <div style="position: absolute; top: 6px; width: 100%; text-align: center; color: rgba(255,255,255,0.35); font-weight: 800; font-size: 11px; pointer-events: none;">▲ ATTACK (FW)</div>
-                        <div style="position: absolute; top: 50%; left: 0; width: 100%; height: 1px; background: rgba(255,255,255,0.18); pointer-events: none;"></div>
-                        <div style="position: absolute; bottom: 6px; width: 100%; text-align: center; color: rgba(255,255,255,0.35); font-weight: 800; font-size: 11px; pointer-events: none;">▼ DEFENSE (GK)</div>
-                        <div id="formation-container" style="position: relative; width: 100%; height: 100%;"></div>
+                    <div class="pitch-container-25d" id="fc-tactics-pitch">
+                        <canvas id="chem-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none; z-index: 1; width: 100%; height: 100%;"></canvas>
                     </div>
 
-                    <div style="font-size: 10px; text-align: center; margin-top: 6px; color: #bdc3c7;">
-                        【戦術志向枠】
-                        <span style="color: #3498db;">■Possession</span>
-                        <span style="color: #e74c3c;">■Counter</span>
-                        <span style="color: #f1c40f;">■HighPress</span>
-                        <span style="color: #2ecc71;">■Retreat</span>
+                    <div class="horizontal-bench-container" id="fc-bench-container">
                     </div>
                 </div>
 
-                <!-- Center Column: Bench 7 & Micro Commands 4 -->
-                <div class="ui-panel" style="flex: 1;">
-                    <div class="panel-header-title">
-                        <span>ベンチメンバー (7名)</span>
-                        <span style="font-size: 10px; color: #95a5a6;">クリックで詳細・比較</span>
-                    </div>
-                    <div id="bench-container" style="display: flex; flex-direction: column; gap: 4px; flex: 1; justify-content: space-between;"></div>
-
-                    <div class="panel-header-title" style="margin-top: 10px;">
-                        <span>戦術コマンド (ミクロ 4枠)</span>
-                        <span style="font-size: 10px; color: #f1c40f;">所持: ${team.ownedMicroCommands.length}種</span>
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
-                        ${[0, 1, 2, 3].map(i => {
-                            const currentCmdId = team.microCommands[i];
-                            const availableCmds = window.MasterData.MicroCommands.filter(c =>
-                                team.ownedMicroCommands.includes(c.id) && (!team.microCommands.includes(c.id) || c.id === currentCmdId)
-                            );
-                            const currentCmd = window.MasterData.MicroCommands.find(c => c.id === currentCmdId);
-                            const desc = currentCmd
-                                ? (currentCmd.description || (currentCmd.type === 'buff' ? `${currentCmd.target} +${currentCmd.value}` : currentCmd.actionType))
-                                : '未セット';
-
-                            return `
-                                <div style="background: #122620; border: 1px solid #264a3f; padding: 6px 8px; border-radius: 6px; display: flex; flex-direction: column; gap: 3px;">
-                                    <div style="display: flex; align-items: center; gap: 6px;">
-                                        <span style="font-size: 10px; font-weight: 800; color: #2ecc71;">SLOT ${i + 1}</span>
-                                        <select style="background: #0b1714; color: #fff; border: 1px solid #2e594c; padding: 2px 4px; font-size: 11px; flex: 1; border-radius: 3px;"
-                                            onchange="managementUI.updateMicroCommand(${i}, this.value, 'squad')">
-                                            <option value="">-- 外す --</option>
-                                            ${availableCmds.map(c => `<option value="${c.id}" ${c.id === currentCmdId ? 'selected' : ''}>${c.name} (CD:${c.cooldown}s)</option>`).join('')}
-                                        </select>
-                                    </div>
-                                    <div style="font-size: 10px; color: #95a5a6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${desc}">
-                                        効果: ${desc}
-                                    </div>
-                                </div>
-                            `;
-                        }).join('')}
+                <div class="ui-panel right-panel" id="fc-player-details" style="width: 450px; height: 100%; background: rgba(0, 30, 15, 0.75); border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; backdrop-filter: blur(8px); display: flex; flex-direction: column; overflow: hidden; position: relative;">
+                    <div style="padding: 20px; text-align: center; color: #aaa; margin-top: 50px;">
+                        <span style="font-size: 48px;">👤</span><br><br>
+                        左のピッチまたはベンチから選手を選択してください。
                     </div>
                 </div>
-
-                <!-- Right Column: Player Inspector & Side-by-Side Swap Comparison -->
-                <div class="ui-panel" id="player-detail-panel" style="flex: 0 0 400px;"></div>
             </div>
         `;
 
@@ -307,7 +256,7 @@ class ManagementUI {
         const initPlayer = this.selectedPlayerIndex < 11
             ? team.starting11[this.selectedPlayerIndex]
             : team.bench[this.selectedPlayerIndex - 11];
-        this.renderPlayerDetailCard(initPlayer, this.selectedPlayerIndex);
+        if(initPlayer) this.renderPlayerDetailCard(initPlayer, this.selectedPlayerIndex);
     }
 
     changeFormation(newFormation) {
@@ -336,143 +285,101 @@ class ManagementUI {
         return [];
     }
 
-    renderFormation() {
+renderFormation() {
         const team = window.gameState.playerTeam;
-        const container = document.getElementById('formation-container');
-        const benchContainer = document.getElementById('bench-container');
+        const pitch = document.getElementById('fc-tactics-pitch');
+        const bench = document.getElementById('fc-bench-container');
         const canvas = document.getElementById('chem-canvas');
-        if (!container || !benchContainer) return;
+        if (!pitch || !bench) return;
 
-        container.innerHTML = '';
-        benchContainer.innerHTML = '';
-
-        const coords = this.getFormationCoordinates(team.formation);
-        const fSlots = window.MasterData.Formations[team.formation]?.slots || [];
-        const prefColors = {
-            Possession: '#3498db',
-            Counter: '#e74c3c',
-            HighPress: '#f1c40f',
-            Retreat: '#2ecc71'
-        };
-
-        const posMap = {};
-
-        team.starting11.forEach((p, idx) => {
-            const c = coords[idx] || { x: 0.5, y: 0.5 };
-            const expectedPos = fSlots[idx]?.expectedPosStr || p.position;
-            const isMainPos = p.position === expectedPos;
-            const isSubPos = !isMainPos && p.subPositions && p.subPositions.includes(expectedPos);
-            const isMob = !isMainPos && !isSubPos;
-            p.isMob = isMob;
-
-            const borderColor = prefColors[p.preference] || '#bdc3c7';
-            const isSelected = this.selectedPlayerIndex === idx;
-            const isSwapSrc = this.swapSourceIndex === idx;
-
-            const pDiv = document.createElement('div');
-            pDiv.style.cssText = `
-                position: absolute;
-                left: ${c.x * 100}%;
-                top: ${c.y * 100}%;
-                transform: translate(-50%, -50%);
-                width: 62px;
-                padding: 3px 4px;
-                background: ${isSwapSrc ? '#78281f' : (isSelected ? '#1b4f72' : 'rgba(10, 24, 20, 0.92)')};
-                border: 2px solid ${isSwapSrc ? '#ff7979' : (isSelected ? '#fff' : borderColor)};
-                border-radius: 8px;
-                text-align: center;
-                cursor: pointer;
-                z-index: 5;
-                box-shadow: 0 3px 8px rgba(0,0,0,0.6);
-            `;
-
-            const cond = p.condition ?? 100;
-            const condColor = cond > 50 ? '#2ecc71' : (cond > 25 ? '#f1c40f' : '#e74c3c');
-
-            pDiv.innerHTML = `
-                <div style="font-size: 9px; font-weight: 800; color: ${isMob ? '#e74c3c' : (isSubPos ? '#f1c40f' : '#a3e4d7')};">
-                    ${isMob ? '⚠️' : ''}${expectedPos}${isSubPos ? '*' : ''} <span style="color:#f1c40f;">${p.getOvr()}</span>
-                </div>
-                <div style="font-size: 10px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                    ${p.name}
-                </div>
-                <div style="width: 100%; height: 3px; background: #222; margin-top: 2px; border-radius: 2px; overflow: hidden;">
-                    <div style="width: ${cond}%; height: 100%; background: ${condColor};"></div>
-                </div>
-            `;
-
-            pDiv.onclick = () => this.handlePlayerClick(idx, false);
-            container.appendChild(pDiv);
-
-            if (fSlots[idx]) {
-                posMap[fSlots[idx].id] = { x: c.x, y: c.y, pref: p.preference };
-            }
+        Array.from(pitch.children).forEach(c => {
+            if (c.id !== 'chem-canvas') pitch.removeChild(c);
         });
+        bench.innerHTML = '';
 
-        // Draw chemistry links
         if (canvas) {
-            const rect = canvas.parentElement.getBoundingClientRect();
-            canvas.width = rect.width || 380;
-            canvas.height = rect.height || 420;
+            canvas.width = pitch.clientWidth;
+            canvas.height = pitch.clientHeight;
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            const links = window.ChemistrySystem.getFormationLinks(team.formation);
-            links.forEach(({ from, to }) => {
-                const p1 = posMap[from];
-                const p2 = posMap[to];
-                if (!p1 || !p2) return;
-                const match = p1.pref === p2.pref;
-                ctx.beginPath();
-                ctx.moveTo(p1.x * canvas.width, p1.y * canvas.height);
-                ctx.lineTo(p2.x * canvas.width, p2.y * canvas.height);
-                ctx.strokeStyle = match ? (prefColors[p1.pref] || '#f1c40f') : 'rgba(255,255,255,0.18)';
-                ctx.lineWidth = match ? 3.5 : 1.2;
-                ctx.stroke();
-            });
+            if (team.chemistryGraph && team.chemistryGraph.links) {
+                const positions = this.getFormationCoordinates(team.formation);
+                ctx.lineWidth = 3;
+                team.chemistryGraph.links.forEach(link => {
+                    const p1 = positions.find(p => p.index === parseInt(link.from));
+                    const p2 = positions.find(p => p.index === parseInt(link.to));
+                    if (p1 && p2) {
+                        ctx.beginPath();
+                        ctx.moveTo((p1.x / 100) * canvas.width, (p1.y / 100) * canvas.height);
+                        ctx.lineTo((p2.x / 100) * canvas.width, (p2.y / 100) * canvas.height);
+                        if (link.value >= 3) ctx.strokeStyle = '#2ecc71';
+                        else if (link.value >= 2) ctx.strokeStyle = '#f1c40f';
+                        else ctx.strokeStyle = '#e74c3c';
+                        ctx.stroke();
+                    }
+                });
+            }
         }
 
-        // Render Bench 7
-        team.bench.forEach((p, bIdx) => {
-            const idx = 11 + bIdx;
-            const isSelected = this.selectedPlayerIndex === idx;
-            const isSwapSrc = this.swapSourceIndex === idx;
-            const borderColor = prefColors[p.preference] || '#555';
-            const cond = p.condition ?? 100;
-            const condColor = cond > 50 ? '#2ecc71' : (cond > 25 ? '#f1c40f' : '#e74c3c');
-
-            const row = document.createElement('div');
-            row.style.cssText = `
-                background: ${isSwapSrc ? '#78281f' : (isSelected ? '#1b4f72' : '#122620')};
-                border: 1px solid ${isSwapSrc ? '#ff7979' : (isSelected ? '#fff' : '#264a3f')};
-                border-left: 4px solid ${borderColor};
-                border-radius: 5px;
-                padding: 5px 8px;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                cursor: pointer;
-                font-size: 12px;
-            `;
-
-            const subStr = p.subPositions && p.subPositions.length > 0 ? `/${p.subPositions.join(',')}` : '';
-            row.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 6px; overflow: hidden;">
-                    <span style="font-size: 10px; font-weight: 800; padding: 1px 4px; border-radius: 3px; background: #2c3e50; color: #f1c40f;">${p.rarity}</span>
-                    <strong style="color: #a3e4d7;">[${p.position}${subStr}]</strong>
-                    <span style="font-weight: 700; color: #fff;">${p.name}</span>
-                    <span style="font-size: 10px; color: #95a5a6;">Lv.${p.level}</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
-                    <span style="font-weight: 800; color: #f1c40f;">OVR ${p.getOvr()}</span>
-                    <div style="width: 45px; height: 5px; background: #222; border-radius: 3px; overflow: hidden;" title="体力 ${cond}%">
-                        <div style="width: ${cond}%; height: 100%; background: ${condColor};"></div>
-                    </div>
-                </div>
-            `;
-            row.onclick = () => this.handlePlayerClick(idx, false);
-            benchContainer.appendChild(row);
+        const positions = this.getFormationCoordinates(team.formation);
+        team.starting11.forEach((player, i) => {
+            if (!player) return;
+            const posData = positions.find(p => p.index === i) || { x: 50, y: 50 };
+            const el = this.createFCPlayerToken(player, true, i);
+            el.style.left = posData.x + '%';
+            el.style.top = posData.y + '%';
+            el.onclick = () => this.handlePlayerClick(i, false);
+            if (this.selectedPlayerIndex === i) {
+                el.style.transform = 'translate(-50%, -50%) scale(1.1)';
+                el.style.borderColor = '#f1c40f';
+            }
+            if (this.swapSourceIndex === i) el.style.borderColor = '#2ecc71';
+            pitch.appendChild(el);
         });
+
+        team.bench.forEach((player, i) => {
+            if (!player) return;
+            const idx = i + 11;
+            const el = this.createFCPlayerToken(player, false, idx);
+            el.onclick = () => this.handlePlayerClick(idx, false);
+            if (this.selectedPlayerIndex === idx) {
+                el.style.transform = 'scale(1.05)';
+                el.style.borderColor = '#f1c40f';
+            }
+            if (this.swapSourceIndex === idx) el.style.borderColor = '#2ecc71';
+            bench.appendChild(el);
+        });
+    }
+
+    createFCPlayerToken(player, isStarter, idx) {
+        const div = document.createElement('div');
+        div.className = 'player-token-fc' + (isStarter ? '' : ' bench-token');
+        div.style.cssText = `
+            width: ${isStarter ? '60px' : '65px'};
+            height: ${isStarter ? '80px' : '90px'};
+            background: rgba(20, 20, 20, 0.85);
+            border: 1px solid #aaa;
+            border-radius: 6px;
+            position: ${isStarter ? 'absolute' : 'relative'};
+            ${isStarter ? 'transform: translate(-50%, -50%);' : ''}
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5); cursor: pointer; transition: all 0.1s;
+        `;
+
+        const ovr = Math.floor((player.stats.pass + player.stats.shoot + player.stats.defense + player.stats.physical + player.stats.speed + player.stats.mental) / 6);
+        const stamRatio = (player.condition || 100) / 100;
+        const stamColor = stamRatio > 0.6 ? '#2ecc71' : stamRatio > 0.3 ? '#f1c40f' : '#e74c3c';
+
+        const ovrHtml = `<div style="position:absolute; top:-8px; right:-8px; background:#e67e22; color:#fff; font-weight:bold; font-size:14px; padding:2px 4px; border-radius:4px; box-shadow:0 2px 4px rgba(0,0,0,0.5); z-index:2;">${ovr}</div>`;
+
+        div.innerHTML = `
+            ${ovrHtml}
+            <div style="font-size: ${isStarter ? '32px' : '36px'}; margin-top:5px; text-shadow:0 2px 4px rgba(0,0,0,0.5);">👤</div>
+            <div style="width: 90%; height: 4px; background: #333; border-radius: 2px; margin: 4px 0 2px 0; overflow:hidden;"><div style="height:100%; width:${stamRatio * 100}%; background:${stamColor}"></div></div>
+            <div style="font-size: 11px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:90%; text-align:center;">${player.name}</div>
+            <div style="font-size: 10px; color:#f1c40f; font-weight:bold;">${player.position}</div>
+        `;
+        return div;
     }
 
     renderPlayerDetailCard(player, index) {
@@ -615,7 +522,7 @@ class ManagementUI {
         this.renderPlayerDetailCard(p, this.selectedPlayerIndex);
     }
 
-    handlePlayerClick(index, executeSwap = false) {
+handlePlayerClick(index, executeSwap = false) {
         const team = window.gameState.playerTeam;
         const player = index < 11 ? team.starting11[index] : team.bench[index - 11];
 
@@ -644,13 +551,196 @@ class ManagementUI {
             } else {
                 this.selectedPlayerIndex = index;
                 this.renderFormation();
-                this.renderPlayerDetailCard(player, index);
+                this.renderPlayerComparison(this.swapSourceIndex, index);
             }
         } else {
             this.selectedPlayerIndex = index;
             this.renderFormation();
             this.renderPlayerDetailCard(player, index);
         }
+    }
+
+    renderPlayerComparison(idx1, idx2) {
+        const detailPanel = document.getElementById('fc-player-details');
+        if (!detailPanel) return;
+
+        const team = window.gameState.playerTeam;
+        const p1 = idx1 < 11 ? team.starting11[idx1] : team.bench[idx1 - 11];
+        const p2 = idx2 < 11 ? team.starting11[idx2] : team.bench[idx2 - 11];
+        if(!p1 || !p2) return;
+
+        detailPanel.innerHTML = `
+            <div style="padding: 15px; display: flex; flex-direction: column; height: 100%; box-sizing: border-box;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 10px; margin-bottom: 10px;">
+                    <div style="flex:1; text-align:center;">
+                        <div style="font-size: 18px; font-weight: bold; color: #f1c40f;">${p1.position}</div>
+                        <div style="font-size: 16px; color: #fff;">${p1.name}</div>
+                    </div>
+                    <div style="font-size: 20px; color: #fff; font-weight:bold;">VS</div>
+                    <div style="flex:1; text-align:center;">
+                        <div style="font-size: 18px; font-weight: bold; color: #f1c40f;">${p2.position}</div>
+                        <div style="font-size: 16px; color: #fff;">${p2.name}</div>
+                    </div>
+                </div>
+
+                <div class="compare-radar-container" style="width: 100%; height: 200px; display: flex; justify-content: center; align-items: center; position: relative; margin-bottom: 10px;">
+                    <canvas id="fc-radar-chart" width="200" height="200"></canvas>
+                </div>
+
+                <div style="flex: 1; overflow-y: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 12px; color: #fff;">
+                        <tr><th style="background: rgba(0,0,0,0.5); padding: 5px;">${p1.name}</th><th style="background: rgba(0,0,0,0.5); padding: 5px;">STAT</th><th style="background: rgba(0,0,0,0.5); padding: 5px;">${p2.name}</th></tr>
+                        ${this.generateCompareRow(p1.condition, p2.condition, '体力')}
+                        ${this.generateCompareRow(p1.stats.pass, p2.stats.pass, 'パス')}
+                        ${this.generateCompareRow(p1.stats.shoot, p2.stats.shoot, 'シュート')}
+                        ${this.generateCompareRow(p1.stats.defense, p2.stats.defense, '守備')}
+                        ${this.generateCompareRow(p1.stats.speed, p2.stats.speed, 'スピード')}
+                        ${this.generateCompareRow(p1.stats.physical, p2.stats.physical, 'フィジカル')}
+                        ${this.generateCompareRow(p1.stats.mental, p2.stats.mental, 'メンタル')}
+                    </table>
+                </div>
+
+                <button id="fc-btn-execute-swap" style="margin-top: 10px; width: 100%; padding: 12px; font-size: 16px; font-weight: bold; background: #27ae60; color: #fff; border: none; border-radius: 6px; cursor: pointer;">
+                    ⚡ 入れ替えを確定する
+                </button>
+            </div>
+        `;
+
+        this.drawRadarChart(document.getElementById('fc-radar-chart'), p1, p2);
+
+        document.getElementById('fc-btn-execute-swap').onclick = () => {
+            this.handlePlayerClick(idx2, true);
+        };
+    }
+
+    generateCompareRow(v1, v2, label) {
+        let c1 = '', c2 = '';
+        if (v1 > v2) { c1 = 'color: #2ecc71; font-weight: bold;'; c2 = 'color: #e74c3c; font-weight: bold;'; }
+        else if (v1 < v2) { c1 = 'color: #e74c3c; font-weight: bold;'; c2 = 'color: #2ecc71; font-weight: bold;'; }
+        return `<tr><td style="padding: 4px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); ${c1}">${Math.floor(v1)}</td><td style="padding: 4px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1);">${label}</td><td style="padding: 4px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); ${c2}">${Math.floor(v2)}</td></tr>`;
+    }
+
+    drawRadarChart(canvas, p1, p2) {
+        const ctx = canvas.getContext('2d');
+        const cx = 100, cy = 100, r = 80;
+
+        ctx.clearRect(0,0,200,200);
+        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+        for(let j=1; j<=5; j++){
+            ctx.beginPath();
+            for(let i=0; i<6; i++) {
+                const a = (i * 60 - 90) * Math.PI / 180;
+                const dist = r * (j/5);
+                ctx.lineTo(cx + Math.cos(a)*dist, cy + Math.sin(a)*dist);
+            }
+            ctx.closePath();
+            ctx.stroke();
+        }
+
+        const drawData = (data, color, fillMode) => {
+            ctx.beginPath();
+            for(let i=0; i<6; i++) {
+                const a = (i * 60 - 90) * Math.PI / 180;
+                const val = Math.min(100, Math.max(0, data[i])) / 100;
+                ctx.lineTo(cx + Math.cos(a)*r*val, cy + Math.sin(a)*r*val);
+            }
+            ctx.closePath();
+            ctx.fillStyle = fillMode;
+            ctx.fill();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        };
+
+        const p1Data = [p1.stats.pass, p1.stats.shoot, p1.stats.defense, p1.stats.physical, p1.stats.speed, p1.stats.mental];
+        const p2Data = [p2.stats.pass, p2.stats.shoot, p2.stats.defense, p2.stats.physical, p2.stats.speed, p2.stats.mental];
+        drawData(p1Data, '#3498db', 'rgba(52, 152, 219, 0.4)');
+        drawData(p2Data, '#e74c3c', 'rgba(231, 76, 60, 0.4)');
+    }
+
+    renderPlayerDetailCard(player, index) {
+        const detailPanel = document.getElementById('fc-player-details');
+        if (!detailPanel) return;
+        if (!player) {
+            detailPanel.innerHTML = `<div style="flex:1; display:flex; align-items:center; justify-content:center; color:#7f8c8d;">選手を選択してください</div>`;
+            return;
+        }
+
+        const team = window.gameState.playerTeam;
+        let posRoleBonus = 0;
+        let chemBonus = 0;
+        let linkDetails = '';
+
+        if (index < 11 && team.chemistryGraph && team.chemistryGraph.nodes) {
+            const chemInfo = team.chemistryGraph.nodes[index];
+            if (chemInfo) {
+                posRoleBonus = chemInfo.roleBonus || 0;
+                chemBonus = chemInfo.chemistryBonus || 0;
+                if (chemInfo.links && chemInfo.links.length > 0) {
+                    linkDetails = chemInfo.links.map(l => {
+                        const style = l.value >= 3 ? 'color:#2ecc71;' : l.value >= 2 ? 'color:#f1c40f;' : 'color:#e74c3c;';
+                        return `<span style="${style}">${l.value >= 3 ? '🟩' : l.value >= 2 ? '🟨' : '🟥'} ${l.targetName}</span>`;
+                    }).join(', ');
+                }
+            }
+        }
+
+        const ovr = Math.floor((player.stats.pass + player.stats.shoot + player.stats.defense + player.stats.physical + player.stats.speed + player.stats.mental) / 6);
+
+        detailPanel.innerHTML = `
+            <div style="padding: 15px; display: flex; flex-direction: column; height: 100%; box-sizing: border-box; overflow-y: auto;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 15px; margin-bottom: 15px;">
+                    <div>
+                        <div style="font-size: 24px; font-weight: bold; color: #f1c40f;">${player.position}</div>
+                        <div style="font-size: 20px; color: #fff;">${player.name}</div>
+                        <div style="font-size: 14px; color: #aaa;">LV. ${player.level} / EXP: ${Math.floor(player.exp)}</div>
+                    </div>
+                    <div style="font-size: 40px; font-weight: bold; background: #e67e22; color: #fff; padding: 10px 15px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+                        ${ovr}
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <div style="flex:1; background: rgba(0,0,0,0.5); padding: 8px; border-radius: 6px; text-align:center; font-size: 12px; color: #ddd;">
+                        <div>体力</div><div style="font-size:16px; color:#2ecc71; font-weight:bold;">${Math.floor(player.condition)}%</div>
+                    </div>
+                    <div style="flex:1; background: rgba(0,0,0,0.5); padding: 8px; border-radius: 6px; text-align:center; font-size: 12px; color: #ddd;">
+                        <div>適性</div><div style="font-size:16px; color:#f1c40f; font-weight:bold;">${player.role || '標準'}</div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 150px;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 12px; color: #fff;">
+                            <tr><td style="padding: 4px; border-bottom: 1px solid rgba(255,255,255,0.1);">パス</td><td style="padding: 4px; border-bottom: 1px solid rgba(255,255,255,0.1); font-weight:bold;">${Math.floor(player.stats.pass)}</td></tr>
+                            <tr><td style="padding: 4px; border-bottom: 1px solid rgba(255,255,255,0.1);">シュート</td><td style="padding: 4px; border-bottom: 1px solid rgba(255,255,255,0.1); font-weight:bold;">${Math.floor(player.stats.shoot)}</td></tr>
+                            <tr><td style="padding: 4px; border-bottom: 1px solid rgba(255,255,255,0.1);">守備</td><td style="padding: 4px; border-bottom: 1px solid rgba(255,255,255,0.1); font-weight:bold;">${Math.floor(player.stats.defense)}</td></tr>
+                            <tr><td style="padding: 4px; border-bottom: 1px solid rgba(255,255,255,0.1);">スピード</td><td style="padding: 4px; border-bottom: 1px solid rgba(255,255,255,0.1); font-weight:bold;">${Math.floor(player.stats.speed)}</td></tr>
+                            <tr><td style="padding: 4px; border-bottom: 1px solid rgba(255,255,255,0.1);">フィジカル</td><td style="padding: 4px; border-bottom: 1px solid rgba(255,255,255,0.1); font-weight:bold;">${Math.floor(player.stats.physical)}</td></tr>
+                            <tr><td style="padding: 4px; border-bottom: 1px solid rgba(255,255,255,0.1);">メンタル</td><td style="padding: 4px; border-bottom: 1px solid rgba(255,255,255,0.1); font-weight:bold;">${Math.floor(player.stats.mental)}</td></tr>
+                        </table>
+                    </div>
+                    <div style="flex: 1; min-width: 150px;">
+                        <div style="font-size: 12px; color: #aaa; margin-bottom: 5px; border-bottom: 1px solid rgba(255,255,255,0.2);">ケミストリーリンク</div>
+                        <div style="font-size: 11px; margin-bottom: 10px;">${index < 11 ? (linkDetails || 'なし') : 'ベンチ外'}</div>
+
+                        <div style="font-size: 12px; color: #aaa; margin-bottom: 5px; border-bottom: 1px solid rgba(255,255,255,0.2);">所持スキル</div>
+                        ${player.skills && player.skills.length > 0 ? player.skills.map(s => `<div style="font-size:12px; background:rgba(241,196,15,0.2); color:#f1c40f; padding:4px; margin-bottom:4px; border-radius:4px;">${s.name}</div>`).join('') : '<div style="font-size:12px; color:#777;">なし</div>'}
+
+                        <div style="font-size: 12px; color: #aaa; margin-top: 10px; margin-bottom: 5px; border-bottom: 1px solid rgba(255,255,255,0.2);">キャリア</div>
+                        <div style="font-size:11px; color:#ddd;">出場: ${player.careerStats?.appearances || 0}</div>
+                        <div style="font-size:11px; color:#ddd;">ゴール: ${player.careerStats?.goals || 0}</div>
+                        <div style="font-size:11px; color:#ddd;">アシスト: ${player.careerStats?.assists || 0}</div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 15px; font-size: 12px; color: #f1c40f; text-align: center; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px;">
+                    ${this.swapSourceIndex === null
+                        ? `<button onclick="managementUI.swapSourceIndex = ${index}; managementUI.renderFormation();" style="width:100%; padding:8px; background:#3498db; color:#fff; border:none; border-radius:4px; cursor:pointer;">🔄 この選手を入れ替え対象にする</button>`
+                        : (this.swapSourceIndex === index ? `<button onclick="managementUI.swapSourceIndex = null; managementUI.renderFormation();" style="width:100%; padding:8px; background:#7f8c8d; color:#fff; border:none; border-radius:4px; cursor:pointer;">❌ 選択解除</button>` : '')}
+                </div>
+            </div>
+        `;
     }
 
     // =========================================================

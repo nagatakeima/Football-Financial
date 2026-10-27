@@ -129,14 +129,14 @@
     // 11枠分のスロット定義
     {
       "slot_id": "LCB",
-      "position": "CB", // 左CB等の左右はIDとbaseMatrix.laneで表現され、position自体は共通文字列
+      "position_category": "CB",
       "base_matrix": { "lane": "L-Half", "tier": "Defensive" }, // 基準となるPitch Matrix割り当て
       "base_coordinates": { "x": 0.25, "y": 0.35 } // 相対的な初期基準座標 (例: 0.0~1.0)
     },
     // ... 他10スロット
   ],
-  "chemistryLinks": [
-    // 結線グラフ（連携のアンカーとなる線、MasterDataではオブジェクト配列でID同士を繋ぐ）
+  "chemistry_links": [
+    // 結線グラフ（連携のアンカーとなる線）
     { "from": "LCB", "to": "LSB" },
     { "from": "LCB", "to": "CDM" },
     { "from": "LSB", "to": "LCM" }

@@ -69,55 +69,51 @@ class MatchScene extends Phaser.Scene {
     // =========================================================
     // FC27-Style Dark Emerald Tactical Pitch Drawing
     // =========================================================
-    drawTacticalPitch() {
-        const g = this.add.graphics();
+drawTacticalPitch() {
+        if (this.pitchGraphics) this.pitchGraphics.destroy();
+        this.pitchGraphics = this.add.graphics();
+        this.pitchGraphics.fillStyle(0x0a3b1a, 1.0);
 
-        // Outer dark surround
-        g.fillStyle(0x081a13, 1);
-        g.fillRect(0, 0, 800, 600);
+        this.to25D = (x, y) => {
+            const cx = 400; const cy = 45;
+            const depth = (y - cy) / 510;
+            const perspectiveFactor = 0.5 + (depth * 0.5);
+            return { x: cx + ((x - cx) * perspectiveFactor), y: y };
+        };
 
-        // Turf stripes (FC27 Dark Emerald)
-        const stripeCount = 10;
-        const pitchLeft = 25;
-        const pitchTop = 45;
-        const pitchW = 750;
-        const pitchH = 510;
-        const stripeW = pitchW / stripeCount;
+        const drawPoly = (points) => {
+            const p2d = points.map(p => this.to25D(p.x, p.y));
+            this.pitchGraphics.beginPath();
+            this.pitchGraphics.moveTo(p2d[0].x, p2d[0].y);
+            for(let i=1; i<p2d.length; i++) this.pitchGraphics.lineTo(p2d[i].x, p2d[i].y);
+            this.pitchGraphics.closePath();
+            this.pitchGraphics.strokePath();
+        };
 
-        for (let i = 0; i < stripeCount; i++) {
-            g.fillStyle(i % 2 === 0 ? 0x0d291e : 0x103024, 1);
-            g.fillRect(pitchLeft + i * stripeW, pitchTop, stripeW, pitchH);
-        }
+        // Base rect
+        const pTL = this.to25D(0, 45), pTR = this.to25D(800, 45);
+        const pBL = this.to25D(0, 555), pBR = this.to25D(800, 555);
+        this.pitchGraphics.beginPath();
+        this.pitchGraphics.moveTo(pTL.x, pTL.y); this.pitchGraphics.lineTo(pTR.x, pTR.y);
+        this.pitchGraphics.lineTo(pBR.x, pBR.y); this.pitchGraphics.lineTo(pBL.x, pBL.y);
+        this.pitchGraphics.closePath();
+        this.pitchGraphics.fillPath();
 
-        // Crisp tactical pitch markings
-        g.lineStyle(2, 0xffffff, 0.42);
-        g.strokeRect(pitchLeft, pitchTop, pitchW, pitchH);
+        this.pitchGraphics.lineStyle(1, 0xffffff, 0.15);
+        for(let i=0; i<=10; i++) { const l1 = this.to25D(0, 45+i*51); const l2 = this.to25D(800, 45+i*51); this.pitchGraphics.moveTo(l1.x, l1.y); this.pitchGraphics.lineTo(l2.x, l2.y); }
+        for(let i=0; i<=16; i++) { const l1 = this.to25D(i*50, 45); const l2 = this.to25D(i*50, 555); this.pitchGraphics.moveTo(l1.x, l1.y); this.pitchGraphics.lineTo(l2.x, l2.y); }
+        this.pitchGraphics.strokePath();
 
-        // Halfway line & Center circle
-        g.beginPath();
-        g.moveTo(400, pitchTop);
-        g.lineTo(400, pitchTop + pitchH);
-        g.strokePath();
-        g.strokeCircle(400, 300, 58);
-        g.fillStyle(0xffffff, 0.65);
-        g.fillCircle(400, 300, 3);
+        this.pitchGraphics.lineStyle(3, 0xffffff, 0.8);
+        drawPoly([{x:25,y:60},{x:775,y:60},{x:775,y:540},{x:25,y:540}]); // Touch lines
+        drawPoly([{x:25,y:180},{x:145,y:180},{x:145,y:420},{x:25,y:420}]); // Left Pen
+        drawPoly([{x:775,y:180},{x:655,y:180},{x:655,y:420},{x:775,y:420}]); // Right Pen
 
-        // Penalty Areas
-        g.strokeRect(pitchLeft, 165, 115, 270);
-        g.strokeRect(pitchLeft + pitchW - 115, 165, 115, 270);
+        const h1 = this.to25D(400, 60); const h2 = this.to25D(400, 540);
+        this.pitchGraphics.moveTo(h1.x, h1.y); this.pitchGraphics.lineTo(h2.x, h2.y);
+        this.pitchGraphics.strokePath();
 
-        // Goal Areas (6-yard box)
-        g.strokeRect(pitchLeft, 235, 42, 130);
-        g.strokeRect(pitchLeft + pitchW - 42, 235, 42, 130);
-
-        // Penalty Spots
-        g.fillCircle(pitchLeft + 82, 300, 3);
-        g.fillCircle(pitchLeft + pitchW - 82, 300, 3);
-
-        // Goals
-        g.lineStyle(3, 0xffffff, 0.85);
-        g.strokeRect(pitchLeft - 14, 255, 14, 90);
-        g.strokeRect(pitchLeft + pitchW, 255, 14, 90);
+        this.pitchGraphics.setDepth(10);
     }
 
     createTeamsAndBall() {
@@ -177,386 +173,103 @@ class MatchScene extends Phaser.Scene {
         this.ballSpeed = 0;
     }
 
-    createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
-        const container = this.add.container(400, 300);
-        container.setDepth(20);
-
-        // Tactical Aura Ring
-        const aura = this.add.circle(0, 0, 16, isPlayerTeam ? 0xe74c3c : 0xf1c40f, 0);
-        // Active Ball Owner Ring
-        const activeRing = this.add.circle(0, 0, 14, 0x2ecc71, 0);
-        activeRing.setStrokeStyle(2, 0xffffff, 0.9);
+createPlayerToken(playerData, isPlayerTeam, number, expectedPosStr) {
+        const container = this.add.container(-100, -100);
+        const aura = this.add.ellipse(0, 20, 30, 15, 0x000000, 0);
+        const activeRing = this.add.ellipse(0, 20, 28, 12, isPlayerTeam ? 0x2ecc71 : 0xe74c3c, 0);
+        activeRing.setStrokeStyle(3, 0xffffff, 1);
         activeRing.setVisible(false);
+        const mainColor = isPlayerTeam ? 0x3498db : 0xe74c3c;
+        const skinColor = 0xffe0bd;
+        const shoeColor = 0x333333;
 
-        // Token Disk (FC27 Style: Home=Crimson/BlueGK, Away=Gold/GreenGK)
-        const isGK = expectedPosStr === 'GK';
-        const fillColor = isPlayerTeam
-            ? (isGK ? 0x2980b9 : 0xd63031)
-            : (isGK ? 0x27ae60 : 0xf1c40f);
-        const strokeColor = isPlayerTeam ? 0xffffff : 0x111111;
-        const textColor = isPlayerTeam ? '#ffffff' : '#111111';
+        const body = this.add.rectangle(0, 0, 18, 22, mainColor);
+        body.setStrokeStyle(1, 0x000000, 0.5);
+        const head = this.add.circle(0, -16, 9, skinColor);
+        head.setStrokeStyle(1, 0x000000, 0.5);
+        const legL = this.add.rectangle(-5, 12, 6, 12, skinColor);
+        const legR = this.add.rectangle(5, 12, 6, 12, skinColor);
+        const shoeL = this.add.rectangle(-5, 19, 8, 5, shoeColor);
+        const shoeR = this.add.rectangle(5, 19, 8, 5, shoeColor);
 
-        const tokenCircle = this.add.circle(0, 0, 10.5, fillColor, 1);
-        tokenCircle.setStrokeStyle(2, strokeColor, 0.95);
+        const numText = this.add.text(0, -2, playerData.jerseyNumber || number || '0', { fontSize: '12px', fill: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
 
-        const numText = this.add.text(0, 0, String(pData.jerseyNumber || number), {
-            fontSize: '11px',
-            fontFamily: 'Arial',
-            fontStyle: 'bold',
-            color: textColor
-        }).setOrigin(0.5);
-
-        const nameLabel = this.add.text(0, 15, pData.name.split(' ').pop(), {
-            fontSize: '9px',
-            fontFamily: 'Arial',
-            color: isPlayerTeam ? '#ecf0f1' : '#f9e79f',
-            stroke: '#000000',
-            strokeThickness: 2
-        }).setOrigin(0.5);
-
-        // Hidden compatibility refs so legacy checks never fail
-        const dummyLegL = { y: 12 };
-        const dummyLegR = { y: 12 };
-        const dummyShoeL = { y: 17 };
-        const dummyShoeR = { y: 17 };
-
-        container.add([aura, activeRing, tokenCircle, numText, nameLabel]);
-
-        container.playerData = pData;
+        container.add([aura, activeRing, legL, legR, shoeL, shoeR, body, head, numText]);
         container.isPlayerTeam = isPlayerTeam;
+        container.playerData = playerData;
         container.expectedPosStr = expectedPosStr;
-        container.aura = aura;
-        container.activeRing = activeRing;
-        container.tokenCircle = tokenCircle;
-        container.legL = dummyLegL;
-        container.legR = dummyLegR;
-        container.shoeL = dummyShoeL;
-        container.shoeR = dummyShoeR;
-        container.bodyParts = [];
-        container.stunTimer = 0;
-        container.actionCooldown = 0;
-        container.gkKeepTimer = 0;
-        container.aiTickTimer = 0;
-        container.animTick = 0;
-        container.currentAction = 'HoldPosition';
 
+        container.actionCooldown = 0; container.stunTimer = 0; container.gkKeepTimer = 0;
+        container.activeRing = activeRing; container.aura = aura;
+        container.legL = legL; container.legR = legR; container.shoeL = shoeL; container.shoeR = shoeR;
+        container.animTick = Math.random() * 10;
         return container;
+    }
+
+    syncBallVisuals() {
+        if (!this.to25D) return;
+        const allPlayers = [...this.playerSprites, ...this.opponentSprites];
+        allPlayers.forEach(p => {
+            const p25D = this.to25D(p.x, p.y);
+            const depthRatio = Phaser.Math.Clamp((p.y - 45) / 510, 0, 1);
+            p.setPosition(p25D.x, p25D.y);
+            p.setScale(0.65 + (depthRatio * 0.45));
+            p.setDepth(100 + p.y);
+
+            if (p.actionCooldown <= 0 && p.stunTimer <= 0 && p.playerData.position !== 'GK') {
+                p.animTick += 0.4;
+                const swing = Math.sin(p.animTick) * 3;
+                if(p.legL) { p.legL.y = 12 + swing; p.legR.y = 12 - swing; p.shoeL.y = p.legL.y + 7; p.shoeR.y = p.legR.y + 7; }
+            } else {
+                if(p.legL) { p.legL.y = 12; p.legR.y = 12; p.shoeL.y = 19; p.shoeR.y = 19; }
+            }
+        });
+
+        const b25D = this.to25D(this.ball.x, this.ball.y);
+        const ballDepthRatio = Phaser.Math.Clamp((this.ball.y - 45) / 510, 0, 1);
+        if(this.ballContainer) {
+            this.ballContainer.setPosition(b25D.x, b25D.y);
+            this.ballContainer.setScale(0.7 + (ballDepthRatio * 0.4));
+            this.ballContainer.setDepth(100 + this.ball.y + 50);
+            if(this.ballSprite) this.ballSprite.y = -this.ball.z;
+            const shadowScale = Math.max(0.2, 1 - (this.ball.z / 40));
+            this.ballContainer.list[0].setScale(shadowScale);
+            this.ballContainer.list[0].setAlpha(shadowScale * 0.5);
+        }
     }
 
     // =========================================================
     // FC27 Broadcast Header & Side Panels Binding
     // =========================================================
-    createMatchUI() {
-        const tierNames = { 3: 'LEAGUE THREE', 2: 'LEAGUE TWO', 1: 'LEAGUE ONE' };
-        const gimmickLabels = {
-            none: '環境: 通常ピッチ',
-            fever: '環境: 熱狂 (前半相手プレス増)',
-            fortress: '環境: 要塞 (相手守備ブロック強化)',
-            badWeather: '環境: 悪天候 (パス・トラップ精度低下)'
-        };
+createMatchUI() {
+        // Use existing DOM elements defined in index.html instead of completely rewriting them!
+        const lPill = document.getElementById('fc-league-pill');
+        if(lPill) lPill.innerText = `${this.game.league ? this.game.league.currentTier : '1部'} - 第${this.game.league ? this.game.league.currentMatchday : 1}節`;
 
-        const setElText = (id, txt) => {
-            const el = document.getElementById(id);
-            if (el) el.textContent = txt;
-        };
+        const hName = document.getElementById('fc-home-name');
+        if(hName) hName.innerText = this.playerTeamData.name;
 
-        setElText('fc-league-pill', `${tierNames[window.gameState.currentTier] || 'LEAGUE'} - 第${window.gameState.league?.currentMatchday || 1}節`);
-        setElText('fc-home-name', this.playerTeamData.name);
-        setElText('fc-away-name', this.opponentTeamData.name);
-        setElText('fc-score-home', '0');
-        setElText('fc-score-away', '0');
-        setElText('fc-match-clock', '00:00');
-        setElText('fc-scorers-home', '');
-        setElText('fc-scorers-away', '');
-        setElText('fc-gimmick-label', gimmickLabels[this.currentGimmick] || '環境: 通常');
+        const aName = document.getElementById('fc-away-name');
+        if(aName) aName.innerText = this.opponentTeamData.name;
 
-        // Dummy Phaser text objects for legacy references
-        this.timeText = { setText: (t) => setElText('fc-match-clock', t) };
-        this.scoreText = {
-            setText: () => {
-                setElText('fc-score-home', String(this.score.player));
-                setElText('fc-score-away', String(this.score.opponent));
+        this.timeText = { setText: (t) => { const el = document.getElementById('fc-match-clock'); if(el) el.innerText = t; } };
+
+        this.scoreText = { setText: (t) => {
+            const sc = t.match(/(\d+)\s*-\s*(\d+)/);
+            if(sc) {
+                const sH = document.getElementById('fc-score-home');
+                const sA = document.getElementById('fc-score-away');
+                if(sH) sH.innerText = sc[1];
+                if(sA) sA.innerText = sc[2];
             }
-        };
+        } };
 
-        // Bind Speed Controls
-        document.querySelectorAll('.fc-speed-btn[data-speed]').forEach(btn => {
-            btn.onclick = () => {
-                this.timeScale = Number(btn.getAttribute('data-speed')) || 1;
-                if (this.logicTimer) this.logicTimer.paused = false;
-                document.querySelectorAll('.fc-speed-btn[data-speed]').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-            };
-        });
-
-        const pauseBtn = document.getElementById('btn-pause-match');
-        if (pauseBtn) {
-            pauseBtn.onclick = () => {
-                if (!this.logicTimer) return;
-                this.logicTimer.paused = !this.logicTimer.paused;
-                pauseBtn.textContent = this.logicTimer.paused ? '▶ 再開' : '⏸ 一時停止';
-            };
-        }
-
-        const skipBtn = document.getElementById('btn-skip-match');
-        if (skipBtn) {
-            skipBtn.onclick = () => {
-                this.isSkip = true;
-                this.quickSimulateRemainingMatch();
-            };
-        }
-
-        // Bind FC27 View Mode Tabs (Stamina | Rating | Stats | GamePlan)
+        // Attach to existing view tabs
         document.querySelectorAll('.fc-view-tab').forEach(tab => {
             tab.onclick = () => {
-                this.sideViewMode = tab.getAttribute('data-view') || 'stamina';
                 document.querySelectorAll('.fc-view-tab').forEach(t => t.classList.remove('active'));
                 tab.classList.add('active');
-                this.updateSidePanels();
-            };
-        });
-
-        // Bind Starter / Bench Roster Tabs
-        document.querySelectorAll('.fc-roster-tab').forEach(tab => {
-            tab.onclick = () => {
-                const side = tab.getAttribute('data-side');
-                const grp = tab.getAttribute('data-group');
-                this.rosterGroup[side] = grp;
-                tab.parentElement.querySelectorAll('.fc-roster-tab').forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                this.updateSidePanels();
-            };
-        });
-
-        this.updateSidePanels();
-    }
-
-    updateSidePanels() {
-        const leftContent = document.getElementById('fc-left-content');
-        const rightContent = document.getElementById('fc-right-content');
-        const leftTabs = document.getElementById('fc-left-roster-tabs');
-        const rightTabs = document.getElementById('fc-right-roster-tabs');
-        if (!leftContent || !rightContent) return;
-
-        if (this.sideViewMode === 'stats') {
-            if (leftTabs) leftTabs.style.visibility = 'hidden';
-            if (rightTabs) rightTabs.style.visibility = 'hidden';
-
-            const totalTicks = this.matchStats.playerPossessionTicks + this.matchStats.oppPossessionTicks;
-            const homePoss = Math.round((this.matchStats.playerPossessionTicks / totalTicks) * 100);
-            const awayPoss = 100 - homePoss;
-
-            leftContent.innerHTML = `
-                <div class="fc-stats-big-container">
-                    <div>
-                        <div class="fc-stat-item-label">ポゼッション</div>
-                        <div class="fc-stat-item-value">${homePoss}</div>
-                    </div>
-                    <div>
-                        <div class="fc-stat-item-label">シュート</div>
-                        <div class="fc-stat-item-value">${this.matchStats.playerShots}</div>
-                    </div>
-                    <div>
-                        <div class="fc-stat-item-label">決定機</div>
-                        <div class="fc-stat-item-value">${this.matchStats.playerBigChances}</div>
-                    </div>
-                </div>
-            `;
-            rightContent.innerHTML = `
-                <div class="fc-stats-big-container fc-stats-big-Container-right">
-                    <div>
-                        <div class="fc-stat-item-label">ポゼッション</div>
-                        <div class="fc-stat-item-value">${awayPoss}</div>
-                    </div>
-                    <div>
-                        <div class="fc-stat-item-label">シュート</div>
-                        <div class="fc-stat-item-value">${this.matchStats.oppShots}</div>
-                    </div>
-                    <div>
-                        <div class="fc-stat-item-label">決定機</div>
-                        <div class="fc-stat-item-value">${this.matchStats.oppBigChances}</div>
-                    </div>
-                </div>
-            `;
-            return;
-        }
-
-        if (this.sideViewMode === 'gameplan') {
-            if (leftTabs) leftTabs.style.visibility = 'hidden';
-            if (rightTabs) rightTabs.style.visibility = 'hidden';
-
-            const tacticJp = { Balance: 'バランス', Attack: '猛攻 (ハイライン)', Defend: '全員守備 (リトリート)' };
-            leftContent.innerHTML = `
-                <div class="fc-gameplan-container">
-                    <div class="fc-gp-title">${this.playerTeamData.name} 基本</div>
-                    <div>
-                        <div class="fc-gp-block-label">フォーメーション</div>
-                        <div class="fc-gp-block-val">${this.playerTeamData.formation}</div>
-                    </div>
-                    <div>
-                        <div class="fc-gp-block-label">ビルドアップスタイル</div>
-                        <div class="fc-gp-block-val">${this.playerTeamData.manager?.preference || 'Balance'}</div>
-                    </div>
-                    <div>
-                        <div class="fc-gp-block-label">リアルタイム指示</div>
-                        <div class="fc-gp-block-val">${tacticJp[this.realTimeTactic] || 'バランス'}</div>
-                    </div>
-                </div>
-            `;
-            rightContent.innerHTML = `
-                <div class="fc-gameplan-container" style="text-align: right;">
-                    <div class="fc-gp-title">${this.opponentTeamData.name} 基本</div>
-                    <div>
-                        <div class="fc-gp-block-label">フォーメーション</div>
-                        <div class="fc-gp-block-val">${this.opponentTeamData.formation}</div>
-                    </div>
-                    <div>
-                        <div class="fc-gp-block-label">ビルドアップスタイル</div>
-                        <div class="fc-gp-block-val">${this.opponentTeamData.manager?.preference || 'Counter'}</div>
-                    </div>
-                    <div>
-                        <div class="fc-gp-block-label">チームコンセプト</div>
-                        <div class="fc-gp-block-val">${this.opponentTeamData.specializedConcept || 'Normal'}</div>
-                    </div>
-                </div>
-            `;
-            return;
-        }
-
-        if (leftTabs) leftTabs.style.visibility = 'visible';
-        if (rightTabs) rightTabs.style.visibility = 'visible';
-
-        const renderRosterList = (team, isHome) => {
-            const group = isHome ? this.rosterGroup.home : this.rosterGroup.away;
-            const list = group === 'starters' ? team.starting11 : team.bench;
-
-            return list.map((p, idx) => {
-                const isOwner = this.ball && this.ball.owner && this.ball.owner.playerData === p;
-                const stamPct = Math.max(0, Math.min(100, Math.round(((p.currentStamina ?? 80) / (p.stats.stamina || 80)) * 100)));
-                const stamColor = stamPct > 55 ? '#2ecc71' : (stamPct > 25 ? '#f1c40f' : '#e74c3c');
-                const goalIcons = p.matchGoals > 0 ? '⚽'.repeat(p.matchGoals) : '';
-
-                let metricHtml = '';
-                if (this.sideViewMode === 'rating') {
-                    const rVal = group === 'bench' && !p.playedInMatch ? 'N/A' : (p.matchRating || 6.0).toFixed(1);
-                    const rColor = rVal >= 7.0 ? '#2ecc71' : (rVal >= 6.0 ? '#f39c12' : '#95a5a6');
-                    metricHtml = `<span class="fc-rating-badge" style="color: ${rColor};">${rVal}</span>`;
-                } else {
-                    metricHtml = `
-                        <div class="fc-stamina-bar-wrap">
-                            <div class="fc-stamina-bar-fill" style="width: ${stamPct}%; background: ${stamColor};"></div>
-                        </div>
-                    `;
-                }
-
-                const num = p.jerseyNumber || (group === 'starters' ? idx + 1 : idx + 12);
-                if (isHome) {
-                    return `
-                        <div class="fc-player-row ${isOwner ? 'has-ball' : ''}">
-                            <div class="fc-player-label">
-                                <span class="fc-player-num">${num}</span>
-                                <span class="fc-player-name">${p.name}</span>
-                                <span class="fc-player-pos-tag">${p.position} ${goalIcons}</span>
-                            </div>
-                            ${metricHtml}
-                        </div>
-                    `;
-                } else {
-                    return `
-                        <div class="fc-player-row ${isOwner ? 'has-ball' : ''}">
-                            ${metricHtml}
-                            <div class="fc-player-label">
-                                <span class="fc-player-pos-tag">${goalIcons} ${p.position}</span>
-                                <span class="fc-player-name">${p.name}</span>
-                                <span class="fc-player-num">${num}</span>
-                            </div>
-                        </div>
-                    `;
-                }
-            }).join('');
-        };
-
-        leftContent.innerHTML = renderRosterList(this.playerTeamData, true);
-        rightContent.innerHTML = renderRosterList(this.opponentTeamData, false);
-    }
-
-    // =========================================================
-    // Bottom Tactical Command Deck
-    // =========================================================
-    createCommandUI() {
-        const container = document.getElementById('command-slots-container');
-        if (container) container.innerHTML = '';
-        this.commandSlots = [];
-
-        let cdReduction = 0;
-        (this.playerTeamData.relics || []).forEach(rId => {
-            const relic = window.MasterData.Relics.find(r => r.id === rId);
-            if (relic && relic.effectType === 'CD_REDUCE') cdReduction += relic.value;
-        });
-
-        const equipped = this.playerTeamData.microCommands || [];
-        for (let i = 0; i < 4; i++) {
-            const cmdId = equipped[i];
-            const rawCmd = window.MasterData.MicroCommands.find(c => c.id === cmdId);
-            if (!rawCmd) {
-                if (container) {
-                    const emptyEl = document.createElement('div');
-                    emptyEl.className = 'command-slot disabled';
-                    emptyEl.innerHTML = `<div class="command-name">SLOT ${i + 1}: 未設定</div>`;
-                    container.appendChild(emptyEl);
-                }
-                this.commandSlots.push(null);
-                continue;
-            }
-
-            const cmdData = { ...rawCmd, cooldown: Math.max(5, Math.round(rawCmd.cooldown * (1 - cdReduction))) };
-            const slotData = {
-                cmdId,
-                data: cmdData,
-                currentCd: 0,
-                usesLeft: cmdData.maxUses !== undefined ? cmdData.maxUses : Infinity,
-                auto: false
-            };
-            this.commandSlots.push(slotData);
-
-            if (container) {
-                const slotEl = document.createElement('div');
-                slotEl.className = 'command-slot';
-                slotEl.id = `cmd-slot-${i}`;
-
-                const expl = cmdData.description || (cmdData.type === 'buff' ? `${cmdData.target} +${cmdData.value}` : cmdData.actionType);
-                slotEl.innerHTML = `
-                    <div class="command-slot-top">
-                        <span class="command-name">${cmdData.name}</span>
-                        <button class="auto-toggle-btn" id="cmd-auto-${i}" style="background: #555;">AUTO: OFF</button>
-                    </div>
-                    <div class="command-expl">${expl}</div>
-                    <div class="command-slot-bottom">
-                        <span class="command-desc">残り: ${slotData.usesLeft === Infinity ? '∞' : slotData.usesLeft} (CD:${cmdData.cooldown}s)</span>
-                    </div>
-                    <div class="command-cd-bar" id="cmd-cd-${i}"></div>
-                `;
-
-                const autoBtn = slotEl.querySelector(`#cmd-auto-${i}`);
-                if (autoBtn) {
-                    autoBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        slotData.auto = !slotData.auto;
-                        autoBtn.textContent = slotData.auto ? 'AUTO: ON' : 'AUTO: OFF';
-                        autoBtn.style.background = slotData.auto ? '#27ae60' : '#555';
-                    };
-                }
-
-                slotEl.onclick = () => this.triggerCommand(i);
-                container.appendChild(slotEl);
-            }
-        }
-
-        document.querySelectorAll('.tactic-btn').forEach(btn => {
-            btn.onclick = () => {
-                this.realTimeTactic = btn.getAttribute('data-tactic') || 'Balance';
-                document.querySelectorAll('.tactic-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
+                this.sideViewMode = tab.getAttribute('data-view');
                 this.updateSidePanels();
             };
         });
@@ -565,6 +278,119 @@ class MatchScene extends Phaser.Scene {
         if (subBtn) {
             subBtn.textContent = `🔄 チーム管理・交代 (枠: ${this.substitutionsLeft})`;
             subBtn.onclick = () => this.openSubstitutionUI('inmatch');
+        }
+
+        this.updateSidePanels();
+    }
+
+updateSidePanels() {
+        const leftContent = document.getElementById('fc-left-content');
+        const rightContent = document.getElementById('fc-right-content');
+
+        // Hide/show the existing roster tabs if needed (we are now using top view tabs instead of group tabs for simplicity)
+        const leftTabs = document.getElementById('fc-left-roster-tabs');
+        const rightTabs = document.getElementById('fc-right-roster-tabs');
+        if(leftTabs) leftTabs.style.display = 'none';
+        if(rightTabs) rightTabs.style.display = 'none';
+
+        if (!leftContent || !rightContent) return;
+
+        if (this.sideViewMode === 'stamina' || this.sideViewMode === 'rating') {
+            const renderList = (sprites) => {
+                return sprites.filter(s=>s.playerData.position !== 'GK').slice(0,10).map(s => {
+                    const pd = s.playerData;
+                    const stam = pd.currentStamina || 100;
+                    const stamColor = stam > 60 ? '#2ecc71' : stam > 30 ? '#f1c40f' : '#e74c3c';
+                    const num = pd.jerseyNumber || 99;
+                    const name = pd.name;
+                    const rating = (pd.matchRating || 6.0).toFixed(1);
+                    const rightCol = this.sideViewMode === 'stamina'
+                        ? `<div style="width: 60px; height: 6px; background: #333; border-radius: 3px; overflow: hidden;"><div style="height: 100%; width:${stam}%; background:${stamColor}"></div></div>`
+                        : `<div style="font-weight: bold; width: 30px; text-align: right; color:${rating >= 7.0 ? '#2ecc71' : rating <= 5.0 ? '#e74c3c' : '#fff'}">${rating} <span style="font-size: 10px; margin-left: 5px;">${rating >= 6.5 ? '▲' : '▼'}</span></div>`;
+
+                    return `<div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 11px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                <div style="display:flex; gap: 5px; align-items: center;"><div style="color:#aaa; width: 15px;">${num}</div><div style="width: 100px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${name}</div></div>
+                                ${rightCol}
+                            </div>`;
+                }).join('');
+            };
+            leftContent.innerHTML = renderList(this.playerSprites);
+            rightContent.innerHTML = renderList(this.opponentSprites);
+        } else if (this.sideViewMode === 'stats') {
+            const totalPoss = Math.max(1, this.matchStats.playerPossessionTicks + this.matchStats.oppPossessionTicks);
+            const pPoss = Math.round((this.matchStats.playerPossessionTicks / totalPoss) * 100);
+            const oPoss = 100 - pPoss;
+            leftContent.innerHTML = `
+                <div class="fc-stats-big-container">
+                    <div>
+                        <div class="fc-stat-item-label">ポゼッション</div>
+                        <div class="fc-stat-item-value">${pPoss}%</div>
+                    </div>
+                    <div>
+                        <div class="fc-stat-item-label">シュート数</div>
+                        <div class="fc-stat-item-value">${this.matchStats.shotsHome}</div>
+                    </div>
+                </div>`;
+            rightContent.innerHTML = `
+                <div class="fc-stats-big-container">
+                    <div>
+                        <div class="fc-stat-item-label">ポゼッション</div>
+                        <div class="fc-stat-item-value">${oPoss}%</div>
+                    </div>
+                    <div>
+                        <div class="fc-stat-item-label">シュート数</div>
+                        <div class="fc-stat-item-value">${this.matchStats.shotsAway}</div>
+                    </div>
+                </div>`;
+        } else if (this.sideViewMode === 'gameplan') {
+            leftContent.innerHTML = `
+                <div style="padding: 10px;">
+                    <div style="color:#aaa; font-size:12px;">フォーメーション</div>
+                    <div style="font-size:18px; font-weight:bold; margin-bottom: 10px;">${this.playerTeamData.formation || '4-4-2'}</div>
+                    <div style="color:#aaa; font-size:12px;">戦術指示</div>
+                    <div style="font-size:14px; color:#f1c40f;">${this.realTimeTactic === 'Attack' ? '猛攻' : this.realTimeTactic === 'Defend' ? '守備的' : 'バランス'}</div>
+                </div>`;
+            rightContent.innerHTML = `
+                <div style="padding: 10px;">
+                    <div style="color:#aaa; font-size:12px;">フォーメーション</div>
+                    <div style="font-size:18px; font-weight:bold; margin-bottom: 10px;">${this.opponentTeamData.formation || '4-4-2'}</div>
+                    <div style="color:#aaa; font-size:12px;">戦術指示</div>
+                    <div style="font-size:14px; color:#f1c40f;">バランス</div>
+                </div>`;
+        }
+    }
+
+    // =========================================================
+    // Bottom Tactical Command Deck
+    // =========================================================
+createCommandUI() {
+        this.commandSlots = [];
+        if (this.playerTeamData.microCommands) {
+            this.playerTeamData.microCommands.forEach(cmdId => {
+                if (cmdId) {
+                    const cmdData = window.MasterData.MicroCommands.find(c => c.id === cmdId);
+                    if (cmdData) {
+                        this.commandSlots.push({ data: cmdData, currentCd: 0, auto: false, usesLeft: 3 });
+                    } else this.commandSlots.push(null);
+                } else this.commandSlots.push(null);
+            });
+        }
+
+        const cmdContainer = document.getElementById('micro-command-bar');
+        if (cmdContainer) {
+            cmdContainer.innerHTML = '';
+            this.commandSlots.forEach((slot, idx) => {
+                if (!slot) return;
+                const btn = document.createElement('button');
+                btn.className = 'fc-command-btn';
+                btn.innerHTML = `
+                    <div class="cmd-icon">⚡</div>
+                    <div class="cmd-name">${slot.data.name}</div>
+                    <div class="cmd-cooldown-fill" id="cmd-cd-${idx}"></div>
+                `;
+                btn.onclick = () => this.triggerCommand(idx);
+                cmdContainer.appendChild(btn);
+            });
         }
     }
 
@@ -775,52 +601,46 @@ class MatchScene extends Phaser.Scene {
         };
     }
 
-    getDynamicBasePosition(p, isAttacking, isPlayerTeam) {
+getDynamicBasePosition(p, isAttacking, isPlayerTeam) {
         const base = this.getBasePosition(p, isPlayerTeam);
-        let tx = base.x;
-        let ty = base.y;
+        let tx = base.x; let ty = base.y;
         const pos = p.expectedPosStr || p.playerData?.position;
         const role = p.playerData?.role;
         const dir = isPlayerTeam ? 1 : -1;
 
-        if (pos === 'GK') {
-            return { x: isPlayerTeam ? 42 : 758, y: Phaser.Math.Clamp(300 + (this.ball.y - 300) * 0.15, 265, 335) };
+        if (pos === 'GK') return { x: isPlayerTeam ? 42 : 758, y: Phaser.Math.Clamp(300 + (this.ball.y - 300) * 0.15, 265, 335) };
+
+        const ballRelX = isPlayerTeam ? this.ball.x : (800 - this.ball.x);
+        let phaseShift = 0; let widthMult = 1.0;
+
+        if (isAttacking) {
+            if (ballRelX < 266) { phaseShift = 20 * dir; widthMult = 1.3; }
+            else if (ballRelX < 533) { phaseShift = 60 * dir; widthMult = 1.1; }
+            else { phaseShift = 100 * dir; widthMult = 0.9; }
+            if (this.realTimeTactic === 'Attack') phaseShift += 40 * dir;
+        } else {
+            if (ballRelX > 533) { phaseShift = -30 * dir; widthMult = 0.8; }
+            else if (ballRelX > 266) { phaseShift = -55 * dir; widthMult = 0.7; }
+            else { phaseShift = -90 * dir; widthMult = 0.5; }
+            if (this.realTimeTactic === 'Defend') phaseShift -= 40 * dir;
         }
 
-        // Dynamic team block shift based on ball X (FC27 cohesive block movement)
-        const ballShift = (this.ball.x - 400) * 0.42;
-        const phaseShift = isAttacking ? 65 * dir : -55 * dir;
-        tx += ballShift + phaseShift;
+        tx += phaseShift;
+        ty = 300 + ((ty - 300) * widthMult);
 
-        if (this.realTimeTactic === 'Attack' && isPlayerTeam) tx += 35;
-        if (this.realTimeTactic === 'Defend' && isPlayerTeam) tx -= 40;
-        if (this.activeBuff && this.activeBuff.target === 'defenseLine' && isPlayerTeam) tx += 45;
-
-        // Role overrides (Required by test_phase3_ai.js)
         if (!p.playerData?.isMob) {
-            if (pos === 'SB' && role === 'Inverted' && isAttacking) {
-                ty = ty < 300 ? 220 : 380;
-                tx += 25 * dir;
-            } else if (pos === 'SB' && role === 'Attacking' && isAttacking) {
-                tx += 55 * dir;
-            } else if (pos === 'CF' && role === 'False-9' && isAttacking) {
-                tx -= 45 * dir;
-            } else if (pos === 'CF' && role === 'Poacher' && isAttacking) {
-                tx += 30 * dir;
-            } else if (pos === 'WG' && role === 'Inside-Forward' && isAttacking) {
-                ty = ty < 300 ? 235 : 365;
-                tx += 25 * dir;
+            if (pos === 'SB') {
+                if (isAttacking && role === 'Attacking') { tx += 40 * dir; ty = ty < 300 ? Math.max(65, ty - 20) : Math.min(535, ty + 20); }
+                else if (isAttacking && role === 'Inverted') { ty = ty < 300 ? 230 : 370; tx += 30 * dir; }
+            } else if (pos === 'WG') {
+                if (isAttacking && role === 'Inside-Forward') { ty = ty < 300 ? 240 : 360; tx += 40 * dir; }
+            } else if (pos === 'CF') {
+                if (isAttacking && role === 'False-9') { tx -= 30 * dir; }
+                else if (isAttacking && role === 'Poacher') { tx += 30 * dir; }
             }
         }
-
-        // Width compression when defending
-        if (!isAttacking) {
-            ty = ty + (this.ball.y - ty) * 0.22;
-        }
-
-        tx = Phaser.Math.Clamp(tx, 65, 735);
-        ty = Phaser.Math.Clamp(ty, 58, 542);
-        return { x: tx, y: ty };
+        ty += (this.ball.y - 300) * (isAttacking ? 0.2 : 0.35);
+        return { x: Phaser.Math.Clamp(tx, 65, 735), y: Phaser.Math.Clamp(ty, 58, 542) };
     }
 
     calculateThreat(x, y, isPlayerTeam) {
@@ -959,6 +779,12 @@ class MatchScene extends Phaser.Scene {
                 this.halfNumber = 2;
                 this.matchTime = 45;
                 this.matchState = 'halftime';
+                const banner = document.getElementById('fc-goal-banner');
+                if (banner) {
+                    document.getElementById('fc-goal-details').innerText = "HALF TIME";
+                    banner.style.display = 'block';
+                    setTimeout(() => banner.style.display = 'none', 2000);
+                }
                 this.openSubstitutionUI('halftime');
                 return;
             }
@@ -984,6 +810,7 @@ class MatchScene extends Phaser.Scene {
         });
 
         this.simulateAction();
+        if(this.syncBallVisuals) this.syncBallVisuals();
     }
 
     simulateAction() {
@@ -1322,58 +1149,35 @@ class MatchScene extends Phaser.Scene {
         }
     }
 
-    triggerGoal(isPlayerTeam) {
+triggerGoal(isPlayerTeam) {
         if (isPlayerTeam) this.score.player++; else this.score.opponent++;
         this.scoreText.setText(`${this.playerTeamData.name} ${this.score.player} - ${this.score.opponent} ${this.opponentTeamData.name}`);
-
         this.matchState = 'celebration';
 
-        const text = this.add.text(400, 300, 'GOAL!!!', {
-            fontSize: '80px',
-            fill: '#f1c40f',
-            fontStyle: 'bold',
-            stroke: '#c0392b',
-            strokeThickness: 8
-        }).setOrigin(0.5).setDepth(2000).setScale(0.1);
+        const popupScorer = this.ball.lastShooter ? this.ball.lastShooter.playerData : { name: 'Unknown', position: 'FW', jerseyNumber: 9 };
+        const timeStr = Math.floor(this.matchTime) + "'";
 
-        this.tweens.add({
-            targets: text,
-            scale: 1.5,
-            duration: 800,
-            ease: 'Bounce.easeOut',
-            onComplete: () => {
-                this.tweens.add({
-                    targets: text,
-                    alpha: 0,
-                    delay: 2000,
-                    duration: 500,
-                    onComplete: () => {
-                        text.destroy();
-                        this.resetPositions();
-                    }
-                });
-            }
-        });
-
-        // Find the scorer (last touched) and make them jump
-        let scorer = this.ball.owner;
-        if (!scorer) {
-            // Find closest player to goal
-            const team = isPlayerTeam ? this.playerSprites : this.opponentSprites;
-            const goalX = isPlayerTeam ? 800 : 0;
-            scorer = team.reduce((closest, p) => Math.abs(p.x - goalX) < Math.abs(closest.x - goalX) ? p : closest, team[0]);
+        const banner = document.getElementById('fc-goal-banner');
+        if (banner) {
+            document.getElementById('fc-goal-details').innerText = `${timeStr} | #${popupScorer.jerseyNumber} ${popupScorer.name} (${popupScorer.position})`;
+            banner.style.display = 'block';
         }
+
+        const text = this.add.text(400, 300, 'GOAL!!!', { fontSize: '80px', fill: '#f1c40f', fontStyle: 'bold', stroke: '#c0392b', strokeThickness: 8 }).setOrigin(0.5).setDepth(2000).setScale(0.1);
+        this.tweens.add({ targets: text, scale: 1, duration: 800, ease: 'Elastic.easeOut', onComplete: () => { setTimeout(() => { if(text && text.destroy) text.destroy(); if(banner) banner.style.display = 'none'; }, 1500); } });
+
+        let scorer = this.ball.owner;
+        if (!scorer && this.ball.lastShooter && this.ball.lastShooter.isPlayerTeam === isPlayerTeam) { scorer = this.ball.lastShooter; }
 
         if (scorer) {
-            this.tweens.add({
-                targets: scorer.bodyParts,
-                y: '-=15',
-                yoyo: true,
-                repeat: 5,
-                duration: 300,
-                ease: 'Sine.easeInOut'
-            });
+            scorer.playerData.matchGoals = (scorer.playerData.matchGoals || 0) + 1;
+            scorer.playerData.matchRating = Math.min(10.0, (scorer.playerData.matchRating || 6.0) + 1.2);
+            if (isPlayerTeam) this.matchStats.scorersHome.push(`${scorer.playerData.name} (${Math.floor(this.matchTime)}')`);
+            else this.matchStats.scorersAway.push(`${scorer.playerData.name} (${Math.floor(this.matchTime)}')`);
         }
+
+        this.celebrationTimer = 75;
+        this.nextKickoffIsPlayer = !isPlayerTeam;
     }
 
     finishMatchInstantly() {
@@ -1406,9 +1210,6 @@ class MatchScene extends Phaser.Scene {
             } else {
                 managementUI.showDashboard();
             }
-            this.game.canvas.style.display = 'none';
-            const fcUiLayer = document.getElementById('fc-match-ui-layer');
-            if (fcUiLayer) fcUiLayer.style.display = 'none';
             this.scene.stop();
         });
     }
