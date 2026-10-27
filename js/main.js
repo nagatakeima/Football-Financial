@@ -21,10 +21,13 @@ class MatchScene extends Phaser.Scene {
     create() {
         const phaserDiv = document.getElementById('phaser-game');
         if (phaserDiv) {
-            phaserDiv.style.transform = 'perspective(900px) rotateX(15deg)';
-            phaserDiv.style.transformOrigin = 'bottom center';
-            phaserDiv.style.boxShadow = '0 10px 30px rgba(0,0,0,0.8)';
-            phaserDiv.style.borderRadius = '10px';
+            const cv = phaserDiv.querySelector('canvas');
+            if (cv) {
+                cv.style.transform = 'perspective(900px) rotateX(15deg)';
+                cv.style.transformOrigin = 'bottom center';
+                cv.style.boxShadow = '0 10px 30px rgba(0,0,0,0.8)';
+                cv.style.borderRadius = '10px';
+            }
         }
 
         this.playerTeamData = window.gameState.playerTeam;
@@ -189,64 +192,49 @@ class MatchScene extends Phaser.Scene {
         const container = this.add.container(400, 300);
         container.setDepth(20);
 
-        // Tactical Aura Ring
-        const aura = this.add.circle(0, 0, 16, isPlayerTeam ? 0xe74c3c : 0xf1c40f, 0);
-        // Active Ball Owner Ring
-        const activeRing = this.add.circle(0, 0, 14, 0x2ecc71, 0);
-        activeRing.setStrokeStyle(2, 0xffffff, 0.9);
+        const aura = this.add.ellipse(0, 15, 30, 15, 0x000000, 0);
+        const activeRing = this.add.ellipse(0, 15, 28, 12, isPlayerTeam ? 0x2ecc71 : 0xe74c3c, 0);
+        activeRing.setStrokeStyle(2, 0xffffff, 1);
         activeRing.setVisible(false);
 
-        // Token Disk (FC27 Style: Home=Crimson/BlueGK, Away=Gold/GreenGK)
         const isGK = expectedPosStr === 'GK';
-        const fillColor = isPlayerTeam
-            ? (isGK ? 0x2980b9 : 0xd63031)
-            : (isGK ? 0x27ae60 : 0xf1c40f);
-        const strokeColor = isPlayerTeam ? 0xffffff : 0x111111;
-        const textColor = isPlayerTeam ? '#ffffff' : '#111111';
+        const mainColor = isPlayerTeam ? (isGK ? 0x2980b9 : 0x3498db) : (isGK ? 0x27ae60 : 0xe74c3c);
+        const skinColor = 0xffe0bd;
+        const shoeColor = 0x333333;
 
-        const tokenCircle = this.add.circle(0, 0, 10.5, fillColor, 1);
-        tokenCircle.setStrokeStyle(2, strokeColor, 0.95);
+        const body = this.add.rectangle(0, -4, 18, 22, mainColor);
+        body.setStrokeStyle(1, 0x000000, 0.5);
+        const head = this.add.circle(0, -20, 9, skinColor);
+        head.setStrokeStyle(1, 0x000000, 0.5);
+        const legL = this.add.rectangle(-5, 10, 6, 12, skinColor);
+        const legR = this.add.rectangle(5, 10, 6, 12, skinColor);
+        const shoeL = this.add.rectangle(-5, 17, 8, 5, shoeColor);
+        const shoeR = this.add.rectangle(5, 17, 8, 5, shoeColor);
 
-        const numText = this.add.text(0, 0, String(pData.jerseyNumber || number), {
-            fontSize: '11px',
-            fontFamily: 'Arial',
-            fontStyle: 'bold',
-            color: textColor
+        const numText = this.add.text(0, -5, String(pData.jerseyNumber || number || '0'), { fontSize: '11px', fill: '#ffffff', fontStyle: 'bold', fontFamily: 'Arial' }).setOrigin(0.5);
+
+        const nameLabel = this.add.text(0, -35, pData.name, {
+            fontSize: '9px', fill: '#ffffff', fontFamily: 'Arial', backgroundColor: 'rgba(0,0,0,0.5)', padding: { x: 2, y: 1 }
         }).setOrigin(0.5);
+        nameLabel.setVisible(false);
 
-        const nameLabel = this.add.text(0, 15, pData.name.split(' ').pop(), {
-            fontSize: '9px',
-            fontFamily: 'Arial',
-            color: isPlayerTeam ? '#ecf0f1' : '#f9e79f',
-            stroke: '#000000',
-            strokeThickness: 2
-        }).setOrigin(0.5);
+        const staminaArc = this.add.graphics();
+        staminaArc.rotation = -Math.PI / 2;
 
-        // Hidden compatibility refs so legacy checks never fail
-        const dummyLegL = { y: 12 };
-        const dummyLegR = { y: 12 };
-        const dummyShoeL = { y: 17 };
-        const dummyShoeR = { y: 17 };
+        container.add([aura, activeRing, legL, legR, shoeL, shoeR, body, head, numText, staminaArc, nameLabel]);
 
-        container.add([aura, activeRing, tokenCircle, numText, nameLabel]);
-
-        container.playerData = pData;
         container.isPlayerTeam = isPlayerTeam;
+        container.playerData = pData;
         container.expectedPosStr = expectedPosStr;
-        container.aura = aura;
-        container.activeRing = activeRing;
-        container.tokenCircle = tokenCircle;
-        container.legL = dummyLegL;
-        container.legR = dummyLegR;
-        container.shoeL = dummyShoeL;
-        container.shoeR = dummyShoeR;
-        container.bodyParts = [];
-        container.stunTimer = 0;
-        container.actionCooldown = 0;
-        container.gkKeepTimer = 0;
-        container.aiTickTimer = 0;
-        container.animTick = 0;
-        container.currentAction = 'HoldPosition';
+
+        container.actionCooldown = 0; container.stunTimer = 0; container.gkKeepTimer = 0; container.aiTickTimer = Math.random() * 20;
+        container.activeRing = activeRing; container.aura = aura; container.staminaArc = staminaArc; container.numText = numText; container.nameLabel = nameLabel;
+        container.legL = legL; container.legR = legR; container.shoeL = shoeL; container.shoeR = shoeR;
+        container.animTick = Math.random() * 10;
+        container.bodyParts = [body, head, numText, legL, legR];
+
+        container.on('pointerover', () => { nameLabel.setVisible(true); });
+        container.on('pointerout', () => { nameLabel.setVisible(false); });
 
         return container;
     }
@@ -783,14 +771,17 @@ class MatchScene extends Phaser.Scene {
         };
     }
 
-    getDynamicBasePosition(p, isAttacking, isPlayerTeam) {
+getDynamicBasePosition(p, isAttacking, isPlayerTeam) {
         const base = this.getBasePosition(p, isPlayerTeam);
-        let tx = base.x; let ty = base.y;
+        let tx = base.x;
+        let ty = base.y;
         const pos = p.expectedPosStr || p.playerData?.position;
         const role = p.playerData?.role;
         const dir = isPlayerTeam ? 1 : -1;
 
-        if (pos === 'GK') return { x: isPlayerTeam ? 42 : 758, y: Phaser.Math.Clamp(300 + (this.ball.y - 300) * 0.15, 265, 335) };
+        if (pos === 'GK') {
+            return { x: isPlayerTeam ? 42 : 758, y: Phaser.Math.Clamp(300 + (this.ball.y - 300) * 0.15, 265, 335) };
+        }
 
         const ballRelX = isPlayerTeam ? this.ball.x : (800 - this.ball.x);
         let phaseShift = 0; let widthMult = 1.0;
@@ -995,6 +986,7 @@ class MatchScene extends Phaser.Scene {
         });
 
         this.simulateAction();
+        if (this.syncBallVisuals) this.syncBallVisuals();
     }
 
     simulateAction() {
@@ -1349,27 +1341,15 @@ class MatchScene extends Phaser.Scene {
                 if(p.legL) { p.legL.y = 10; p.legR.y = 10; p.shoeL.y = 17; p.shoeR.y = 17; }
             }
         });
-
-        if (this.ballContainer) {
-            const ballDepthRatio = Phaser.Math.Clamp((this.ball.y - 45) / 510, 0, 1);
-            this.ballContainer.setPosition(this.ball.x, this.ball.y);
-            this.ballContainer.setScale(0.7 + ballDepthRatio * 0.4);
-            this.ballContainer.setDepth(30 + Math.floor(this.ball.y));
-            if (this.ballSprite) this.ballSprite.y = -this.ball.z;
-            const shadowScale = Math.max(0.2, 1 - (this.ball.z / 40));
-            if (this.ballContainer.list[0]) {
-                this.ballContainer.list[0].setScale(shadowScale);
-                this.ballContainer.list[0].setAlpha(shadowScale * 0.5);
-            }
-        }
     }
-
     triggerGoal(isPlayerTeam) {
         if (isPlayerTeam) this.score.player++; else this.score.opponent++;
         this.scoreText.setText(`${this.playerTeamData.name} ${this.score.player} - ${this.score.opponent} ${this.opponentTeamData.name}`);
 
         this.matchState = 'celebration';
 
+        const bannerTitle = document.querySelector('.fc-goal-title');
+        if (bannerTitle) bannerTitle.innerText = 'ゴール';
         const text = this.add.text(400, 300, 'GOAL!!!', {
             fontSize: '80px',
             fill: '#f1c40f',
