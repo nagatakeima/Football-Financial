@@ -914,7 +914,7 @@ button:disabled {
     background: url('kickoff.png') no-repeat center center;
     background-size: cover;
     border-radius: 12px;
-    transform: perspective(800px) rotateX(25deg);
+    transform: perspective(900px) rotateX(16deg);
     transform-origin: bottom center;
     border: 1px solid rgba(255, 255, 255, 0.2);
     box-shadow: 0 15px 35px rgba(0,0,0,0.5);

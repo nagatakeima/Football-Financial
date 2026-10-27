@@ -208,38 +208,46 @@ showSquad() {
             return;
         }
         this.activeTab = 'squad';
+        if (this.matchWrapper) this.matchWrapper.style.display = 'none';
+        if (this.uiLayer) this.uiLayer.style.display = 'flex';
+        this.gameContainer.classList.remove('match-mode');
 
         const team = window.gameState.playerTeam;
+        const activeLinksCount = window.ChemistrySystem.calculateTeamChemistry(team) || 0;
+        this.updateTopBar();
+
         let html = `
             <div class="ui-layout-container" style="display: flex; flex-direction: row; width: 100%; height: calc(100vh - 100px); overflow: hidden; gap: 15px; padding: 10px;">
-                <div class="ui-panel left-panel" style="flex: 1; display: flex; flex-direction: column; gap: 10px; height: 100%; background: transparent; border: none; box-shadow: none;">
+                <div class="left-panel-tactics" style="flex: 1; display: flex; flex-direction: column; gap: 10px; height: 100%;">
 
+                    <!-- Controls -->
                     <div style="background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px; display: flex; gap: 10px; align-items: center; justify-content: space-between;">
                         <div>
-                            <span style="color:#aaa; font-size: 12px;">フォーメーション:</span>
-                            <select id="formation-select" onchange="managementUI.changeFormation(this.value)" style="background:#222; color:#fff; border:1px solid #444; padding:4px;">
-                                ${Object.keys(window.MasterData.Formations).map(f => `<option value="${f}" ${team.formation === f ? 'selected' : ''}>${f}</option>`).join('')}
+                            <span style="color:#aaa; font-size: 12px; margin-right: 8px;">フォーメーション:</span>
+                            <select id="formation-select" onchange="managementUI.changeFormation(this.value)" style="padding: 4px 8px; background: #1a3c2f; color: #ecf0f1; border: 1px solid #2ecc71; border-radius: 6px; cursor: pointer;">
+                                ${team.manager.formations.map(f => `<option value="${f}" ${team.formation === f ? 'selected' : ''}>${f}</option>`).join('')}
                             </select>
                         </div>
                         <div style="display:flex; gap: 5px;">
                             ${[0,1,2,3].map(i => `
                                 <select id="micro-cmd-${i}" onchange="managementUI.updateMicroCommand(${i}, this.value, 'squad')" style="background:#222; color:#fff; border:1px solid #444; padding:4px; max-width: 100px;">
                                     <option value="">--未設定--</option>
-                                    ${window.MasterData.MicroCommands.map(cmd => `<option value="${cmd.id}" ${team.microCommands[i] === cmd.id ? 'selected' : ''}>${cmd.name}</option>`).join('')}
+                                    ${window.MasterData.MicroCommands.filter(c => team.ownedMicroCommands.includes(c.id)).map(cmd => `<option value="${cmd.id}" ${team.microCommands[i] === cmd.id ? 'selected' : ''}>${cmd.name}</option>`).join('')}
                                 </select>
                             `).join('')}
                         </div>
                     </div>
 
-                    <div class="pitch-container-25d" id="fc-tactics-pitch">
+                    <div class="pitch-container-25d" id="fc-tactics-pitch" style="flex: 1; position: relative; background: url('kickoff.png') no-repeat center center; background-size: cover; border-radius: 12px; transform: perspective(900px) rotateX(16deg); transform-origin: bottom center; border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 15px 35px rgba(0,0,0,0.5); margin-bottom: -20px; z-index: 1;">
                         <canvas id="chem-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none; z-index: 1; width: 100%; height: 100%;"></canvas>
+                        <div id="formation-container" style="width: 100%; height: 100%; position: absolute; z-index: 2; top:0; left:0;"></div>
                     </div>
 
-                    <div class="horizontal-bench-container" id="fc-bench-container">
+                    <div class="horizontal-bench-container" id="bench-container" style="height: 140px; background: rgba(0,0,0,0.6); border-radius: 12px; display: flex; flex-direction: row; align-items: center; justify-content: space-around; padding: 5px; z-index: 2; border: 1px solid rgba(255,255,255,0.15); margin-top: auto;">
                     </div>
                 </div>
 
-                <div class="ui-panel right-panel" id="fc-player-details" style="width: 450px; height: 100%; background: rgba(0, 30, 15, 0.75); border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; backdrop-filter: blur(8px); display: flex; flex-direction: column; overflow: hidden; position: relative;">
+                <div class="right-panel-details" id="player-detail-panel" style="width: 450px; height: 100%; background: rgba(0, 30, 15, 0.75); border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; backdrop-filter: blur(8px); display: flex; flex-direction: column; overflow: hidden; position: relative;">
                     <div style="padding: 20px; text-align: center; color: #aaa; margin-top: 50px;">
                         <span style="font-size: 48px;">👤</span><br><br>
                         左のピッチまたはベンチから選手を選択してください。
@@ -287,31 +295,32 @@ showSquad() {
 
 renderFormation() {
         const team = window.gameState.playerTeam;
-        const pitch = document.getElementById('fc-tactics-pitch');
-        const bench = document.getElementById('fc-bench-container');
+        const container = document.getElementById('formation-container');
+        const benchContainer = document.getElementById('bench-container');
         const canvas = document.getElementById('chem-canvas');
-        if (!pitch || !bench) return;
+        if (!container || !benchContainer) return;
 
-        Array.from(pitch.children).forEach(c => {
-            if (c.id !== 'chem-canvas') pitch.removeChild(c);
-        });
-        bench.innerHTML = '';
+        container.innerHTML = '';
+        benchContainer.innerHTML = '';
 
         if (canvas) {
-            canvas.width = pitch.clientWidth;
-            canvas.height = pitch.clientHeight;
+            canvas.width = container.parentElement.clientWidth;
+            canvas.height = container.parentElement.clientHeight;
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            if (team.chemistryGraph && team.chemistryGraph.links) {
-                const positions = this.getFormationCoordinates(team.formation);
+
+            const links = window.ChemistrySystem.getFormationLinks(team.formation);
+            if (links) {
+                const fSlots = window.MasterData.Formations[team.formation].slots;
                 ctx.lineWidth = 3;
-                team.chemistryGraph.links.forEach(link => {
-                    const p1 = positions.find(p => p.index === parseInt(link.from));
-                    const p2 = positions.find(p => p.index === parseInt(link.to));
+                links.forEach(link => {
+                    const p1 = fSlots.find(s => s.id === link.from);
+                    const p2 = fSlots.find(s => s.id === link.to);
                     if (p1 && p2) {
                         ctx.beginPath();
-                        ctx.moveTo((p1.x / 100) * canvas.width, (p1.y / 100) * canvas.height);
-                        ctx.lineTo((p2.x / 100) * canvas.width, (p2.y / 100) * canvas.height);
+                        ctx.moveTo((p1.offsetY / 600) * canvas.width, (1.0 - p1.offsetX / 800) * canvas.height);
+                        ctx.lineTo((p2.offsetY / 600) * canvas.width, (1.0 - p2.offsetX / 800) * canvas.height);
+
                         if (link.value >= 3) ctx.strokeStyle = '#2ecc71';
                         else if (link.value >= 2) ctx.strokeStyle = '#f1c40f';
                         else ctx.strokeStyle = '#e74c3c';
@@ -321,37 +330,36 @@ renderFormation() {
             }
         }
 
-        const positions = this.getFormationCoordinates(team.formation);
-        team.starting11.forEach((player, i) => {
-            if (!player) return;
-            const posData = positions.find(p => p.index === i) || { x: 50, y: 50 };
-            const el = this.createFCPlayerToken(player, true, i);
-            el.style.left = posData.x + '%';
-            el.style.top = posData.y + '%';
-            el.onclick = () => this.handlePlayerClick(i, false);
-            if (this.selectedPlayerIndex === i) {
-                el.style.transform = 'translate(-50%, -50%) scale(1.1)';
-                el.style.borderColor = '#f1c40f';
+        const coords = this.getFormationCoordinates(team.formation);
+
+        team.starting11.forEach((player, idx) => {
+            const c = coords[idx] || { x: 0.5, y: 0.5 };
+            const div = this.createFCPlayerToken(player, true, idx, team.formation);
+            div.style.left = `${c.x * 100}%`;
+            div.style.top = `${c.y * 100}%`;
+            div.onclick = () => this.handlePlayerClick(idx, false);
+            if (this.selectedPlayerIndex === idx) {
+                div.style.transform = 'translate(-50%, -50%) scale(1.1)';
+                div.style.borderColor = '#f1c40f';
             }
-            if (this.swapSourceIndex === i) el.style.borderColor = '#2ecc71';
-            pitch.appendChild(el);
+            if (this.swapSourceIndex === idx) div.style.borderColor = '#2ecc71';
+            container.appendChild(div);
         });
 
         team.bench.forEach((player, i) => {
-            if (!player) return;
             const idx = i + 11;
-            const el = this.createFCPlayerToken(player, false, idx);
-            el.onclick = () => this.handlePlayerClick(idx, false);
+            const div = this.createFCPlayerToken(player, false, idx, team.formation);
+            div.onclick = () => this.handlePlayerClick(idx, false);
             if (this.selectedPlayerIndex === idx) {
-                el.style.transform = 'scale(1.05)';
-                el.style.borderColor = '#f1c40f';
+                div.style.transform = 'scale(1.05)';
+                div.style.borderColor = '#f1c40f';
             }
-            if (this.swapSourceIndex === idx) el.style.borderColor = '#2ecc71';
-            bench.appendChild(el);
+            if (this.swapSourceIndex === idx) div.style.borderColor = '#2ecc71';
+            benchContainer.appendChild(div);
         });
     }
 
-    createFCPlayerToken(player, isStarter, idx) {
+    createFCPlayerToken(player, isStarter, idx, formation) {
         const div = document.createElement('div');
         div.className = 'player-token-fc' + (isStarter ? '' : ' bench-token');
         div.style.cssText = `
@@ -366,13 +374,30 @@ renderFormation() {
             box-shadow: 0 4px 6px rgba(0,0,0,0.5); cursor: pointer; transition: all 0.1s;
         `;
 
-        const ovr = Math.floor((player.stats.pass + player.stats.shoot + player.stats.defense + player.stats.physical + player.stats.speed + player.stats.mental) / 6);
+        if (!player) {
+            div.innerHTML = `<div style="font-size:32px; margin-top:15px;">❌</div>`;
+            return div;
+        }
+
+        const ovr = player.getOvr ? player.getOvr() : 50;
         const stamRatio = (player.condition || 100) / 100;
         const stamColor = stamRatio > 0.6 ? '#2ecc71' : stamRatio > 0.3 ? '#f1c40f' : '#e74c3c';
+
+        let mobWarning = '';
+        if (isStarter && formation) {
+            const fSlots = window.MasterData.Formations[formation].slots;
+            if (fSlots && fSlots[idx]) {
+                const expectedCategory = fSlots[idx].position;
+                if (!player.position.includes(expectedCategory) && !player.subPositions?.includes(expectedCategory)) {
+                    mobWarning = `<div style="position:absolute; top:-12px; left:-12px; font-size:16px; background:#000; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; box-shadow:0 0 4px #000; z-index:3;" title="適性外 (モブ化ペナルティ)">⚠️</div>`;
+                }
+            }
+        }
 
         const ovrHtml = `<div style="position:absolute; top:-8px; right:-8px; background:#e67e22; color:#fff; font-weight:bold; font-size:14px; padding:2px 4px; border-radius:4px; box-shadow:0 2px 4px rgba(0,0,0,0.5); z-index:2;">${ovr}</div>`;
 
         div.innerHTML = `
+            ${mobWarning}
             ${ovrHtml}
             <div style="font-size: ${isStarter ? '32px' : '36px'}; margin-top:5px; text-shadow:0 2px 4px rgba(0,0,0,0.5);">👤</div>
             <div style="width: 90%; height: 4px; background: #333; border-radius: 2px; margin: 4px 0 2px 0; overflow:hidden;"><div style="height:100%; width:${stamRatio * 100}%; background:${stamColor}"></div></div>
@@ -382,7 +407,7 @@ renderFormation() {
         return div;
     }
 
-    renderPlayerDetailCard(player, index) {
+renderPlayerDetailCard(player, index) {
         const detailPanel = document.getElementById('player-detail-panel');
         if (!detailPanel) return;
         if (!player) {
@@ -391,120 +416,101 @@ renderFormation() {
         }
 
         const team = window.gameState.playerTeam;
-        const isComparing = this.swapSourceIndex !== null && this.swapSourceIndex !== index;
-        const srcPlayer = isComparing
-            ? (this.swapSourceIndex < 11 ? team.starting11[this.swapSourceIndex] : team.bench[this.swapSourceIndex - 11])
-            : null;
+        let posRoleBonus = 0;
+        let chemBonus = 0;
+        let linkDetails = '';
 
-        const statLabels = {
-            pass: 'Pass', shoot: 'Shoot', defense: 'Defense',
-            physical: 'Physical', speed: 'Speed', mental: 'Mental', stamina: 'Stamina'
-        };
-
-        const buildStatGrid = (targetP, baseCompareP = null) => {
-            return Object.entries(targetP.stats).map(([key, val]) => {
-                let color = '#3498db';
-                if (val >= 80) color = '#f1c40f';
-                else if (val >= 65) color = '#2ecc71';
-                else if (val < 45) color = '#e74c3c';
-
-                let diffHtml = '';
-                if (baseCompareP) {
-                    const diff = val - (baseCompareP.stats[key] || 0);
-                    if (diff > 0) diffHtml = `<span style="color:#2ecc71; font-size:10px; margin-left:2px;">+${diff}</span>`;
-                    else if (diff < 0) diffHtml = `<span style="color:#e74c3c; font-size:10px; margin-left:2px;">${diff}</span>`;
+        if (index < 11 && team.chemistryGraph && team.chemistryGraph.nodes) {
+            const chemInfo = team.chemistryGraph.nodes[index];
+            if (chemInfo) {
+                posRoleBonus = chemInfo.roleBonus || 0;
+                chemBonus = chemInfo.chemistryBonus || 0;
+            }
+            const fSlots = window.MasterData.Formations[team.formation]?.slots;
+            if (fSlots && team.chemistryGraph.links) {
+                const slotId = fSlots[index]?.id;
+                const relatedLinks = team.chemistryGraph.links.filter(l => l.from === slotId || l.to === slotId);
+                if (relatedLinks.length > 0) {
+                    linkDetails = relatedLinks.map(l => {
+                        const targetId = l.from === slotId ? l.to : l.from;
+                        const targetIdx = fSlots.findIndex(s => s.id === targetId);
+                        const targetPlayer = team.starting11[targetIdx];
+                        const style = l.value >= 3 ? 'color:#2ecc71;' : l.value >= 2 ? 'color:#f1c40f;' : 'color:#e74c3c;';
+                        return `<span style="${style}">${l.value >= 3 ? '🟩' : l.value >= 2 ? '🟨' : '🟥'} ${targetPlayer ? targetPlayer.name : targetId}</span>`;
+                    }).join(', ');
                 }
+            }
+        }
 
-                return `
-                    <div style="background: rgba(0,0,0,0.25); padding: 3px 6px; border-radius: 4px;">
-                        <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 2px;">
-                            <span style="color: #bdc3c7;">${statLabels[key]}</span>
-                            <span style="font-weight: 800; color: #fff;">${val}${diffHtml}</span>
-                        </div>
-                        <div style="width: 100%; background: #222; height: 5px; border-radius: 3px; overflow: hidden;">
-                            <div style="width: ${val}%; background: ${color}; height: 100%;"></div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        };
+        const ovr = player.getOvr ? player.getOvr() : 50;
 
-        const buildSkillsList = (targetP) => {
-            if (!targetP.skills || targetP.skills.length === 0) return '<span style="font-size:10px; color:#666;">スキルなし</span>';
-            return targetP.skills.map(sId => {
-                const s = window.MasterData.PlayerSkills.find(sk => sk.id === sId);
-                return s ? `<span style="background:#1a3a30; border:1px solid #2ecc71; padding:2px 6px; border-radius:4px; font-size:10px; display:inline-block; margin:2px;" title="${s.description}">${s.name}</span>` : '';
-            }).join('');
-        };
+        let skillsHtml = '<span style="color:#7f8c8d; font-size:11px;">スキルなし</span>';
+        if (player.skills && player.skills.length > 0) {
+            skillsHtml = player.skills.map(sId => {
+                const sk = window.MasterData.PlayerSkills.find(k => k.id === sId);
+                return sk ? `<span style="background: #e67e22; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10px;" title="${sk.description}">${sk.name}</span>` : '';
+            }).join(' ');
+        }
 
-        let comparisonSectionHtml = '';
-        if (isComparing && srcPlayer) {
-            comparisonSectionHtml = `
-                <div style="margin-top: 8px; padding: 8px; background: rgba(231, 76, 60, 0.1); border: 1px dashed #e74c3c; border-radius: 6px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                        <span style="font-size: 11px; font-weight: 800; color: #ff7979;">入れ替え元: [${srcPlayer.position}] ${srcPlayer.name}</span>
-                        <span style="font-size: 13px; font-weight: 900; color: #f1c40f;">OVR ${srcPlayer.getOvr()}</span>
-                    </div>
-                    <div style="font-size: 10px; color: #bdc3c7; margin-bottom: 4px;">
-                        副適性: ${srcPlayer.subPositions?.join(', ') || 'なし'} | 志向: ${srcPlayer.preference} | 体力: ${srcPlayer.condition ?? 100}%
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
-                        ${buildStatGrid(srcPlayer)}
-                    </div>
-                </div>
-                <div style="display: flex; gap: 8px; margin-top: auto; padding-top: 8px;">
-                    <button onclick="managementUI.toggleSwapMode(null)" style="flex: 1; background: #555;">キャンセル</button>
-                    <button onclick="managementUI.handlePlayerClick(${index}, true)" style="flex: 2; background: #e74c3c; border-color: #ff7979; font-size: 14px;">
-                        ⚡ この2人を入れ替える
-                    </button>
-                </div>
-            `;
-        } else {
-            comparisonSectionHtml = `
-                <div style="margin-top: auto; padding-top: 8px;">
-                    <button onclick="managementUI.toggleSwapMode(${index})" style="width: 100%; padding: 10px; font-size: 13px; background: ${this.swapSourceIndex === index ? '#c0392b' : '#2980b9'}; border-color: #5dade2;">
-                        ${this.swapSourceIndex === index ? '❌ 入れ替え選択を解除（他の選手をクリックで比較）' : '🔄 この選手を入れ替え元に指定する'}
-                    </button>
-                </div>
-            `;
+        if (this.swapSourceIndex !== null && this.swapSourceIndex !== index) {
+            this.renderPlayerComparison(this.swapSourceIndex, index);
+            return;
         }
 
         detailPanel.innerHTML = `
-            <div class="panel-header-title">
-                <span>${isComparing ? '🔍 2選手ステータス比較' : '選手詳細インスペクター'}</span>
-                <span style="color: #f1c40f;">${index < 11 ? 'スタメン' : 'ベンチ'}</span>
-            </div>
-
-            <div style="background: #122620; border: 1px solid #285446; border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <span style="background: #f39c12; color: #000; font-weight: 900; font-size: 10px; padding: 1px 5px; border-radius: 3px;">${player.rarity}</span>
-                        <span style="font-size: 11px; color: #bdc3c7; margin-left: 4px;">${player.nationality || ''}</span>
-                        <div style="font-size: 16px; font-weight: 900; color: #fff; margin-top: 2px;">[${player.position}] ${player.name}</div>
-                    </div>
-                    <div style="text-align: right;">
-                        <div style="font-size: 20px; font-weight: 900; color: #f1c40f;">OVR ${player.getOvr()}</div>
-                        <div style="font-size: 11px; color: #2ecc71;">Lv.${player.level} (${player.preference})</div>
+            <div style="display: flex; gap: 16px; margin-bottom: 12px;">
+                <div style="width: 80px; height: 80px; background: #0b1714; border: 2px solid #2ecc71; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 32px; position: relative;">
+                    👤
+                    <div style="position: absolute; bottom: -8px; right: -8px; background: #e74c3c; padding: 2px 6px; border-radius: 12px; font-size: 11px; font-weight: bold;">
+                        ${ovr}
                     </div>
                 </div>
-
-                <div style="display: flex; justify-content: space-between; font-size: 11px; color: #bdc3c7; background: rgba(0,0,0,0.25); padding: 4px 8px; border-radius: 4px;">
-                    <span><strong>副適性:</strong> ${player.subPositions?.length ? player.subPositions.join(', ') : 'なし'}</span>
-                    <span><strong>役割:</strong> ${player.role || 'Standard'}</span>
-                    <span><strong>体力:</strong> ${player.condition ?? 100}%</span>
-                </div>
-
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
-                    ${buildStatGrid(player, srcPlayer)}
-                </div>
-
-                <div>
-                    <div style="font-size: 10px; color: #95a5a6; margin-bottom: 2px;">所持スキル:</div>
-                    <div>${buildSkillsList(player)}</div>
+                <div style="flex: 1;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div>
+                            <div style="color: #f1c40f; font-weight: 800; font-size: 16px; line-height: 1.2;">${player.position} <span style="font-size:12px; color:#bdc3c7;">(${player.role || '汎用'})</span></div>
+                            <h3 style="margin: 0 0 4px; font-size: 20px; color: #ecf0f1;">${player.name}</h3>
+                            <div style="font-size: 12px; color: #7f8c8d;">LV: ${player.level} | EXP: ${Math.floor(player.exp)}/${player.maxExp}</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 11px; color: #bdc3c7; margin-bottom: 2px;">戦術志向: <span style="color:#3498db; font-weight:bold;">${player.preference}</span></div>
+                            <div style="font-size: 11px; color: #bdc3c7;">体力: <span style="color:${player.condition > 50 ? '#2ecc71' : '#e74c3c'}; font-weight:bold;">${Math.floor(player.condition)}%</span></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            ${comparisonSectionHtml}
+            <div style="display: flex; gap: 12px; margin-bottom: 12px; font-size: 12px;">
+                <div style="flex: 1; background: #122620; padding: 8px; border-radius: 6px; border: 1px solid #1a3c2f;">
+                    <div style="color: #7f8c8d; margin-bottom: 4px; font-weight: bold; font-size: 11px;">BASE STATS</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+                        <div>PAC: ${Math.floor(player.stats.speed)}</div>
+                        <div>SHO: ${Math.floor(player.stats.shoot)}</div>
+                        <div>PAS: ${Math.floor(player.stats.pass)}</div>
+                        <div>DEF: ${Math.floor(player.stats.defense)}</div>
+                        <div>PHY: ${Math.floor(player.stats.physical)}</div>
+                        <div>MEN: ${Math.floor(player.stats.mental)}</div>
+                    </div>
+                </div>
+                <div style="flex: 1; background: #122620; padding: 8px; border-radius: 6px; border: 1px solid #1a3c2f;">
+                    <div style="color: #7f8c8d; margin-bottom: 4px; font-weight: bold; font-size: 11px;">CHEMISTRY & SKILLS</div>
+                    <div style="margin-bottom: 6px; line-height: 1.3;">
+                        ${linkDetails || '<span style="color:#7f8c8d;">リンクなし</span>'}
+                    </div>
+                    <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                        ${skillsHtml}
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: auto; display: flex; gap: 10px;">
+                ${this.swapSourceIndex === null ?
+                    `<button onclick="managementUI.swapSourceIndex = ${index}; managementUI.renderFormation();" style="flex: 1; padding: 10px; background: #3498db; color:#fff; border:none; font-weight: bold; border-radius:6px; cursor:pointer;">🔄 比較・入れ替え</button>` :
+                    (this.swapSourceIndex === index ?
+                        `<button onclick="managementUI.swapSourceIndex = null; managementUI.renderFormation();" style="flex: 1; padding: 10px; background: #e74c3c; color:#fff; border:none; font-weight: bold; border-radius:6px; cursor:pointer;">❌ 選択解除</button>` : ''
+                    )
+                }
+            </div>
         `;
     }
 
@@ -561,7 +567,7 @@ handlePlayerClick(index, executeSwap = false) {
     }
 
     renderPlayerComparison(idx1, idx2) {
-        const detailPanel = document.getElementById('fc-player-details');
+        const detailPanel = document.getElementById('player-detail-panel');
         if (!detailPanel) return;
 
         const team = window.gameState.playerTeam;
@@ -600,17 +606,13 @@ handlePlayerClick(index, executeSwap = false) {
                     </table>
                 </div>
 
-                <button id="fc-btn-execute-swap" style="margin-top: 10px; width: 100%; padding: 12px; font-size: 16px; font-weight: bold; background: #27ae60; color: #fff; border: none; border-radius: 6px; cursor: pointer;">
+                <button onclick="managementUI.handlePlayerClick(${idx2}, true)" style="margin-top: 10px; width: 100%; padding: 12px; font-size: 16px; font-weight: bold; background: #27ae60; color:#fff; border: none; border-radius: 6px; cursor: pointer;">
                     ⚡ 入れ替えを確定する
                 </button>
             </div>
         `;
 
         this.drawRadarChart(document.getElementById('fc-radar-chart'), p1, p2);
-
-        document.getElementById('fc-btn-execute-swap').onclick = () => {
-            this.handlePlayerClick(idx2, true);
-        };
     }
 
     generateCompareRow(v1, v2, label) {
@@ -656,91 +658,6 @@ handlePlayerClick(index, executeSwap = false) {
         const p2Data = [p2.stats.pass, p2.stats.shoot, p2.stats.defense, p2.stats.physical, p2.stats.speed, p2.stats.mental];
         drawData(p1Data, '#3498db', 'rgba(52, 152, 219, 0.4)');
         drawData(p2Data, '#e74c3c', 'rgba(231, 76, 60, 0.4)');
-    }
-
-    renderPlayerDetailCard(player, index) {
-        const detailPanel = document.getElementById('fc-player-details');
-        if (!detailPanel) return;
-        if (!player) {
-            detailPanel.innerHTML = `<div style="flex:1; display:flex; align-items:center; justify-content:center; color:#7f8c8d;">選手を選択してください</div>`;
-            return;
-        }
-
-        const team = window.gameState.playerTeam;
-        let posRoleBonus = 0;
-        let chemBonus = 0;
-        let linkDetails = '';
-
-        if (index < 11 && team.chemistryGraph && team.chemistryGraph.nodes) {
-            const chemInfo = team.chemistryGraph.nodes[index];
-            if (chemInfo) {
-                posRoleBonus = chemInfo.roleBonus || 0;
-                chemBonus = chemInfo.chemistryBonus || 0;
-                if (chemInfo.links && chemInfo.links.length > 0) {
-                    linkDetails = chemInfo.links.map(l => {
-                        const style = l.value >= 3 ? 'color:#2ecc71;' : l.value >= 2 ? 'color:#f1c40f;' : 'color:#e74c3c;';
-                        return `<span style="${style}">${l.value >= 3 ? '🟩' : l.value >= 2 ? '🟨' : '🟥'} ${l.targetName}</span>`;
-                    }).join(', ');
-                }
-            }
-        }
-
-        const ovr = Math.floor((player.stats.pass + player.stats.shoot + player.stats.defense + player.stats.physical + player.stats.speed + player.stats.mental) / 6);
-
-        detailPanel.innerHTML = `
-            <div style="padding: 15px; display: flex; flex-direction: column; height: 100%; box-sizing: border-box; overflow-y: auto;">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 15px; margin-bottom: 15px;">
-                    <div>
-                        <div style="font-size: 24px; font-weight: bold; color: #f1c40f;">${player.position}</div>
-                        <div style="font-size: 20px; color: #fff;">${player.name}</div>
-                        <div style="font-size: 14px; color: #aaa;">LV. ${player.level} / EXP: ${Math.floor(player.exp)}</div>
-                    </div>
-                    <div style="font-size: 40px; font-weight: bold; background: #e67e22; color: #fff; padding: 10px 15px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
-                        ${ovr}
-                    </div>
-                </div>
-
-                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                    <div style="flex:1; background: rgba(0,0,0,0.5); padding: 8px; border-radius: 6px; text-align:center; font-size: 12px; color: #ddd;">
-                        <div>体力</div><div style="font-size:16px; color:#2ecc71; font-weight:bold;">${Math.floor(player.condition)}%</div>
-                    </div>
-                    <div style="flex:1; background: rgba(0,0,0,0.5); padding: 8px; border-radius: 6px; text-align:center; font-size: 12px; color: #ddd;">
-                        <div>適性</div><div style="font-size:16px; color:#f1c40f; font-weight:bold;">${player.role || '標準'}</div>
-                    </div>
-                </div>
-
-                <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-                    <div style="flex: 1; min-width: 150px;">
-                        <table style="width: 100%; border-collapse: collapse; font-size: 12px; color: #fff;">
-                            <tr><td style="padding: 4px; border-bottom: 1px solid rgba(255,255,255,0.1);">パス</td><td style="padding: 4px; border-bottom: 1px solid rgba(255,255,255,0.1); font-weight:bold;">${Math.floor(player.stats.pass)}</td></tr>
-                            <tr><td style="padding: 4px; border-bottom: 1px solid rgba(255,255,255,0.1);">シュート</td><td style="padding: 4px; border-bottom: 1px solid rgba(255,255,255,0.1); font-weight:bold;">${Math.floor(player.stats.shoot)}</td></tr>
-                            <tr><td style="padding: 4px; border-bottom: 1px solid rgba(255,255,255,0.1);">守備</td><td style="padding: 4px; border-bottom: 1px solid rgba(255,255,255,0.1); font-weight:bold;">${Math.floor(player.stats.defense)}</td></tr>
-                            <tr><td style="padding: 4px; border-bottom: 1px solid rgba(255,255,255,0.1);">スピード</td><td style="padding: 4px; border-bottom: 1px solid rgba(255,255,255,0.1); font-weight:bold;">${Math.floor(player.stats.speed)}</td></tr>
-                            <tr><td style="padding: 4px; border-bottom: 1px solid rgba(255,255,255,0.1);">フィジカル</td><td style="padding: 4px; border-bottom: 1px solid rgba(255,255,255,0.1); font-weight:bold;">${Math.floor(player.stats.physical)}</td></tr>
-                            <tr><td style="padding: 4px; border-bottom: 1px solid rgba(255,255,255,0.1);">メンタル</td><td style="padding: 4px; border-bottom: 1px solid rgba(255,255,255,0.1); font-weight:bold;">${Math.floor(player.stats.mental)}</td></tr>
-                        </table>
-                    </div>
-                    <div style="flex: 1; min-width: 150px;">
-                        <div style="font-size: 12px; color: #aaa; margin-bottom: 5px; border-bottom: 1px solid rgba(255,255,255,0.2);">ケミストリーリンク</div>
-                        <div style="font-size: 11px; margin-bottom: 10px;">${index < 11 ? (linkDetails || 'なし') : 'ベンチ外'}</div>
-
-                        <div style="font-size: 12px; color: #aaa; margin-bottom: 5px; border-bottom: 1px solid rgba(255,255,255,0.2);">所持スキル</div>
-                        ${player.skills && player.skills.length > 0 ? player.skills.map(s => `<div style="font-size:12px; background:rgba(241,196,15,0.2); color:#f1c40f; padding:4px; margin-bottom:4px; border-radius:4px;">${s.name}</div>`).join('') : '<div style="font-size:12px; color:#777;">なし</div>'}
-
-                        <div style="font-size: 12px; color: #aaa; margin-top: 10px; margin-bottom: 5px; border-bottom: 1px solid rgba(255,255,255,0.2);">キャリア</div>
-                        <div style="font-size:11px; color:#ddd;">出場: ${player.careerStats?.appearances || 0}</div>
-                        <div style="font-size:11px; color:#ddd;">ゴール: ${player.careerStats?.goals || 0}</div>
-                        <div style="font-size:11px; color:#ddd;">アシスト: ${player.careerStats?.assists || 0}</div>
-                    </div>
-                </div>
-
-                <div style="margin-top: 15px; font-size: 12px; color: #f1c40f; text-align: center; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px;">
-                    ${this.swapSourceIndex === null
-                        ? `<button onclick="managementUI.swapSourceIndex = ${index}; managementUI.renderFormation();" style="width:100%; padding:8px; background:#3498db; color:#fff; border:none; border-radius:4px; cursor:pointer;">🔄 この選手を入れ替え対象にする</button>`
-                        : (this.swapSourceIndex === index ? `<button onclick="managementUI.swapSourceIndex = null; managementUI.renderFormation();" style="width:100%; padding:8px; background:#7f8c8d; color:#fff; border:none; border-radius:4px; cursor:pointer;">❌ 選択解除</button>` : '')}
-                </div>
-            </div>
-        `;
     }
 
     // =========================================================
