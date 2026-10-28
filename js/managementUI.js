@@ -574,6 +574,11 @@ class ManagementUI {
     }
 
     renderPlayerDetailCard(player, index) {
+        if (this.swapSourceIndex !== null && this.swapSourceIndex !== index) {
+            this.renderPlayerComparison(this.swapSourceIndex, index);
+            return;
+        }
+
         const detailPanel = document.getElementById('player-detail-panel');
         if (!detailPanel) return;
         if (!player) {
@@ -713,43 +718,7 @@ class ManagementUI {
         this.renderPlayerDetailCard(p, this.selectedPlayerIndex);
     }
 
-    handlePlayerClick(index, executeSwap = false) {
-        const team = window.gameState.playerTeam;
-        const player = index < 11 ? team.starting11[index] : team.bench[index - 11];
 
-        if (this.swapSourceIndex !== null) {
-            if (this.swapSourceIndex === index) {
-                this.swapSourceIndex = null;
-                this.selectedPlayerIndex = index;
-                this.renderFormation();
-                this.renderPlayerDetailCard(player, index);
-            } else if (executeSwap) {
-                const idx1 = this.swapSourceIndex;
-                const idx2 = index;
-                const p1 = idx1 < 11 ? team.starting11[idx1] : team.bench[idx1 - 11];
-                const p2 = idx2 < 11 ? team.starting11[idx2] : team.bench[idx2 - 11];
-
-                if (idx1 < 11) team.starting11[idx1] = p2;
-                else team.bench[idx1 - 11] = p2;
-
-                if (idx2 < 11) team.starting11[idx2] = p1;
-                else team.bench[idx2 - 11] = p1;
-
-                window.ChemistrySystem.calculateTeamChemistry(team);
-                this.swapSourceIndex = null;
-                this.selectedPlayerIndex = index;
-                this.showSquad();
-            } else {
-                this.selectedPlayerIndex = index;
-                this.renderFormation();
-                this.renderPlayerDetailCard(player, index);
-            }
-        } else {
-            this.selectedPlayerIndex = index;
-            this.renderFormation();
-            this.renderPlayerDetailCard(player, index);
-        }
-    }
 
     // =========================================================
     // 2. スカウト・強化 (APイベント) 画面
