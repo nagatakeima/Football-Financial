@@ -1,3 +1,25 @@
+
+function getSlotPitchCoords(s) {
+    if (Math.abs(s.offsetX) > 45 || s.offsetY > 60) {
+        return { x: s.offsetX, y: s.offsetY };
+    }
+    const tierMap = { 'GK': 45, 'Defensive': 145, 'DM': 220, 'Middle': 275, 'AM': 330, 'Attacking': 375 };
+    const laneMap = {
+        'Left': 100, 'OutsideL': 100, 'L-Out': 100,
+        'L-Half': 200, 'Half-spaceL': 200, 'Left-Center': 210,
+        'Center': 300,
+        'R-Half': 400, 'Half-spaceR': 400, 'Right-Center': 390,
+        'Right': 500, 'OutsideR': 500, 'R-Out': 500
+    };
+    const posDefaultX = { 'GK': 45, 'CB': 135, 'SB': 155, 'CDM': 215, 'CM': 275, 'CAM': 330, 'WG': 360, 'CF': 380 };
+    const baseX = (s.baseMatrix && tierMap[s.baseMatrix.tier]) || posDefaultX[s.expectedPosStr] || 250;
+    const baseY = (s.baseMatrix && laneMap[s.baseMatrix.lane]) || 300;
+    return {
+        x: baseX + (s.offsetX || 0),
+        y: baseY + (s.offsetY || 0)
+    };
+}
+
 class ManagementUI {
     constructor() {
         this.uiLayer = document.getElementById('ui-layer');
@@ -290,10 +312,21 @@ class ManagementUI {
     getFormationCoordinates(formation) {
         const fData = window.MasterData.Formations[formation] || window.MasterData.Formations['4-4-2'];
         if (fData && fData.slots) {
-            return fData.slots.map(s => {
-                let normX = Phaser.Math.Clamp(s.offsetY / 600, 0.12, 0.88);
-                let normY = Phaser.Math.Clamp(1.0 - (s.offsetX / 800), 0.12, 0.88);
+            const positions = [];
+            return fData.slots.map((s, idx) => {
+                const coords = getSlotPitchCoords(s);
+                let normX = Phaser.Math.Clamp(coords.y / 600, 0.12, 0.88);
+                let normY = Phaser.Math.Clamp(1.0 - ((coords.x - 20) / 400), 0.12, 0.90);
 
+                // Prevent exact overlaps by adding a tiny offset if another player is too close
+                for (let prev of positions) {
+                    if (Math.abs(prev.x - normX) < 0.02 && Math.abs(prev.y - normY) < 0.02) {
+                        normX += (idx % 2 === 0 ? 0.04 : -0.04);
+                        normY += (idx % 3 === 0 ? 0.03 : -0.03);
+                    }
+                }
+
+                positions.push({ x: normX, y: normY });
                 return {
                     x: normX,
                     y: normY,
@@ -362,16 +395,23 @@ class ManagementUI {
             const links = window.ChemistrySystem.getFormationLinks(team.formation);
             if (links) {
                 ctx.lineWidth = 3;
-                links.forEach(({from, to}) => {
-                    const p1 = posMap[from];
-                    const p2 = posMap[to];
+                links.forEach(link => {
+                    const p1 = posMap[link.from];
+                    const p2 = posMap[link.to];
                     if (p1 && p2) {
                         ctx.beginPath();
                         ctx.moveTo(p1.x * canvas.width, p1.y * canvas.height);
                         ctx.lineTo(p2.x * canvas.width, p2.y * canvas.height);
 
-                        if (p1.pref === p2.pref) {
+                        if (link.level === 3) {
+                            ctx.strokeStyle = '#f1c40f';
+                            ctx.lineWidth = 4;
+                        } else if (link.level === 2) {
                             ctx.strokeStyle = '#2ecc71';
+                            ctx.lineWidth = 3;
+                        } else if (link.level === 1) {
+                            ctx.strokeStyle = '#3498db';
+                            ctx.lineWidth = 2;
                         } else {
                             ctx.strokeStyle = 'rgba(255,255,255,0.2)';
                             ctx.lineWidth = 1.5;
@@ -626,10 +666,18 @@ class ManagementUI {
             ? (this.swapSourceIndex < 11 ? team.starting11[this.swapSourceIndex] : team.bench[this.swapSourceIndex - 11])
             : null;
 
-        const statLabels = {
+
+        let statLabels = {
             pass: 'Pass', shoot: 'Shoot', defense: 'Defense',
             physical: 'Physical', speed: 'Speed', mental: 'Mental', stamina: 'Stamina'
         };
+        if ((player && player.position === 'GK') || (srcPlayer && srcPlayer.position === 'GK')) {
+            statLabels = {
+                pass: 'KIC', shoot: 'Shoot', defense: 'SAV',
+                physical: 'AER', speed: 'Speed', mental: 'REF', stamina: 'Stamina'
+            };
+        }
+
 
         const buildStatGrid = (targetP, baseCompareP = null) => {
             return Object.entries(targetP.stats).map(([key, val]) => {
@@ -936,9 +984,10 @@ class ManagementUI {
         const currentSquadSize = window.gameState.playerTeam.players.length;
 
         const guaranteedTypes = ['scout', 'training', 'relic', 'command', 'mystery'];
+        const getRandomApCost = () => Math.floor(Math.random() * 3) + 1;
 
         guaranteedTypes.forEach((type, i) => {
-            const eventObj = { id: `evt_${Date.now()}_${i}`, type, choices: [] };
+            const eventObj = { id: `evt_${Date.now()}_${i}`, type, choices: [], apCost: getRandomApCost() };
 
             if (type === 'scout') {
                 eventObj.title = 'スカウトからの提案';
