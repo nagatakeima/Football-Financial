@@ -213,10 +213,11 @@ createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
 
         const numText = this.add.text(0, -5, String(pData.jerseyNumber || number || '0'), { fontSize: '11px', fill: '#ffffff', fontStyle: 'bold', fontFamily: 'Arial' }).setOrigin(0.5);
 
-        const nameLabel = this.add.text(0, -35, pData.name, {
+        const lastName = pData.name.split(' ').pop();
+        const nameLabel = this.add.text(0, 30, lastName, {
             fontSize: '9px', fill: '#ffffff', fontFamily: 'Arial', backgroundColor: 'rgba(0,0,0,0.5)', padding: { x: 2, y: 1 }
         }).setOrigin(0.5);
-        nameLabel.setVisible(false);
+        nameLabel.setVisible(true);
 
         const staminaArc = this.add.graphics();
         staminaArc.rotation = -Math.PI / 2;
@@ -233,8 +234,7 @@ createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
         container.animTick = Math.random() * 10;
         container.bodyParts = [body, head, numText, legL, legR];
 
-        container.on('pointerover', () => { nameLabel.setVisible(true); });
-        container.on('pointerout', () => { nameLabel.setVisible(false); });
+        // Name label always visible now
 
         return container;
     }
@@ -619,16 +619,10 @@ createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
                 const offY = (Math.random() - 0.5) * 10;
 
                 if (isPlayer) {
-                    if (s.expectedPosStr === 'GK') p.x = 45;
-                    else if (['CB', 'SB'].includes(s.expectedPosStr)) p.x = 160 + offX;
-                    else if (['CDM', 'CM', 'CAM'].includes(s.expectedPosStr)) p.x = 280 + offX;
-                    else p.x = 375 + offX;
+                    p.x = Phaser.Math.Clamp(s.offsetX + offX, 45, 400);
                     p.y = Phaser.Math.Clamp(s.offsetY + offY, 65, 535);
                 } else {
-                    if (s.expectedPosStr === 'GK') p.x = 755;
-                    else if (['CB', 'SB'].includes(s.expectedPosStr)) p.x = 640 + offX;
-                    else if (['CDM', 'CM', 'CAM'].includes(s.expectedPosStr)) p.x = 520 + offX;
-                    else p.x = 425 + offX;
+                    p.x = Phaser.Math.Clamp(800 - s.offsetX + offX, 400, 755);
                     p.y = Phaser.Math.Clamp(s.offsetY + offY, 65, 535);
                 }
                 p.stunTimer = 0;
@@ -1346,6 +1340,20 @@ createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
             }
         });
     }
+    syncBallVisuals() {
+        if (!this.ballContainer || !this.ballSprite) return;
+        this.ballContainer.x = this.ball.x;
+        this.ballContainer.y = this.ball.y;
+        this.ballSprite.y = -this.ball.z;
+        const shadow = this.ballContainer.list[0];
+        if (shadow) {
+            const scale = Math.max(0.3, 1 - (this.ball.z / 100));
+            shadow.scaleX = scale;
+            shadow.scaleY = scale;
+            shadow.alpha = scale * 0.45;
+        }
+    }
+
 
     triggerGoal(isPlayerTeam) {
         if (isPlayerTeam) this.score.player++; else this.score.opponent++;

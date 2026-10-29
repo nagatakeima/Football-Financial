@@ -234,7 +234,8 @@ class ManagementUI {
                                     team.ownedMicroCommands.includes(c.id) && (!team.microCommands.includes(c.id) || c.id === currentCmdId)
                                 );
                                 return `
-                                <select id="micro-cmd-${i}" onchange="managementUI.updateMicroCommand(${i}, this.value, 'squad')" style="background:#222; color:#fff; border:1px solid #444; padding:4px; max-width: 100px;">
+                                <label style="color:#aaa; font-size:11px; align-self:center; margin-right:3px;">SLOT ${i+1}</label>
+                                <select id="micro-cmd-${i}" onchange="managementUI.updateMicroCommand(${i}, this.value, 'squad')" style="background:#222; color:#fff; border:1px solid #444; padding:4px; max-width: 180px; margin-right:8px;">
                                     <option value="">--未設定--</option>
                                     ${availableCmds.map(cmd => `<option value="${cmd.id}" ${currentCmdId === cmd.id ? 'selected' : ''}>${cmd.name}</option>`).join('')}
                                 </select>
@@ -243,7 +244,7 @@ class ManagementUI {
                         </div>
                     </div>
 
-                    <div class="pitch-container-25d" id="fc-tactics-pitch" style="flex: 1; position: relative; background: url('kickoff.png') no-repeat center center; background-size: cover; border-radius: 12px; transform: perspective(900px) rotateX(16deg); transform-origin: bottom center; border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 15px 35px rgba(0,0,0,0.5); margin-bottom: -20px; z-index: 1;">
+                    <div class="pitch-container-25d" id="fc-tactics-pitch" style="flex: 1; position: relative; background: repeating-linear-gradient(0deg, #183e29, #183e29 30px, #1a452d 30px, #1a452d 60px); border-radius: 12px; transform: perspective(900px) rotateX(16deg); transform-origin: bottom center; border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 15px 35px rgba(0,0,0,0.5); margin-bottom: -20px; z-index: 1;">
                         <canvas id="chem-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none; z-index: 1; width: 100%; height: 100%;"></canvas>
                         <div id="formation-container" style="width: 100%; height: 100%; position: absolute; z-index: 2; top:0; left:0;"></div>
                     </div>
@@ -289,11 +290,16 @@ class ManagementUI {
     getFormationCoordinates(formation) {
         const fData = window.MasterData.Formations[formation] || window.MasterData.Formations['4-4-2'];
         if (fData && fData.slots) {
-            return fData.slots.map(s => ({
-                x: s.offsetY / 600,
-                y: 1.0 - (s.offsetX / 800),
-                expectedPos: s.expectedPosStr
-            }));
+            return fData.slots.map(s => {
+                let normX = Phaser.Math.Clamp(s.offsetY / 600, 0.12, 0.88);
+                let normY = Phaser.Math.Clamp(1.0 - (s.offsetX / 800), 0.12, 0.88);
+
+                return {
+                    x: normX,
+                    y: normY,
+                    expectedPos: s.expectedPosStr
+                };
+            });
         }
         return [];
     }
@@ -324,6 +330,34 @@ class ManagementUI {
                 const sId = fSlots[idx]?.id;
                 if (sId) posMap[sId] = { x: c.x, y: c.y, pref: player.preference };
             });
+
+            // Draw Pitch Lines
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.lineWidth = 2;
+            const w = canvas.width;
+            const h = canvas.height;
+
+            // Outer boundary
+            ctx.strokeRect(5, 5, w - 10, h - 10);
+
+            // Halfway line
+            ctx.beginPath();
+            ctx.moveTo(5, h / 2);
+            ctx.lineTo(w - 5, h / 2);
+            ctx.stroke();
+
+            // Center circle
+            ctx.beginPath();
+            ctx.arc(w / 2, h / 2, 40, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Penalty areas
+            const penW = w * 0.5;
+            const penH = h * 0.15;
+            const penX = (w - penW) / 2;
+
+            ctx.strokeRect(penX, 5, penW, penH);
+            ctx.strokeRect(penX, h - 5 - penH, penW, penH);
 
             const links = window.ChemistrySystem.getFormationLinks(team.formation);
             if (links) {
@@ -710,12 +744,18 @@ class ManagementUI {
         } else {
             this.swapSourceIndex = index;
         }
-        const team = window.gameState.playerTeam;
-        const p = this.selectedPlayerIndex < 11
-            ? team.starting11[this.selectedPlayerIndex]
-            : team.bench[this.selectedPlayerIndex - 11];
+
         this.renderFormation();
-        this.renderPlayerDetailCard(p, this.selectedPlayerIndex);
+
+        const team = window.gameState.playerTeam;
+        if (this.swapSourceIndex !== null && this.swapSourceIndex !== this.selectedPlayerIndex) {
+             this.renderPlayerComparison(this.swapSourceIndex, this.selectedPlayerIndex);
+        } else {
+            const p = this.selectedPlayerIndex < 11
+                ? team.starting11[this.selectedPlayerIndex]
+                : team.bench[this.selectedPlayerIndex - 11];
+            this.renderPlayerDetailCard(p, this.selectedPlayerIndex);
+        }
     }
 
 
@@ -800,7 +840,7 @@ class ManagementUI {
 
             let innerContent = '';
             if (choice.candidates) {
-                innerContent += `<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 8px;">`;
+                innerContent += `<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; width: 100%; margin-bottom: 8px;">`;
                 choice.candidates.forEach((cand, candIdx) => {
                     const skillsStr = cand.skills.map(sid => window.MasterData.PlayerSkills.find(s => s.id === sid)?.name).filter(Boolean).join(', ') || 'なし';
                     const subStr = cand.subPositions?.length ? `/${cand.subPositions.join(',')}` : '';

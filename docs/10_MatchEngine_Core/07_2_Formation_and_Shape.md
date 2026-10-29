@@ -128,10 +128,12 @@
   "slots": [
     // 11枠分のスロット定義
     {
-      "slot_id": "LCB",
-      "position_category": "CB",
+      "id": "LCB",
+      "expectedPosStr": "CB",
+      "offsetX": 120,
+      "offsetY": 270,
       "base_matrix": { "lane": "L-Half", "tier": "Defensive" }, // 基準となるPitch Matrix割り当て
-      "base_coordinates": { "x": 0.25, "y": 0.35 } // 相対的な初期基準座標 (例: 0.0~1.0)
+       // 相対的な初期基準座標 (例: 0.0~1.0)
     },
     // ... 他10スロット
   ],
