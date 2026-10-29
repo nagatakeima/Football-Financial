@@ -36,13 +36,25 @@ class Player {
     }
 
     getOvr() {
-        const avgStat = Object.values(this.stats).reduce((a, b) => a + b, 0) / 7;
+        const s = this.stats;
+        let ovr = 0;
+        switch (this.position) {
+            case 'GK': ovr = s.defense * 0.40 + s.mental * 0.25 + s.physical * 0.20 + s.pass * 0.15; break;
+            case 'CB': ovr = s.defense * 0.40 + s.physical * 0.30 + s.mental * 0.15 + s.speed * 0.10 + s.pass * 0.05; break;
+            case 'SB': ovr = s.speed * 0.25 + s.defense * 0.25 + s.stamina * 0.20 + s.pass * 0.20 + s.physical * 0.10; break;
+            case 'CDM': ovr = s.defense * 0.30 + s.pass * 0.25 + s.mental * 0.20 + s.physical * 0.15 + s.stamina * 0.10; break;
+            case 'CM': ovr = s.pass * 0.30 + s.stamina * 0.20 + s.mental * 0.20 + s.defense * 0.15 + s.shoot * 0.15; break;
+            case 'CAM': ovr = s.pass * 0.35 + s.shoot * 0.25 + s.mental * 0.20 + s.speed * 0.20; break;
+            case 'WG': ovr = s.speed * 0.35 + s.shoot * 0.25 + s.pass * 0.25 + s.stamina * 0.15; break;
+            case 'CF': ovr = s.shoot * 0.45 + s.physical * 0.20 + s.speed * 0.20 + s.mental * 0.15; break;
+            default: ovr = (s.pass + s.shoot + s.defense + s.physical + s.speed + s.mental + s.stamina) / 7;
+        }
         let rarityBonus = 0;
         if (this.rarity === 'R') rarityBonus = 2;
-        if (this.rarity === 'SR') rarityBonus = 5;
-        if (this.rarity === 'SSR') rarityBonus = 10;
+        else if (this.rarity === 'SR') rarityBonus = 5;
+        else if (this.rarity === 'SSR') rarityBonus = 10;
 
-        return Math.min(100, Math.floor(avgStat + rarityBonus)); // Level bonus is already applied to stats
+        return Math.min(100, Math.floor(ovr + rarityBonus)); // Level bonus is already applied to stats
     }
 
     addExp(amount) {

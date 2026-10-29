@@ -1,25 +1,3 @@
-
-function getSlotPitchCoords(s) {
-    if (Math.abs(s.offsetX) > 45 || s.offsetY > 60) {
-        return { x: s.offsetX, y: s.offsetY };
-    }
-    const tierMap = { 'GK': 45, 'Defensive': 145, 'DM': 220, 'Middle': 275, 'AM': 330, 'Attacking': 375 };
-    const laneMap = {
-        'Left': 100, 'OutsideL': 100, 'L-Out': 100,
-        'L-Half': 200, 'Half-spaceL': 200, 'Left-Center': 210,
-        'Center': 300,
-        'R-Half': 400, 'Half-spaceR': 400, 'Right-Center': 390,
-        'Right': 500, 'OutsideR': 500, 'R-Out': 500
-    };
-    const posDefaultX = { 'GK': 45, 'CB': 135, 'SB': 155, 'CDM': 215, 'CM': 275, 'CAM': 330, 'WG': 360, 'CF': 380 };
-    const baseX = (s.baseMatrix && tierMap[s.baseMatrix.tier]) || posDefaultX[s.expectedPosStr] || 250;
-    const baseY = (s.baseMatrix && laneMap[s.baseMatrix.lane]) || 300;
-    return {
-        x: baseX + (s.offsetX || 0),
-        y: baseY + (s.offsetY || 0)
-    };
-}
-
 class ManagementUI {
     constructor() {
         this.uiLayer = document.getElementById('ui-layer');
@@ -256,8 +234,7 @@ class ManagementUI {
                                     team.ownedMicroCommands.includes(c.id) && (!team.microCommands.includes(c.id) || c.id === currentCmdId)
                                 );
                                 return `
-                                <label style="color:#aaa; font-size:11px; align-self:center; margin-right:3px;">SLOT ${i+1}</label>
-                                <select id="micro-cmd-${i}" onchange="managementUI.updateMicroCommand(${i}, this.value, 'squad')" style="background:#222; color:#fff; border:1px solid #444; padding:4px; max-width: 180px; margin-right:8px;">
+                                <select id="micro-cmd-${i}" onchange="managementUI.updateMicroCommand(${i}, this.value, 'squad')" style="background:#222; color:#fff; border:1px solid #444; padding:4px; max-width: 100px;">
                                     <option value="">--未設定--</option>
                                     ${availableCmds.map(cmd => `<option value="${cmd.id}" ${currentCmdId === cmd.id ? 'selected' : ''}>${cmd.name}</option>`).join('')}
                                 </select>
@@ -266,7 +243,7 @@ class ManagementUI {
                         </div>
                     </div>
 
-                    <div class="pitch-container-25d" id="fc-tactics-pitch" style="flex: 1; position: relative; background: repeating-linear-gradient(0deg, #183e29, #183e29 30px, #1a452d 30px, #1a452d 60px); border-radius: 12px; transform: perspective(900px) rotateX(16deg); transform-origin: bottom center; border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 15px 35px rgba(0,0,0,0.5); margin-bottom: -20px; z-index: 1;">
+                    <div class="pitch-container-25d" id="fc-tactics-pitch" style="flex: 1; position: relative; background: url('kickoff.png') no-repeat center center; background-size: cover; border-radius: 12px; transform: perspective(900px) rotateX(16deg); transform-origin: bottom center; border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 15px 35px rgba(0,0,0,0.5); margin-bottom: -20px; z-index: 1;">
                         <canvas id="chem-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none; z-index: 1; width: 100%; height: 100%;"></canvas>
                         <div id="formation-container" style="width: 100%; height: 100%; position: absolute; z-index: 2; top:0; left:0;"></div>
                     </div>
@@ -312,27 +289,11 @@ class ManagementUI {
     getFormationCoordinates(formation) {
         const fData = window.MasterData.Formations[formation] || window.MasterData.Formations['4-4-2'];
         if (fData && fData.slots) {
-            const positions = [];
-            return fData.slots.map((s, idx) => {
-                const coords = getSlotPitchCoords(s);
-                let normX = Phaser.Math.Clamp(coords.y / 600, 0.12, 0.88);
-                let normY = Phaser.Math.Clamp(1.0 - ((coords.x - 20) / 400), 0.12, 0.90);
-
-                // Prevent exact overlaps by adding a tiny offset if another player is too close
-                for (let prev of positions) {
-                    if (Math.abs(prev.x - normX) < 0.02 && Math.abs(prev.y - normY) < 0.02) {
-                        normX += (idx % 2 === 0 ? 0.04 : -0.04);
-                        normY += (idx % 3 === 0 ? 0.03 : -0.03);
-                    }
-                }
-
-                positions.push({ x: normX, y: normY });
-                return {
-                    x: normX,
-                    y: normY,
-                    expectedPos: s.expectedPosStr
-                };
-            });
+            return fData.slots.map(s => ({
+                x: s.offsetY / 600,
+                y: 1.0 - (s.offsetX / 800),
+                expectedPos: s.expectedPosStr
+            }));
         }
         return [];
     }
@@ -364,54 +325,19 @@ class ManagementUI {
                 if (sId) posMap[sId] = { x: c.x, y: c.y, pref: player.preference };
             });
 
-            // Draw Pitch Lines
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-            ctx.lineWidth = 2;
-            const w = canvas.width;
-            const h = canvas.height;
-
-            // Outer boundary
-            ctx.strokeRect(5, 5, w - 10, h - 10);
-
-            // Halfway line
-            ctx.beginPath();
-            ctx.moveTo(5, h / 2);
-            ctx.lineTo(w - 5, h / 2);
-            ctx.stroke();
-
-            // Center circle
-            ctx.beginPath();
-            ctx.arc(w / 2, h / 2, 40, 0, Math.PI * 2);
-            ctx.stroke();
-
-            // Penalty areas
-            const penW = w * 0.5;
-            const penH = h * 0.15;
-            const penX = (w - penW) / 2;
-
-            ctx.strokeRect(penX, 5, penW, penH);
-            ctx.strokeRect(penX, h - 5 - penH, penW, penH);
-
             const links = window.ChemistrySystem.getFormationLinks(team.formation);
             if (links) {
                 ctx.lineWidth = 3;
-                links.forEach(link => {
-                    const p1 = posMap[link.from];
-                    const p2 = posMap[link.to];
+                links.forEach(({from, to}) => {
+                    const p1 = posMap[from];
+                    const p2 = posMap[to];
                     if (p1 && p2) {
                         ctx.beginPath();
                         ctx.moveTo(p1.x * canvas.width, p1.y * canvas.height);
                         ctx.lineTo(p2.x * canvas.width, p2.y * canvas.height);
 
-                        if (link.level === 3) {
-                            ctx.strokeStyle = '#f1c40f';
-                            ctx.lineWidth = 4;
-                        } else if (link.level === 2) {
+                        if (p1.pref === p2.pref) {
                             ctx.strokeStyle = '#2ecc71';
-                            ctx.lineWidth = 3;
-                        } else if (link.level === 1) {
-                            ctx.strokeStyle = '#3498db';
-                            ctx.lineWidth = 2;
                         } else {
                             ctx.strokeStyle = 'rgba(255,255,255,0.2)';
                             ctx.lineWidth = 1.5;
@@ -666,18 +592,10 @@ class ManagementUI {
             ? (this.swapSourceIndex < 11 ? team.starting11[this.swapSourceIndex] : team.bench[this.swapSourceIndex - 11])
             : null;
 
-
-        let statLabels = {
+        const statLabels = {
             pass: 'Pass', shoot: 'Shoot', defense: 'Defense',
             physical: 'Physical', speed: 'Speed', mental: 'Mental', stamina: 'Stamina'
         };
-        if ((player && player.position === 'GK') || (srcPlayer && srcPlayer.position === 'GK')) {
-            statLabels = {
-                pass: 'KIC', shoot: 'Shoot', defense: 'SAV',
-                physical: 'AER', speed: 'Speed', mental: 'REF', stamina: 'Stamina'
-            };
-        }
-
 
         const buildStatGrid = (targetP, baseCompareP = null) => {
             return Object.entries(targetP.stats).map(([key, val]) => {
@@ -792,18 +710,12 @@ class ManagementUI {
         } else {
             this.swapSourceIndex = index;
         }
-
-        this.renderFormation();
-
         const team = window.gameState.playerTeam;
-        if (this.swapSourceIndex !== null && this.swapSourceIndex !== this.selectedPlayerIndex) {
-             this.renderPlayerComparison(this.swapSourceIndex, this.selectedPlayerIndex);
-        } else {
-            const p = this.selectedPlayerIndex < 11
-                ? team.starting11[this.selectedPlayerIndex]
-                : team.bench[this.selectedPlayerIndex - 11];
-            this.renderPlayerDetailCard(p, this.selectedPlayerIndex);
-        }
+        const p = this.selectedPlayerIndex < 11
+            ? team.starting11[this.selectedPlayerIndex]
+            : team.bench[this.selectedPlayerIndex - 11];
+        this.renderFormation();
+        this.renderPlayerDetailCard(p, this.selectedPlayerIndex);
     }
 
 
@@ -888,7 +800,7 @@ class ManagementUI {
 
             let innerContent = '';
             if (choice.candidates) {
-                innerContent += `<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; width: 100%; margin-bottom: 8px;">`;
+                innerContent += `<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 8px;">`;
                 choice.candidates.forEach((cand, candIdx) => {
                     const skillsStr = cand.skills.map(sid => window.MasterData.PlayerSkills.find(s => s.id === sid)?.name).filter(Boolean).join(', ') || 'なし';
                     const subStr = cand.subPositions?.length ? `/${cand.subPositions.join(',')}` : '';
@@ -984,10 +896,9 @@ class ManagementUI {
         const currentSquadSize = window.gameState.playerTeam.players.length;
 
         const guaranteedTypes = ['scout', 'training', 'relic', 'command', 'mystery'];
-        const getRandomApCost = () => Math.floor(Math.random() * 3) + 1;
 
         guaranteedTypes.forEach((type, i) => {
-            const eventObj = { id: `evt_${Date.now()}_${i}`, type, choices: [], apCost: getRandomApCost() };
+            const eventObj = { id: `evt_${Date.now()}_${i}`, type, choices: [] };
 
             if (type === 'scout') {
                 eventObj.title = 'スカウトからの提案';

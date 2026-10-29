@@ -1,25 +1,3 @@
-
-function getSlotPitchCoords(s) {
-    if (Math.abs(s.offsetX) > 45 || s.offsetY > 60) {
-        return { x: s.offsetX, y: s.offsetY };
-    }
-    const tierMap = { 'GK': 45, 'Defensive': 145, 'DM': 220, 'Middle': 275, 'AM': 330, 'Attacking': 375 };
-    const laneMap = {
-        'Left': 100, 'OutsideL': 100, 'L-Out': 100,
-        'L-Half': 200, 'Half-spaceL': 200, 'Left-Center': 210,
-        'Center': 300,
-        'R-Half': 400, 'Half-spaceR': 400, 'Right-Center': 390,
-        'Right': 500, 'OutsideR': 500, 'R-Out': 500
-    };
-    const posDefaultX = { 'GK': 45, 'CB': 135, 'SB': 155, 'CDM': 215, 'CM': 275, 'CAM': 330, 'WG': 360, 'CF': 380 };
-    const baseX = (s.baseMatrix && tierMap[s.baseMatrix.tier]) || posDefaultX[s.expectedPosStr] || 250;
-    const baseY = (s.baseMatrix && laneMap[s.baseMatrix.lane]) || 300;
-    return {
-        x: baseX + (s.offsetX || 0),
-        y: baseY + (s.offsetY || 0)
-    };
-}
-
 class MatchScene extends Phaser.Scene {
     constructor() {
         super({ key: 'MatchScene' });
@@ -161,9 +139,7 @@ class MatchScene extends Phaser.Scene {
 
         const initTeamRatings = (team) => {
             team.players.forEach((p, idx) => {
-                const cond = p.condition !== undefined ? p.condition : 100;
-                const baseStamina = p.stats.stamina || 80;
-                p.currentStamina = baseStamina * (0.5 + 0.5 * (cond / 100));
+                p.currentStamina = p.stats.stamina || 80;
                 p.matchRating = 6.0;
                 p.matchGoals = 0;
                 p.matchAssists = 0;
@@ -176,7 +152,6 @@ class MatchScene extends Phaser.Scene {
 
         const pSlots = window.MasterData.Formations[this.playerTeamData.formation]?.slots || [];
         this.playerTeamData.starting11.forEach((pData, idx) => {
-            pData.playedInMatch = true;
             const expectedPos = pSlots[idx]?.expectedPosStr || pData.position;
             const sprite = this.createPlayerToken(pData, true, idx + 1, expectedPos);
             this.playerSprites.push(sprite);
@@ -238,11 +213,10 @@ createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
 
         const numText = this.add.text(0, -5, String(pData.jerseyNumber || number || '0'), { fontSize: '11px', fill: '#ffffff', fontStyle: 'bold', fontFamily: 'Arial' }).setOrigin(0.5);
 
-        const lastName = pData.name.split(' ').pop();
-        const nameLabel = this.add.text(0, 30, lastName, {
-            fontSize: '11px', fill: '#ffffff', fontFamily: 'Arial', fontStyle: 'bold', backgroundColor: 'rgba(0,0,0,0.6)', padding: { x: 3, y: 1 }
+        const nameLabel = this.add.text(0, -35, pData.name, {
+            fontSize: '9px', fill: '#ffffff', fontFamily: 'Arial', backgroundColor: 'rgba(0,0,0,0.5)', padding: { x: 2, y: 1 }
         }).setOrigin(0.5);
-        nameLabel.setVisible(true);
+        nameLabel.setVisible(false);
 
         const staminaArc = this.add.graphics();
         staminaArc.rotation = -Math.PI / 2;
@@ -644,13 +618,18 @@ createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
                 const offX = (Math.random() - 0.5) * 8;
                 const offY = (Math.random() - 0.5) * 10;
 
-                const coords = getSlotPitchCoords(s);
                 if (isPlayer) {
-                    p.x = Phaser.Math.Clamp(coords.x + offX, 45, 390);
-                    p.y = Phaser.Math.Clamp(coords.y + offY, 65, 535);
+                    if (s.expectedPosStr === 'GK') p.x = 45;
+                    else if (['CB', 'SB'].includes(s.expectedPosStr)) p.x = 160 + offX;
+                    else if (['CDM', 'CM', 'CAM'].includes(s.expectedPosStr)) p.x = 280 + offX;
+                    else p.x = 375 + offX;
+                    p.y = Phaser.Math.Clamp(s.offsetY + offY, 65, 535);
                 } else {
-                    p.x = Phaser.Math.Clamp(800 - coords.x + offX, 410, 755);
-                    p.y = Phaser.Math.Clamp(coords.y + offY, 65, 535);
+                    if (s.expectedPosStr === 'GK') p.x = 755;
+                    else if (['CB', 'SB'].includes(s.expectedPosStr)) p.x = 640 + offX;
+                    else if (['CDM', 'CM', 'CAM'].includes(s.expectedPosStr)) p.x = 520 + offX;
+                    else p.x = 425 + offX;
+                    p.y = Phaser.Math.Clamp(s.offsetY + offY, 65, 535);
                 }
                 p.stunTimer = 0;
                 p.actionCooldown = 0;
@@ -1222,15 +1201,6 @@ createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
             }
         });
 
-        // Tactical extreme offsets
-        this.playerSprites.forEach(p => {
-            if (this.currentTactic === 'attack' && p.playerData.position !== 'GK') {
-                p.y = Math.max(65, p.y - 1.5); // move up
-            } else if (this.currentTactic === 'defense' && p.playerData.position !== 'GK') {
-                p.y = Math.min(535, p.y + 1.5); // move down
-            }
-        });
-
         this.syncBallVisuals();
         if (this.syncPlayerVisuals) this.syncPlayerVisuals();
     }
@@ -1336,7 +1306,6 @@ createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
         this.ball.isShot = true;
         this.ball.lastShooter = shooter;
         this.ball.cooldown = 5;
-        this.drawPassTrajectory(shooter.x, shooter.y, goalX, targetY, 'shoot');
         shooter.actionCooldown = 20;
     }
 
@@ -1376,47 +1345,6 @@ createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
                 if(p.legL) { p.legL.y = 10; p.legR.y = 10; p.shoeL.y = 17; p.shoeR.y = 17; }
             }
         });
-    }
-
-    drawPassTrajectory(startX, startY, endX, endY, actionType) {
-        const graphics = this.add.graphics();
-        let color = 0xa3e4d7; // Default Pass
-        if (actionType === 'throughBall' || actionType === 'earlyCross' || actionType === 'cross') {
-            color = 0xf1c40f;
-        } else if (actionType === 'shoot') {
-            color = 0xff5252;
-        }
-
-        graphics.lineStyle(3, color, 0.8);
-        graphics.beginPath();
-        graphics.moveTo(startX, startY);
-        graphics.lineTo(endX, endY);
-        graphics.strokePath();
-        graphics.setDepth(25);
-
-        this.tweens.add({
-            targets: graphics,
-            alpha: 0,
-            duration: 450,
-            onComplete: () => {
-                graphics.destroy();
-            }
-        });
-    }
-
-
-    syncBallVisuals() {
-        if (!this.ballContainer || !this.ballSprite) return;
-        this.ballContainer.x = this.ball.x;
-        this.ballContainer.y = this.ball.y;
-        this.ballSprite.y = -this.ball.z;
-        const shadow = this.ballContainer.list[0];
-        if (shadow) {
-            const scale = Math.max(0.3, 1 - (this.ball.z / 100));
-            shadow.scaleX = scale;
-            shadow.scaleY = scale;
-            shadow.alpha = scale * 0.45;
-        }
     }
 
     triggerGoal(isPlayerTeam) {

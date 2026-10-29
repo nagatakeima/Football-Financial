@@ -319,263 +319,233 @@ const MasterData = {
         }
     ],
     "MicroCommands": [
-            {
-                    "id": 1,
-                    "name": "ショートパッシング",
-                    "cooldown": 20,
-                    "type": "buff",
-                    "target": "pass",
-                    "value": 20,
-                    "description": "ショートパスの精度と成功率を向上させる"
-            },
-            {
-                    "id": 2,
-                    "name": "ロングボール配給",
-                    "cooldown": 30,
-                    "type": "action",
-                    "actionType": "longBall",
-                    "description": "前線へのロングボール供給を増やす"
-            },
-            {
-                    "id": 3,
-                    "name": "セーフティ・クリア",
-                    "cooldown": 25,
-                    "type": "buff",
-                    "target": "defense",
-                    "value": 30,
-                    "description": "自陣でのセーフティなクリアを優先する"
-            },
-            {
-                    "id": 4,
-                    "name": "サイドチェンジ",
-                    "cooldown": 30,
-                    "type": "action",
-                    "actionType": "switchPlay",
-                    "description": "逆サイドへ大きく展開して局面を打開する"
-            },
-            {
-                    "id": 5,
-                    "name": "GKビルドアップ",
-                    "cooldown": 40,
-                    "type": "buff",
-                    "target": "possession",
-                    "value": 15,
-                    "description": "GKを含めたビルドアップでポゼッションを高める"
-            },
-            {
-                    "id": 6,
-                    "name": "ワンツーパス",
-                    "cooldown": 25,
-                    "type": "action",
-                    "actionType": "oneTwo",
-                    "description": "ワンツーパスで相手の守備を崩す"
-            },
-            {
-                    "id": 7,
-                    "name": "アーリークロス",
-                    "cooldown": 30,
-                    "type": "action",
-                    "actionType": "earlyCross",
-                    "description": "早いタイミングでアーリークロスを放り込む"
-            },
-            {
-                    "id": 8,
-                    "name": "スルーパス",
-                    "cooldown": 35,
-                    "type": "action",
-                    "actionType": "throughBall",
-                    "description": "裏を狙うスルーパスの頻度を増やす"
-            },
-            {
-                    "id": 9,
-                    "name": "サイドバックのオーバーラップ",
-                    "cooldown": 40,
-                    "type": "buff",
-                    "target": "attackWidth",
-                    "value": 20,
-                    "description": "サイドバックのオーバーラップで幅を取る"
-            },
-            {
-                    "id": 10,
-                    "name": "偽9番の降下",
-                    "cooldown": 45,
-                    "type": "action",
-                    "actionType": "falseNine",
-                    "description": "CFが中盤に降りて組み立てに参加する（偽9番）"
-            },
-            {
-                    "id": 11,
-                    "name": "ミドルシュート",
-                    "cooldown": 25,
-                    "type": "action",
-                    "actionType": "shoot",
-                    "description": "ペナルティエリア外からのミドルシュートを狙う"
-            },
-            {
-                    "id": 12,
-                    "name": "ファー詰め",
-                    "cooldown": 30,
-                    "type": "buff",
-                    "target": "crossReception",
-                    "value": 25,
-                    "description": "クロスに対する飛び込みと決定力を大幅強化"
-            },
-            {
-                    "id": 13,
-                    "name": "ニアハイぶち抜き",
-                    "cooldown": 40,
-                    "type": "buff",
-                    "target": "shoot",
-                    "value": 30,
-                    "description": "ニア上への強烈なシュートの成功率UP"
-            },
-            {
-                    "id": 14,
-                    "name": "ライン裏抜け",
-                    "cooldown": 35,
-                    "type": "action",
-                    "actionType": "runBehind",
-                    "description": "DFラインの裏へ一斉に飛び出す"
-            },
-            {
-                    "id": 15,
-                    "name": "カットイン・シュート",
-                    "cooldown": 30,
-                    "type": "action",
-                    "actionType": "cutInShoot",
-                    "description": "サイドから中央へカットインしてシュートを狙う"
-            },
-            {
-                    "id": 16,
-                    "name": "ヘディング・ターゲット",
-                    "cooldown": 30,
-                    "type": "buff",
-                    "target": "header",
-                    "value": 25,
-                    "description": "ヘディングの精度と威力を強化する"
-            },
-            {
-                    "id": 17,
-                    "name": "ミドルブロック",
-                    "cooldown": 35,
-                    "type": "buff",
-                    "target": "defenseLine",
-                    "value": "middle",
-                    "description": "守備ブロックをミドルゾーンに設定する"
-            },
-            {
-                    "id": 18,
-                    "name": "パスカット",
-                    "cooldown": 25,
-                    "type": "buff",
-                    "target": "intercept",
-                    "value": 25,
-                    "description": "パスカット（インターセプト）の成功率UP"
-            },
-            {
-                    "id": 19,
-                    "name": "激しいタックル",
-                    "cooldown": 20,
-                    "type": "buff",
-                    "target": "tackle",
-                    "value": 30,
-                    "description": "激しいタックルでボールを奪いに行く"
-            },
-            {
-                    "id": 20,
-                    "name": "ハイライン・ハイプレス",
-                    "cooldown": 45,
-                    "type": "buff",
-                    "target": "press",
-                    "value": 40,
-                    "description": "高い最終ラインと前線からのハイプレス"
-            },
-            {
-                    "id": 21,
-                    "name": "リトリート・５バック化",
-                    "cooldown": 50,
-                    "type": "action",
-                    "actionType": "parkBus",
-                    "description": "自陣に引きこもり、5バック化して守りを固める"
-            },
-            {
-                    "id": 22,
-                    "name": "オフサイドトラップ",
-                    "cooldown": 40,
-                    "type": "action",
-                    "actionType": "offsideTrap",
-                    "description": "意図的にラインを上げてオフサイドトラップをかける"
-            },
-            {
-                    "id": 23,
-                    "name": "ファスト・ブレイク",
-                    "cooldown": 30,
-                    "type": "buff",
-                    "target": "speed",
-                    "value": 20,
-                    "description": "カウンター時のスピードを一時的に引き上げる"
-            },
-            {
-                    "id": 24,
-                    "name": "カウンター・プレス",
-                    "cooldown": 35,
-                    "type": "buff",
-                    "target": "press",
-                    "value": 25,
-                    "description": "ボールロスト直後の即時奪回（カウンタープレス）を強化"
-            },
-            {
-                    "id": 25,
-                    "name": "ゲーゲンプレス",
-                    "cooldown": 50,
-                    "type": "action",
-                    "actionType": "gegenpress",
-                    "description": "高い位置からの激しいプレッシング（ゲーゲンプレス）"
-            },
-            {
-                    "id": 26,
-                    "name": "ロングカウンター",
-                    "cooldown": 40,
-                    "type": "action",
-                    "actionType": "longCounter",
-                    "description": "自陣深くから前線へ一気にロングカウンターを仕掛ける"
-            },
-            {
-                    "id": 27,
-                    "name": "【回数制限】選手交代",
-                    "cooldown": 0,
-                    "type": "special",
-                    "actionType": "substitute",
-                    "maxUses": 3,
-                    "description": "選手の交代枠を使用する"
-            },
-            {
-                    "id": 28,
-                    "name": "【回数制限】パワープレー",
-                    "cooldown": 0,
-                    "type": "special",
-                    "actionType": "powerPlay",
-                    "maxUses": 1,
-                    "description": "終盤にCBを前線へ上げてパワープレーを仕掛ける"
-            },
-            {
-                    "id": 29,
-                    "name": "【条件】逆境の猛攻",
-                    "cooldown": 60,
-                    "type": "special",
-                    "actionType": "comeback",
-                    "condition": "behind",
-                    "description": "ビハインド時にリスクを冒して猛攻を仕掛ける"
-            },
-            {
-                    "id": 30,
-                    "name": "【条件】ゲームクローズ",
-                    "cooldown": 60,
-                    "type": "special",
-                    "actionType": "closeGame",
-                    "condition": "lead",
-                    "description": "リード時にボールをキープして時間を稼ぐ"
-            }
+        {
+            "id": 1,
+            "name": "ショートパッシング",
+            "cooldown": 20,
+            "type": "buff",
+            "target": "pass",
+            "value": 20
+        },
+        {
+            "id": 2,
+            "name": "ロングボール配給",
+            "cooldown": 30,
+            "type": "action",
+            "actionType": "longBall"
+        },
+        {
+            "id": 3,
+            "name": "セーフティ・クリア",
+            "cooldown": 25,
+            "type": "buff",
+            "target": "defense",
+            "value": 30
+        },
+        {
+            "id": 4,
+            "name": "サイドチェンジ",
+            "cooldown": 30,
+            "type": "action",
+            "actionType": "switchPlay"
+        },
+        {
+            "id": 5,
+            "name": "GKビルドアップ",
+            "cooldown": 40,
+            "type": "buff",
+            "target": "possession",
+            "value": 15
+        },
+        {
+            "id": 6,
+            "name": "ワンツーパス",
+            "cooldown": 25,
+            "type": "action",
+            "actionType": "oneTwo"
+        },
+        {
+            "id": 7,
+            "name": "アーリークロス",
+            "cooldown": 30,
+            "type": "action",
+            "actionType": "earlyCross"
+        },
+        {
+            "id": 8,
+            "name": "スルーパス",
+            "cooldown": 35,
+            "type": "action",
+            "actionType": "throughBall"
+        },
+        {
+            "id": 9,
+            "name": "サイドバックのオーバーラップ",
+            "cooldown": 40,
+            "type": "buff",
+            "target": "attackWidth",
+            "value": 20
+        },
+        {
+            "id": 10,
+            "name": "偽9番の降下",
+            "cooldown": 45,
+            "type": "action",
+            "actionType": "falseNine"
+        },
+        {
+            "id": 11,
+            "name": "ミドルシュート",
+            "cooldown": 25,
+            "type": "action",
+            "actionType": "shoot"
+        },
+        {
+            "id": 12,
+            "name": "ファー詰め",
+            "cooldown": 30,
+            "type": "buff",
+            "target": "crossReception",
+            "value": 25
+        },
+        {
+            "id": 13,
+            "name": "ニアハイぶち抜き",
+            "cooldown": 40,
+            "type": "buff",
+            "target": "shoot",
+            "value": 30
+        },
+        {
+            "id": 14,
+            "name": "ライン裏抜け",
+            "cooldown": 35,
+            "type": "action",
+            "actionType": "runBehind"
+        },
+        {
+            "id": 15,
+            "name": "カットイン・シュート",
+            "cooldown": 30,
+            "type": "action",
+            "actionType": "cutInShoot"
+        },
+        {
+            "id": 16,
+            "name": "ヘディング・ターゲット",
+            "cooldown": 30,
+            "type": "buff",
+            "target": "header",
+            "value": 25
+        },
+        {
+            "id": 17,
+            "name": "ミドルブロック",
+            "cooldown": 35,
+            "type": "buff",
+            "target": "defenseLine",
+            "value": "middle"
+        },
+        {
+            "id": 18,
+            "name": "パスカット",
+            "cooldown": 25,
+            "type": "buff",
+            "target": "intercept",
+            "value": 25
+        },
+        {
+            "id": 19,
+            "name": "激しいタックル",
+            "cooldown": 20,
+            "type": "buff",
+            "target": "tackle",
+            "value": 30
+        },
+        {
+            "id": 20,
+            "name": "ハイライン・ハイプレス",
+            "cooldown": 45,
+            "type": "buff",
+            "target": "press",
+            "value": 40
+        },
+        {
+            "id": 21,
+            "name": "リトリート・５バック化",
+            "cooldown": 50,
+            "type": "action",
+            "actionType": "parkBus"
+        },
+        {
+            "id": 22,
+            "name": "オフサイドトラップ",
+            "cooldown": 40,
+            "type": "action",
+            "actionType": "offsideTrap"
+        },
+        {
+            "id": 23,
+            "name": "ファスト・ブレイク",
+            "cooldown": 30,
+            "type": "buff",
+            "target": "speed",
+            "value": 20
+        },
+        {
+            "id": 24,
+            "name": "カウンター・プレス",
+            "cooldown": 35,
+            "type": "buff",
+            "target": "press",
+            "value": 25
+        },
+        {
+            "id": 25,
+            "name": "ゲーゲンプレス",
+            "cooldown": 50,
+            "type": "action",
+            "actionType": "gegenpress"
+        },
+        {
+            "id": 26,
+            "name": "ロングカウンター",
+            "cooldown": 40,
+            "type": "action",
+            "actionType": "longCounter"
+        },
+        {
+            "id": 27,
+            "name": "【回数制限】選手交代",
+            "cooldown": 0,
+            "type": "special",
+            "actionType": "substitute",
+            "maxUses": 3
+        },
+        {
+            "id": 28,
+            "name": "【回数制限】パワープレー",
+            "cooldown": 0,
+            "type": "special",
+            "actionType": "powerPlay",
+            "maxUses": 1
+        },
+        {
+            "id": 29,
+            "name": "【条件】逆境の猛攻",
+            "cooldown": 60,
+            "type": "special",
+            "actionType": "comeback",
+            "condition": "behind"
+        },
+        {
+            "id": 30,
+            "name": "【条件】ゲームクローズ",
+            "cooldown": 60,
+            "type": "special",
+            "actionType": "closeGame",
+            "condition": "lead"
+        }
     ],
     "Positions": [
         "GK",
