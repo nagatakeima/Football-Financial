@@ -234,16 +234,19 @@ class ManagementUI {
                                     team.ownedMicroCommands.includes(c.id) && (!team.microCommands.includes(c.id) || c.id === currentCmdId)
                                 );
                                 return `
-                                <select id="micro-cmd-${i}" onchange="managementUI.updateMicroCommand(${i}, this.value, 'squad')" style="background:#222; color:#fff; border:1px solid #444; padding:4px; max-width: 100px;">
-                                    <option value="">--未設定--</option>
-                                    ${availableCmds.map(cmd => `<option value="${cmd.id}" ${currentCmdId === cmd.id ? 'selected' : ''}>${cmd.name}</option>`).join('')}
-                                </select>
+                                <div style="display: flex; align-items: center; gap: 4px;">
+                                    <span style="font-size: 10px; color: #aaa;">SLOT ${i + 1}:</span>
+                                    <select id="micro-cmd-${i}" onchange="managementUI.updateMicroCommand(${i}, this.value, 'squad')" style="background:#222; color:#fff; border:1px solid #444; padding:4px;">
+                                        <option value="">--未設定--</option>
+                                        ${availableCmds.map(cmd => `<option value="${cmd.id}" ${currentCmdId === cmd.id ? 'selected' : ''}>${cmd.name}</option>`).join('')}
+                                    </select>
+                                </div>
                                 `;
                             }).join('')}
                         </div>
                     </div>
 
-                    <div class="pitch-container-25d" id="fc-tactics-pitch" style="flex: 1; position: relative; background: url('kickoff.png') no-repeat center center; background-size: cover; border-radius: 12px; transform: perspective(900px) rotateX(16deg); transform-origin: bottom center; border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 15px 35px rgba(0,0,0,0.5); margin-bottom: -20px; z-index: 1;">
+                    <div class="pitch-container-25d" id="fc-tactics-pitch" style="flex: 1; position: relative; background: linear-gradient(0deg, #103024 0%, #0d291e 10%, #103024 20%, #0d291e 30%, #103024 40%, #0d291e 50%, #103024 60%, #0d291e 70%, #103024 80%, #0d291e 90%, #103024 100%); background-size: 100% 10%; border-radius: 12px; transform: perspective(900px) rotateX(16deg); transform-origin: bottom center; border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 15px 35px rgba(0,0,0,0.5); margin-bottom: -20px; z-index: 1;">
                         <canvas id="chem-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none; z-index: 1; width: 100%; height: 100%;"></canvas>
                         <div id="formation-container" style="width: 100%; height: 100%; position: absolute; z-index: 2; top:0; left:0;"></div>
                     </div>
@@ -289,11 +292,32 @@ class ManagementUI {
     getFormationCoordinates(formation) {
         const fData = window.MasterData.Formations[formation] || window.MasterData.Formations['4-4-2'];
         if (fData && fData.slots) {
-            return fData.slots.map(s => ({
-                x: s.offsetY / 600,
-                y: 1.0 - (s.offsetX / 800),
-                expectedPos: s.expectedPosStr
-            }));
+            return fData.slots.map((s, index) => {
+                let coords = { x: s.offsetX || 0, y: s.offsetY || 0 };
+                if (Math.abs(s.offsetX) <= 45 && s.offsetY <= 60) {
+                    const tierMap = { 'GK': 45, 'Defensive': 145, 'DM': 220, 'Middle': 275, 'AM': 330, 'Attacking': 375 };
+                    const laneMap = {
+                        'Left': 100, 'OutsideL': 100, 'L-Out': 100,
+                        'L-Half': 200, 'Half-spaceL': 200, 'Left-Center': 210,
+                        'Center': 300,
+                        'R-Half': 400, 'Half-spaceR': 400, 'Right-Center': 390,
+                        'Right': 500, 'OutsideR': 500, 'R-Out': 500
+                    };
+                    const posDefaultX = { 'GK': 45, 'CB': 135, 'SB': 155, 'CDM': 215, 'CM': 275, 'CAM': 330, 'WG': 360, 'CF': 380 };
+                    const baseX = (s.baseMatrix && tierMap[s.baseMatrix.tier]) || posDefaultX[s.expectedPosStr] || 250;
+                    const baseY = (s.baseMatrix && laneMap[s.baseMatrix.lane]) || 300;
+                    coords = { x: baseX + (s.offsetX || 0), y: baseY + (s.offsetY || 0) };
+                }
+
+                const normX = Math.max(0.12, Math.min(0.88, coords.y / 600)) + (index * 0.001); // slight offset for overlaps
+                const normY = Math.max(0.12, Math.min(0.90, 1.0 - ((coords.x - 20) / 400))) + (index * 0.001);
+
+                return {
+                    x: normX,
+                    y: normY,
+                    expectedPos: s.expectedPosStr
+                };
+            });
         }
         return [];
     }
@@ -317,6 +341,28 @@ class ManagementUI {
             canvas.height = container.parentElement.clientHeight;
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+            ctx.lineWidth = 2;
+            const w = canvas.width;
+            const h = canvas.height;
+            const marginX = 20;
+            const marginY = 30;
+            const pitchW = w - marginX * 2;
+            const pitchH = h - marginY * 2;
+
+            ctx.strokeRect(marginX, marginY, pitchW, pitchH);
+            ctx.beginPath();
+            ctx.moveTo(marginX, h / 2);
+            ctx.lineTo(w - marginX, h / 2);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(w / 2, h / 2, 45, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.strokeRect(w / 2 - 60, marginY, 120, 80);
+            ctx.strokeRect(w / 2 - 60, h - marginY - 80, 120, 80);
 
             team.starting11.forEach((player, idx) => {
                 if(!player) return;
@@ -519,9 +565,14 @@ class ManagementUI {
                     </table>
                 </div>
 
-                <button onclick="managementUI.handlePlayerClick(${idx2}, true)" style="margin-top: 10px; width: 100%; padding: 12px; font-size: 16px; font-weight: bold; background: #27ae60; color:#fff; border: none; border-radius: 6px; cursor: pointer;">
-                    ⚡ 入れ替えを確定する
-                </button>
+                <div style="display: flex; gap: 8px; margin-top: 10px;">
+                    <button onclick="managementUI.toggleSwapMode(null)" style="flex: 1; padding: 12px; font-size: 14px; background: #555; color: #fff; border: none; border-radius: 6px; cursor: pointer;">
+                        キャンセル
+                    </button>
+                    <button onclick="managementUI.handlePlayerClick(${idx2}, true)" style="flex: 2; padding: 12px; font-size: 16px; font-weight: bold; background: #27ae60; color:#fff; border: none; border-radius: 6px; cursor: pointer;">
+                        ⚡ 入れ替えを確定する
+                    </button>
+                </div>
             </div>
         `;
 
@@ -715,7 +766,11 @@ class ManagementUI {
             ? team.starting11[this.selectedPlayerIndex]
             : team.bench[this.selectedPlayerIndex - 11];
         this.renderFormation();
-        this.renderPlayerDetailCard(p, this.selectedPlayerIndex);
+        if (this.swapSourceIndex !== null && this.swapSourceIndex !== this.selectedPlayerIndex) {
+            this.renderPlayerComparison(this.swapSourceIndex, this.selectedPlayerIndex);
+        } else {
+            this.renderPlayerDetailCard(p, this.selectedPlayerIndex);
+        }
     }
 
 
@@ -800,7 +855,7 @@ class ManagementUI {
 
             let innerContent = '';
             if (choice.candidates) {
-                innerContent += `<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 8px;">`;
+                innerContent += `<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; width: 100%; margin-bottom: 8px;">`;
                 choice.candidates.forEach((cand, candIdx) => {
                     const skillsStr = cand.skills.map(sid => window.MasterData.PlayerSkills.find(s => s.id === sid)?.name).filter(Boolean).join(', ') || 'なし';
                     const subStr = cand.subPositions?.length ? `/${cand.subPositions.join(',')}` : '';

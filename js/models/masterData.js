@@ -325,14 +325,16 @@ const MasterData = {
             "cooldown": 20,
             "type": "buff",
             "target": "pass",
-            "value": 20
+            "value": 20,
+            "description": "味方全体のパス成功率が上昇する"
         },
         {
             "id": 2,
             "name": "ロングボール配給",
             "cooldown": 30,
             "type": "action",
-            "actionType": "longBall"
+            "actionType": "longBall",
+            "description": "前線へロングボールを放り込む"
         },
         {
             "id": 3,
@@ -340,14 +342,16 @@ const MasterData = {
             "cooldown": 25,
             "type": "buff",
             "target": "defense",
-            "value": 30
+            "value": 30,
+            "description": "守備意識を高め、ピンチを安全にクリアする"
         },
         {
             "id": 4,
             "name": "サイドチェンジ",
             "cooldown": 30,
             "type": "action",
-            "actionType": "switchPlay"
+            "actionType": "switchPlay",
+            "description": "逆サイドへ大きく展開するパスを狙う"
         },
         {
             "id": 5,
@@ -355,28 +359,32 @@ const MasterData = {
             "cooldown": 40,
             "type": "buff",
             "target": "possession",
-            "value": 15
+            "value": 15,
+            "description": "GKからの丁寧なビルドアップを試みる"
         },
         {
             "id": 6,
             "name": "ワンツーパス",
             "cooldown": 25,
             "type": "action",
-            "actionType": "oneTwo"
+            "actionType": "oneTwo",
+            "description": "近距離でのパス交換から突破を図る"
         },
         {
             "id": 7,
             "name": "アーリークロス",
             "cooldown": 30,
             "type": "action",
-            "actionType": "earlyCross"
+            "actionType": "earlyCross",
+            "description": "早いタイミングでゴール前へクロスを上げる"
         },
         {
             "id": 8,
             "name": "スルーパス",
             "cooldown": 35,
             "type": "action",
-            "actionType": "throughBall"
+            "actionType": "throughBall",
+            "description": "DFラインの裏を狙う鋭いパスを出す"
         },
         {
             "id": 9,
@@ -384,21 +392,24 @@ const MasterData = {
             "cooldown": 40,
             "type": "buff",
             "target": "attackWidth",
-            "value": 20
+            "value": 20,
+            "description": "SBが積極的に前線へ駆け上がる"
         },
         {
             "id": 10,
             "name": "偽9番の降下",
             "cooldown": 45,
             "type": "action",
-            "actionType": "falseNine"
+            "actionType": "falseNine",
+            "description": "CFが中盤に降りてボールを引き出す"
         },
         {
             "id": 11,
             "name": "ミドルシュート",
             "cooldown": 25,
             "type": "action",
-            "actionType": "shoot"
+            "actionType": "shoot",
+            "description": "隙を見つけて遠距離からシュートを狙う"
         },
         {
             "id": 12,
@@ -406,7 +417,8 @@ const MasterData = {
             "cooldown": 30,
             "type": "buff",
             "target": "crossReception",
-            "value": 25
+            "value": 25,
+            "description": "クロスボールに対してファーサイドで待ち構える"
         },
         {
             "id": 13,
@@ -414,21 +426,24 @@ const MasterData = {
             "cooldown": 40,
             "type": "buff",
             "target": "shoot",
-            "value": 30
+            "value": 30,
+            "description": "ニアの上のコースを強烈なシュートで狙う"
         },
         {
             "id": 14,
             "name": "ライン裏抜け",
             "cooldown": 35,
             "type": "action",
-            "actionType": "runBehind"
+            "actionType": "runBehind",
+            "description": "相手ディフェンスの背後へ走り込む"
         },
         {
             "id": 15,
             "name": "カットイン・シュート",
             "cooldown": 30,
             "type": "action",
-            "actionType": "cutInShoot"
+            "actionType": "cutInShoot",
+            "description": "サイドから中央に切れ込みシュートを放つ"
         },
         {
             "id": 16,
@@ -436,7 +451,8 @@ const MasterData = {
             "cooldown": 30,
             "type": "buff",
             "target": "header",
-            "value": 25
+            "value": 25,
+            "description": "前線の選手がターゲットマンとして空中戦に競る"
         },
         {
             "id": 17,
@@ -444,7 +460,8 @@ const MasterData = {
             "cooldown": 35,
             "type": "buff",
             "target": "defenseLine",
-            "value": "middle"
+            "value": "middle",
+            "description": "中盤でコンパクトな守備ブロックを形成する"
         },
         {
             "id": 18,
@@ -452,7 +469,8 @@ const MasterData = {
             "cooldown": 25,
             "type": "buff",
             "target": "intercept",
-            "value": 25
+            "value": 25,
+            "description": "相手のパスコースを読んでインターセプトを狙う"
         },
         {
             "id": 19,
@@ -460,7 +478,8 @@ const MasterData = {
             "cooldown": 20,
             "type": "buff",
             "target": "tackle",
-            "value": 30
+            "value": 30,
+            "description": "強気なスライディングタックルでボールを奪う"
         },
         {
             "id": 20,
@@ -468,21 +487,24 @@ const MasterData = {
             "cooldown": 45,
             "type": "buff",
             "target": "press",
-            "value": 40
+            "value": 40,
+            "description": "最終ラインを上げ、前線から激しくプレスをかける"
         },
         {
             "id": 21,
             "name": "リトリート・５バック化",
             "cooldown": 50,
             "type": "action",
-            "actionType": "parkBus"
+            "actionType": "parkBus",
+            "description": "自陣に深く引いて守備を固める"
         },
         {
             "id": 22,
             "name": "オフサイドトラップ",
             "cooldown": 40,
             "type": "action",
-            "actionType": "offsideTrap"
+            "actionType": "offsideTrap",
+            "description": "最終ラインを一斉に上げ、相手をオフサイドにする"
         },
         {
             "id": 23,
@@ -490,7 +512,8 @@ const MasterData = {
             "cooldown": 30,
             "type": "buff",
             "target": "speed",
-            "value": 20
+            "value": 20,
+            "description": "ボールを奪ったら素早く前線へ展開する"
         },
         {
             "id": 24,
@@ -498,21 +521,24 @@ const MasterData = {
             "cooldown": 35,
             "type": "buff",
             "target": "press",
-            "value": 25
+            "value": 25,
+            "description": "ボールを失った直後に複数人で囲い込む"
         },
         {
             "id": 25,
             "name": "ゲーゲンプレス",
             "cooldown": 50,
             "type": "action",
-            "actionType": "gegenpress"
+            "actionType": "gegenpress",
+            "description": "最前線からの超高強度なプレスで即時奪回を狙う"
         },
         {
             "id": 26,
             "name": "ロングカウンター",
             "cooldown": 40,
             "type": "action",
-            "actionType": "longCounter"
+            "actionType": "longCounter",
+            "description": "自陣深くからのロングパスで一気にカウンターを仕掛ける"
         },
         {
             "id": 27,
@@ -520,7 +546,8 @@ const MasterData = {
             "cooldown": 0,
             "type": "special",
             "actionType": "substitute",
-            "maxUses": 3
+            "maxUses": 3,
+            "description": "ベンチの選手と交代する（最大3回）"
         },
         {
             "id": 28,
@@ -528,7 +555,8 @@ const MasterData = {
             "cooldown": 0,
             "type": "special",
             "actionType": "powerPlay",
-            "maxUses": 1
+            "maxUses": 1,
+            "description": "CBを前線に上げ、ロングボールを多用する"
         },
         {
             "id": 29,
@@ -536,7 +564,8 @@ const MasterData = {
             "cooldown": 60,
             "type": "special",
             "actionType": "comeback",
-            "condition": "behind"
+            "condition": "behind",
+            "description": "ビハインド時にのみ発動可能。チーム全体の攻撃力が上昇"
         },
         {
             "id": 30,
@@ -544,7 +573,8 @@ const MasterData = {
             "cooldown": 60,
             "type": "special",
             "actionType": "closeGame",
-            "condition": "lead"
+            "condition": "lead",
+            "description": "リード時にのみ発動可能。リスクを抑え、時間を消費する"
         }
     ],
     "Positions": [
