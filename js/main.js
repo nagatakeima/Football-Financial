@@ -213,10 +213,11 @@ createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
 
         const numText = this.add.text(0, -5, String(pData.jerseyNumber || number || '0'), { fontSize: '11px', fill: '#ffffff', fontStyle: 'bold', fontFamily: 'Arial' }).setOrigin(0.5);
 
-        const nameLabel = this.add.text(0, -35, pData.name, {
+        const lastName = pData.name.split(' ').pop();
+        const nameLabel = this.add.text(0, 18, lastName, {
             fontSize: '9px', fill: '#ffffff', fontFamily: 'Arial', backgroundColor: 'rgba(0,0,0,0.5)', padding: { x: 2, y: 1 }
         }).setOrigin(0.5);
-        nameLabel.setVisible(false);
+        nameLabel.setVisible(true);
 
         const staminaArc = this.add.graphics();
         staminaArc.rotation = -Math.PI / 2;
@@ -232,9 +233,6 @@ createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
         container.legL = legL; container.legR = legR; container.shoeL = shoeL; container.shoeR = shoeR;
         container.animTick = Math.random() * 10;
         container.bodyParts = [body, head, numText, legL, legR];
-
-        container.on('pointerover', () => { nameLabel.setVisible(true); });
-        container.on('pointerout', () => { nameLabel.setVisible(false); });
 
         return container;
     }
@@ -610,27 +608,39 @@ createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
     // =========================================================
     // Kickoff & Set Piece Positioning
     // =========================================================
+    getSlotPitchCoords(s) {
+        if (Math.abs(s.offsetX) > 45 || s.offsetY > 60) {
+            return { x: s.offsetX, y: s.offsetY };
+        }
+        const tierMap = { 'GK': 45, 'Defensive': 145, 'DM': 220, 'Middle': 275, 'AM': 330, 'Attacking': 375 };
+        const laneMap = {
+            'Left': 100, 'OutsideL': 100, 'L-Out': 100,
+            'L-Half': 200, 'Half-spaceL': 200, 'Left-Center': 210,
+            'Center': 300,
+            'R-Half': 400, 'Half-spaceR': 400, 'Right-Center': 390,
+            'Right': 500, 'OutsideR': 500, 'R-Out': 500
+        };
+        const posDefaultX = { 'GK': 45, 'CB': 135, 'SB': 155, 'CDM': 215, 'CM': 275, 'CAM': 330, 'WG': 360, 'CF': 380 };
+        const baseX = (s.baseMatrix && tierMap[s.baseMatrix.tier]) || posDefaultX[s.expectedPosStr] || 250;
+        const baseY = (s.baseMatrix && laneMap[s.baseMatrix.lane]) || 300;
+        return { x: baseX + (s.offsetX || 0), y: baseY + (s.offsetY || 0) };
+    }
+
     resetPositions(isPlayerKickoff = true) {
         const placeTeam = (sprites, teamData, isPlayer) => {
             const fSlots = window.MasterData.Formations[teamData.formation]?.slots || [];
             sprites.forEach((p, idx) => {
                 const s = fSlots[idx] || { offsetX: 200, offsetY: 300, expectedPosStr: p.playerData.position };
+                const coords = this.getSlotPitchCoords(s);
                 const offX = (Math.random() - 0.5) * 8;
                 const offY = (Math.random() - 0.5) * 10;
 
                 if (isPlayer) {
-                    if (s.expectedPosStr === 'GK') p.x = 45;
-                    else if (['CB', 'SB'].includes(s.expectedPosStr)) p.x = 160 + offX;
-                    else if (['CDM', 'CM', 'CAM'].includes(s.expectedPosStr)) p.x = 280 + offX;
-                    else p.x = 375 + offX;
-                    p.y = Phaser.Math.Clamp(s.offsetY + offY, 65, 535);
+                    p.x = Phaser.Math.Clamp(coords.x + offX, 42, 390);
                 } else {
-                    if (s.expectedPosStr === 'GK') p.x = 755;
-                    else if (['CB', 'SB'].includes(s.expectedPosStr)) p.x = 640 + offX;
-                    else if (['CDM', 'CM', 'CAM'].includes(s.expectedPosStr)) p.x = 520 + offX;
-                    else p.x = 425 + offX;
-                    p.y = Phaser.Math.Clamp(s.offsetY + offY, 65, 535);
+                    p.x = Phaser.Math.Clamp(800 - coords.x + offX, 410, 758);
                 }
+                p.y = Phaser.Math.Clamp(coords.y + offY, 65, 535);
                 p.stunTimer = 0;
                 p.actionCooldown = 0;
             });
@@ -765,9 +775,10 @@ createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
         const sprites = isPlayerTeam ? this.playerSprites : this.opponentSprites;
         const idx = sprites.indexOf(p);
         const slot = slots[idx] || { offsetX: 250, offsetY: 300 };
+        const coords = this.getSlotPitchCoords(slot);
         return {
-            x: isPlayerTeam ? slot.offsetX : 800 - slot.offsetX,
-            y: slot.offsetY
+            x: isPlayerTeam ? coords.x : 800 - coords.x,
+            y: coords.y
         };
     }
 
@@ -1329,6 +1340,20 @@ createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
         }
     }
 
+
+    syncBallVisuals() {
+        if (!this.ballContainer || !this.ballSprite) return;
+        this.ballContainer.x = this.ball.x;
+        this.ballContainer.y = this.ball.y;
+
+        this.ballSprite.y = -this.ball.z;
+        const shadow = this.ballContainer.list[0];
+        if (shadow) {
+            const scale = Math.max(0.3, 1 - (this.ball.z / 60));
+            shadow.setScale(scale);
+            shadow.alpha = Math.max(0.1, 0.45 - (this.ball.z / 100));
+        }
+    }
 
     syncPlayerVisuals() {
         const allPlayers = [...this.playerSprites, ...this.opponentSprites];
