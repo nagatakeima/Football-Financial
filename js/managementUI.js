@@ -342,6 +342,28 @@ class ManagementUI {
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+            ctx.lineWidth = 2;
+            const w = canvas.width;
+            const h = canvas.height;
+            const marginX = 20;
+            const marginY = 30;
+            const pitchW = w - marginX * 2;
+            const pitchH = h - marginY * 2;
+
+            ctx.strokeRect(marginX, marginY, pitchW, pitchH);
+            ctx.beginPath();
+            ctx.moveTo(marginX, h / 2);
+            ctx.lineTo(w - marginX, h / 2);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(w / 2, h / 2, 45, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.strokeRect(w / 2 - 60, marginY, 120, 80);
+            ctx.strokeRect(w / 2 - 60, h - marginY - 80, 120, 80);
+
             team.starting11.forEach((player, idx) => {
                 if(!player) return;
                 const c = coords[idx] || { x: 0.5, y: 0.5 };
@@ -543,9 +565,14 @@ class ManagementUI {
                     </table>
                 </div>
 
-                <button onclick="managementUI.handlePlayerClick(${idx2}, true)" style="margin-top: 10px; width: 100%; padding: 12px; font-size: 16px; font-weight: bold; background: #27ae60; color:#fff; border: none; border-radius: 6px; cursor: pointer;">
-                    ⚡ 入れ替えを確定する
-                </button>
+                <div style="display: flex; gap: 8px; margin-top: 10px;">
+                    <button onclick="managementUI.toggleSwapMode(null)" style="flex: 1; padding: 12px; font-size: 14px; background: #555; color: #fff; border: none; border-radius: 6px; cursor: pointer;">
+                        キャンセル
+                    </button>
+                    <button onclick="managementUI.handlePlayerClick(${idx2}, true)" style="flex: 2; padding: 12px; font-size: 16px; font-weight: bold; background: #27ae60; color:#fff; border: none; border-radius: 6px; cursor: pointer;">
+                        ⚡ 入れ替えを確定する
+                    </button>
+                </div>
             </div>
         `;
 
@@ -739,7 +766,11 @@ class ManagementUI {
             ? team.starting11[this.selectedPlayerIndex]
             : team.bench[this.selectedPlayerIndex - 11];
         this.renderFormation();
-        this.renderPlayerDetailCard(p, this.selectedPlayerIndex);
+        if (this.swapSourceIndex !== null && this.swapSourceIndex !== this.selectedPlayerIndex) {
+            this.renderPlayerComparison(this.swapSourceIndex, this.selectedPlayerIndex);
+        } else {
+            this.renderPlayerDetailCard(p, this.selectedPlayerIndex);
+        }
     }
 
 
