@@ -566,6 +566,19 @@ createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
     }
 
     triggerCommand(slotIndex) {
+        if (!this.playerTeamData) return;
+        const cmdId = this.playerTeamData.microCommands[slotIndex];
+        const cmdData = window.MasterData.MicroCommands.find(c => c.id === cmdId);
+        if (cmdData && cmdData.conditions && cmdData.conditions.length > 0) {
+            cmdData.conditions.forEach(cond => {
+                if (cond.targets) {
+                    cond.targets.forEach(p => {
+                        this.showAuraEffect(p);
+                        this.showFloatingText(p.x, p.y, cmdData.name, 0xffd700);
+                    });
+                }
+            });
+        }
         const slot = this.commandSlots[slotIndex];
         if (!slot) return;
         if (slot.currentCd > 0 || slot.usesLeft <= 0) return;
@@ -869,8 +882,8 @@ createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
         if (pData.currentStamina < 30) base *= 0.8;
 
         const isPlayerTeam = player?.isPlayerTeam ?? pData.isPlayerTeam ?? (this.playerTeamData && pData.teamId === this.playerTeamData.id);
-        const myTac = isPlayerTeam ? this.playerTeamData?.preference : this.opponentTeamData?.preference;
-        const opTac = isPlayerTeam ? this.opponentTeamData?.preference : this.playerTeamData?.preference;
+        const myTac = isPlayerTeam ? (this.playerTeamData?.manager?.preference || this.playerTeamData?.preference) : (this.opponentTeamData?.manager?.preference || this.opponentTeamData?.preference);
+        const opTac = isPlayerTeam ? (this.opponentTeamData?.manager?.preference || this.opponentTeamData?.preference) : (this.playerTeamData?.manager?.preference || this.playerTeamData?.preference);
 
         if (this.isRpsAdvantage(myTac, opTac)) {
             base *= 1.15;

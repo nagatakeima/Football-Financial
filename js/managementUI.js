@@ -342,6 +342,54 @@ class ManagementUI {
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+        // Draw Pitch Lines
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+        ctx.lineWidth = 2;
+
+        // Outer bounds
+        ctx.strokeRect(20, 20, canvas.width - 40, canvas.height - 40);
+
+        // Halfway line
+        ctx.beginPath();
+        ctx.moveTo(20, canvas.height / 2);
+        ctx.lineTo(canvas.width - 20, canvas.height / 2);
+        ctx.stroke();
+
+        // Center circle
+        ctx.beginPath();
+        ctx.arc(canvas.width / 2, canvas.height / 2, 40, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Top Penalty Area
+        ctx.strokeRect(canvas.width / 2 - 60, 20, 120, 60);
+
+        // Bottom Penalty Area
+        ctx.strokeRect(canvas.width / 2 - 60, canvas.height - 80, 120, 60);
+
+        // Draw Pitch Lines
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+        ctx.lineWidth = 2;
+
+        // Outer bounds
+        ctx.strokeRect(20, 20, canvas.width - 40, canvas.height - 40);
+
+        // Halfway line
+        ctx.beginPath();
+        ctx.moveTo(20, canvas.height / 2);
+        ctx.lineTo(canvas.width - 20, canvas.height / 2);
+        ctx.stroke();
+
+        // Center circle
+        ctx.beginPath();
+        ctx.arc(canvas.width / 2, canvas.height / 2, 40, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Top Penalty Area
+        ctx.strokeRect(canvas.width / 2 - 60, 20, 120, 60);
+
+        // Bottom Penalty Area
+        ctx.strokeRect(canvas.width / 2 - 60, canvas.height - 80, 120, 60);
+
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
             ctx.lineWidth = 2;
             const w = canvas.width;
@@ -817,6 +865,7 @@ class ManagementUI {
         }
     }
 
+    // selectEvent deprecated in favor of openEventStep2
     selectEvent(eventId) {
         const e = window.gameState.currentEvents.find(ev => ev.id === eventId);
         if (!e) return;
@@ -953,7 +1002,11 @@ class ManagementUI {
         const guaranteedTypes = ['scout', 'training', 'relic', 'command', 'mystery'];
 
         guaranteedTypes.forEach((type, i) => {
-            const eventObj = { id: `evt_${Date.now()}_${i}`, type, choices: [] };
+            let apCost = 1;
+            if (type === 'command' || type === 'relic') apCost = 2;
+            if (type === 'mystery') apCost = Math.floor(Math.random() * 2) + 2; // 2 or 3
+
+            const eventObj = { id: `evt_${Date.now()}_${i}`, type, apCost, choices: [] };
 
             if (type === 'scout') {
                 eventObj.title = 'スカウトからの提案';
