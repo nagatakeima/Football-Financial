@@ -139,13 +139,16 @@ class MatchScene extends Phaser.Scene {
 
         const initTeamRatings = (team) => {
             team.players.forEach((p, idx) => {
-                p.currentStamina = p.stats.stamina || 80;
+                p.currentStamina = Math.floor((p.stats.stamina || 80) * (0.5 + 0.5 * ((p.condition ?? 100) / 100)));
                 p.matchRating = 6.0;
                 p.matchGoals = 0;
                 p.matchAssists = 0;
                 p.jerseyNumber = idx + 1;
                 if (!p.dynamicStats) p.dynamicStats = { ...p.stats };
             });
+            if (team.starting11) {
+                team.starting11.forEach(p => p.playedInMatch = true);
+            }
         };
         initTeamRatings(this.playerTeamData);
         initTeamRatings(this.opponentTeamData);
@@ -563,6 +566,19 @@ createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
     }
 
     triggerCommand(slotIndex) {
+        if (!this.playerTeamData) return;
+        const cmdId = this.playerTeamData.microCommands[slotIndex];
+        const cmdData = window.MasterData.MicroCommands.find(c => c.id === cmdId);
+        if (cmdData && cmdData.conditions && cmdData.conditions.length > 0) {
+            cmdData.conditions.forEach(cond => {
+                if (cond.targets) {
+                    cond.targets.forEach(p => {
+                        this.showAuraEffect(p);
+                        this.showFloatingText(p.x, p.y, cmdData.name, 0xffd700);
+                    });
+                }
+            });
+        }
         const slot = this.commandSlots[slotIndex];
         if (!slot) return;
         if (slot.currentCd > 0 || slot.usesLeft <= 0) return;
@@ -860,12 +876,33 @@ createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
 
     getEffectiveStat(player, statName, activeConditions = []) {
         const pData = player?.playerData || player || {};
-        const base = pData.dynamicStats?.[statName] ?? pData.stats?.[statName] ?? 50;
+        let base = pData.dynamicStats?.[statName] ?? pData.stats?.[statName] ?? 50;
+
+        if (pData.condition < 70) base *= 0.88;
+        if (pData.currentStamina < 30) base *= 0.8;
+
+        const isPlayerTeam = player?.isPlayerTeam ?? pData.isPlayerTeam ?? (this.playerTeamData && pData.teamId === this.playerTeamData.id);
+        const myTac = isPlayerTeam ? (this.playerTeamData?.manager?.preference || this.playerTeamData?.preference) : (this.opponentTeamData?.manager?.preference || this.opponentTeamData?.preference);
+        const opTac = isPlayerTeam ? (this.opponentTeamData?.manager?.preference || this.opponentTeamData?.preference) : (this.playerTeamData?.manager?.preference || this.playerTeamData?.preference);
+
+        if (this.isRpsAdvantage(myTac, opTac)) {
+            base *= 1.15;
+        }
+
         let bonus = 0;
         if (window.Player && typeof window.Player.getSkillEffectFor === 'function') {
             bonus += window.Player.getSkillEffectFor(pData, 'STAT_UP', statName, activeConditions).value || 0;
         }
         return Phaser.Math.Clamp(base + bonus, 10, 100);
+    }
+
+    isRpsAdvantage(myTac, opTac) {
+        if (!myTac || !opTac) return false;
+        if (myTac === 'Possession' && opTac === 'Retreat') return true;
+        if (myTac === 'Retreat' && opTac === 'Counter') return true;
+        if (myTac === 'Counter' && opTac === 'HighPress') return true;
+        if (myTac === 'HighPress' && opTac === 'Possession') return true;
+        return false;
     }
 
     evaluateActions(p, contextData = {}) {
