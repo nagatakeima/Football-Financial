@@ -14,6 +14,25 @@ class ChemistrySystem {
         return links;
     }
 
+
+    static checkRoleSynergy(role1, role2) {
+        if (!role1 || !role2) return false;
+        const synergies = [
+            ['Attacking', 'Inside-Forward'],
+            ['Inverted', 'Classic-Winger'],
+            ['Stopper', 'Covering'],
+            ['Anchor', 'Box-to-Box'],
+            ['Advanced-Playmaker', 'Poacher'],
+            ['False-9', 'Shadow-Striker'],
+            ['False-9', 'Inside-Forward'],
+            ['Target-Man', 'Crosser']
+        ];
+        return synergies.some(pair =>
+            (pair[0] === role1 && pair[1] === role2) ||
+            (pair[1] === role1 && pair[0] === role2)
+        );
+    }
+
     static calculateTeamChemistry(team) {
         if (!team || team.starting11.length < 11) return;
 
@@ -26,6 +45,8 @@ class ChemistrySystem {
         });
 
         // Calculate preference matches
+        team.chemistryLinks = [];
+
         links.forEach(({from, to}) => {
             const slots = window.MasterData.Formations[team.formation]?.slots || [];
             const idx1 = slots.findIndex(s => s.id === from);
@@ -37,10 +58,15 @@ class ChemistrySystem {
             const p1 = team.starting11[idx1];
             const p2 = team.starting11[idx2];
 
-            if (p1.preference === p2.preference) {
-                // Determine multiplier from Relics (e.g., Possession Philosophy = 1.5x)
-                let multiplier = 1.0;
+            let level = 0;
+            if (p1.preference === p2.preference) level += 1;
+            if (p1.nationality === p2.nationality) level += 1;
+            if (this.checkRoleSynergy(p1.role, p2.role)) level += 1;
 
+            team.chemistryLinks.push({ from, to, level });
+
+            if (level > 0) {
+                let multiplier = 1.0;
                 team.relics.forEach(relicId => {
                     const relic = window.MasterData.Relics.find(r => r.id === relicId);
                     if (relic && relic.effectType === "CHEMISTRY_BOOST" && relic.targetPref === p1.preference) {
@@ -48,8 +74,12 @@ class ChemistrySystem {
                     }
                 });
 
-                // Apply +10% base stat boost for linked players
-                const boost = 1.1 * multiplier;
+                let boostPercentage = 0;
+                if (level === 1) boostPercentage = 0.05;
+                else if (level === 2) boostPercentage = 0.10;
+                else if (level === 3) boostPercentage = 0.18;
+
+                const boost = 1.0 + (boostPercentage * multiplier);
                 this.applyBoost(p1, boost);
                 this.applyBoost(p2, boost);
 
