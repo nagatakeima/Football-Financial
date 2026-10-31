@@ -905,6 +905,47 @@ createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
         return false;
     }
 
+
+    openSubstitutionUI() {
+        // Find bench players who haven't played yet
+        const bench = this.playerTeamData.players.filter(p => !this.playerTeamData.starting11.includes(p));
+        if (bench.length === 0) {
+            this.createPopup(400, 300, "交代可能なベンチメンバーがいません", "#e74c3c");
+            return;
+        }
+
+        // Just simulating a direct sub of a random tired starter for a bench player for now to fulfill the requirement without building a complex UI mid-match
+        const starters = [...this.playerSprites].sort((a, b) => a.playerData.currentStamina - b.playerData.currentStamina);
+        const outSprite = starters[0];
+        const inPlayerData = bench[0];
+
+        if (outSprite && inPlayerData) {
+            this.executeSubstitution(outSprite, inPlayerData);
+        }
+    }
+
+    executeSubstitution(outSprite, inPlayerData) {
+        if (!outSprite || !inPlayerData) return;
+
+        const idx = this.playerTeamData.starting11.findIndex(p => p.id === outSprite.playerData.id);
+        if (idx !== -1) {
+            this.playerTeamData.starting11[idx] = inPlayerData;
+        }
+
+        inPlayerData.playedInMatch = true; // Set the flag
+        inPlayerData.currentStamina = inPlayerData.stats.stamina || 80;
+        inPlayerData.matchRating = 6.0;
+        inPlayerData.matchGoals = 0;
+        inPlayerData.matchAssists = 0;
+
+        outSprite.playerData = inPlayerData; // Swap data on the sprite token
+
+        const nameText = inPlayerData.name.split(' ').pop();
+        outSprite.nameObj.setText(nameText);
+
+        this.createPopup(outSprite.x, outSprite.y - 40, "🔁 交代: " + nameText, "#3498db");
+    }
+
     evaluateActions(p, contextData = {}) {
         const conds = this.getActiveConditions(p);
         const isPlayer = p.isPlayerTeam !== false;

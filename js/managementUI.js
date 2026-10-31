@@ -366,29 +366,7 @@ class ManagementUI {
         // Bottom Penalty Area
         ctx.strokeRect(canvas.width / 2 - 60, canvas.height - 80, 120, 60);
 
-        // Draw Pitch Lines
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
-        ctx.lineWidth = 2;
 
-        // Outer bounds
-        ctx.strokeRect(20, 20, canvas.width - 40, canvas.height - 40);
-
-        // Halfway line
-        ctx.beginPath();
-        ctx.moveTo(20, canvas.height / 2);
-        ctx.lineTo(canvas.width - 20, canvas.height / 2);
-        ctx.stroke();
-
-        // Center circle
-        ctx.beginPath();
-        ctx.arc(canvas.width / 2, canvas.height / 2, 40, 0, Math.PI * 2);
-        ctx.stroke();
-
-        // Top Penalty Area
-        ctx.strokeRect(canvas.width / 2 - 60, 20, 120, 60);
-
-        // Bottom Penalty Area
-        ctx.strokeRect(canvas.width / 2 - 60, canvas.height - 80, 120, 60);
 
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
             ctx.lineWidth = 2;
