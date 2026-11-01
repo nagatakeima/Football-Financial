@@ -117,9 +117,13 @@ class GameState {
 
         // Apply condition recovery
         this.playerTeam.players.forEach(p => {
-             // base match stamina recovery (e.g., 20) + relic bonus
-             p.condition = Math.min(100, p.condition + 20 + conditionRecoveryBonus);
-             p.currentStamina = p.stats.stamina; // Reset match stamina
+            if (this.playerTeam.starting11.includes(p) || p.playedInMatch === true) {
+                p.condition = Math.max(10, (p.condition ?? 100) - 18);
+            } else {
+                p.condition = Math.min(100, (p.condition ?? 100) + 25 + conditionRecoveryBonus);
+            }
+            p.playedInMatch = false; // Reset for next match
+            p.currentStamina = p.stats.stamina; // Reset match stamina
         });
 
         this.funds += matchFunds;

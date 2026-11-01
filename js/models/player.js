@@ -36,13 +36,43 @@ class Player {
     }
 
     getOvr() {
-        const avgStat = Object.values(this.stats).reduce((a, b) => a + b, 0) / 7;
+        const { pass, shoot, defense, physical, speed, mental, stamina } = this.stats;
+        let baseOvr = 0;
+        switch (this.position) {
+            case 'GK':
+                baseOvr = defense * 0.40 + mental * 0.25 + physical * 0.20 + pass * 0.15;
+                break;
+            case 'CB':
+                baseOvr = defense * 0.40 + physical * 0.30 + mental * 0.15 + speed * 0.10 + pass * 0.05;
+                break;
+            case 'SB':
+                baseOvr = speed * 0.25 + defense * 0.25 + stamina * 0.20 + pass * 0.20 + physical * 0.10;
+                break;
+            case 'CDM':
+                baseOvr = defense * 0.30 + pass * 0.25 + mental * 0.20 + physical * 0.15 + stamina * 0.10;
+                break;
+            case 'CM':
+                baseOvr = pass * 0.30 + stamina * 0.20 + mental * 0.20 + defense * 0.15 + shoot * 0.15;
+                break;
+            case 'CAM':
+                baseOvr = pass * 0.35 + shoot * 0.25 + mental * 0.20 + speed * 0.20;
+                break;
+            case 'WG':
+                baseOvr = speed * 0.35 + shoot * 0.25 + pass * 0.25 + stamina * 0.15;
+                break;
+            case 'CF':
+                baseOvr = shoot * 0.45 + physical * 0.20 + speed * 0.20 + mental * 0.15;
+                break;
+            default:
+                baseOvr = Object.values(this.stats).reduce((a, b) => a + b, 0) / 7;
+        }
+
         let rarityBonus = 0;
         if (this.rarity === 'R') rarityBonus = 2;
         if (this.rarity === 'SR') rarityBonus = 5;
         if (this.rarity === 'SSR') rarityBonus = 10;
 
-        return Math.min(100, Math.floor(avgStat + rarityBonus)); // Level bonus is already applied to stats
+        return Math.max(1, Math.min(100, Math.floor(baseOvr + rarityBonus)));
     }
 
     addExp(amount) {
@@ -101,14 +131,25 @@ class Player {
         };
 
         // Random stats slightly weighted by position
+        const posBonus = {
+            GK: { defense: 15, mental: 12, physical: 10, pass: 0, shoot: -15, speed: -10, stamina: 0 },
+            CB: { defense: 15, physical: 12, mental: 5, speed: -5, pass: -5, shoot: -15, stamina: 0 },
+            SB: { speed: 12, defense: 10, stamina: 10, pass: 5, physical: 0, mental: 0, shoot: -10 },
+            CDM: { defense: 12, pass: 10, mental: 10, physical: 5, stamina: 5, shoot: -5, speed: -5 },
+            CM: { pass: 12, stamina: 10, mental: 5, defense: 5, shoot: 5, physical: 0, speed: 0 },
+            CAM: { pass: 15, shoot: 10, speed: 10, mental: 5, physical: -5, defense: -10, stamina: 0 },
+            WG: { speed: 15, shoot: 10, pass: 10, stamina: 5, physical: -5, defense: -10, mental: 0 },
+            CF: { shoot: 15, physical: 10, speed: 10, mental: 5, defense: -15, pass: -5, stamina: -5 }
+        }[position] || { pass: 0, shoot: 0, defense: 0, physical: 0, speed: 0, mental: 0, stamina: 0 };
+
         const stats = {
-            pass: genStat(position === 'CM' || position === 'CAM' ? 10 : 0),
-            shoot: genStat(position === 'CF' || position === 'WG' ? 10 : 0),
-            defense: genStat(position === 'CB' || position === 'CDM' ? 10 : 0),
-            physical: genStat(position === 'CB' || position === 'CF' ? 10 : 0),
-            speed: genStat(position === 'WG' || position === 'SB' ? 10 : 0),
-            mental: genStat(0),
-            stamina: genStat(10)
+            pass: genStat(posBonus.pass),
+            shoot: genStat(posBonus.shoot),
+            defense: genStat(posBonus.defense),
+            physical: genStat(posBonus.physical),
+            speed: genStat(posBonus.speed),
+            mental: genStat(posBonus.mental),
+            stamina: genStat(posBonus.stamina)
         };
 
         // Clamp stats to 100

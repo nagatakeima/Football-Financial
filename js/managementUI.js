@@ -342,6 +342,32 @@ class ManagementUI {
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+        // Draw Pitch Lines
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+        ctx.lineWidth = 2;
+
+        // Outer bounds
+        ctx.strokeRect(20, 20, canvas.width - 40, canvas.height - 40);
+
+        // Halfway line
+        ctx.beginPath();
+        ctx.moveTo(20, canvas.height / 2);
+        ctx.lineTo(canvas.width - 20, canvas.height / 2);
+        ctx.stroke();
+
+        // Center circle
+        ctx.beginPath();
+        ctx.arc(canvas.width / 2, canvas.height / 2, 40, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Top Penalty Area
+        ctx.strokeRect(canvas.width / 2 - 60, 20, 120, 60);
+
+        // Bottom Penalty Area
+        ctx.strokeRect(canvas.width / 2 - 60, canvas.height - 80, 120, 60);
+
+
+
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
             ctx.lineWidth = 2;
             const w = canvas.width;
@@ -556,7 +582,7 @@ class ManagementUI {
                     <table style="width: 100%; border-collapse: collapse; font-size: 12px; color: #fff;">
                         <tr><th style="background: rgba(0,0,0,0.5); padding: 5px;">${p1.name}</th><th style="background: rgba(0,0,0,0.5); padding: 5px;">STAT</th><th style="background: rgba(0,0,0,0.5); padding: 5px;">${p2.name}</th></tr>
                         ${this.generateCompareRow(p1.condition, p2.condition, '体力')}
-                        ${this.generateCompareRow(p1.stats.pass, p2.stats.pass, 'パス')}
+                        ${this.generateCompareRow(p1.stats.pass, p2.stats.pass, p1.position === 'GK' || p2.position === 'GK' ? 'KIC' : 'パス')}
                         ${this.generateCompareRow(p1.stats.shoot, p2.stats.shoot, 'シュート')}
                         ${this.generateCompareRow(p1.stats.defense, p2.stats.defense, '守備')}
                         ${this.generateCompareRow(p1.stats.speed, p2.stats.speed, 'スピード')}
@@ -779,168 +805,178 @@ class ManagementUI {
     // 2. スカウト・強化 (APイベント) 画面
     // =========================================================
     showEvents() {
-        this.activeTab = 'events';
-        this.updateTopBar();
-
-        if (!window.gameState.currentEvents || window.gameState.currentEvents.length === 0) {
-            if (!window.gameState.eventsGeneratedForTurn) {
+        if (!window.gameState.eventsGeneratedForTurn) {
+            if (window.gameState.currentEvents.length === 0) {
                 this.generateEvents();
                 window.gameState.eventsGeneratedForTurn = true;
             }
         }
 
         const events = window.gameState.currentEvents;
+
+        // Step 1: Event List View
         this.uiContent.innerHTML = `
-            <div class="ui-layout-container" style="flex-direction: column;">
-                <div style="display: flex; gap: 10px; flex-shrink: 0;">
+            <div class="ui-layout-container" style="flex-direction: column; overflow-y: auto;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; padding: 10px;">
                     ${events.map(e => {
                         const colors = { scout: '#2ecc71', training: '#3498db', relic: '#f39c12', command: '#9b59b6', mystery: '#e74c3c' };
                         const c = colors[e.type] || '#bdc3c7';
+                        const isOpened = e.isOpened;
                         return `
-                            <div id="card_${e.id}" class="event-card" onclick="managementUI.selectEvent('${e.id}')"
-                                style="flex: 1; background: #10241e; border: 2px solid ${c}; border-radius: 8px; padding: 10px 12px; cursor: pointer;">
-                                <div style="font-size: 14px; font-weight: 800; color: ${c}; margin-bottom: 4px;">${e.title}</div>
-                                <div style="font-size: 11px; color: #95a5a6;">${e.flavorText || ''}</div>
+                            <div class="event-card ${isOpened ? 'opened' : ''}" onclick="managementUI.openEventStep2('${e.id}')"
+                                style="background: #10241e; border: 2px solid ${c}; border-radius: 8px; padding: 20px; cursor: pointer; transition: transform 0.2s; min-height: 150px; display: flex; flex-direction: column;">
+                                <div style="font-size: 18px; font-weight: 800; color: ${c}; margin-bottom: 10px;">${e.title}</div>
+                                <div style="font-size: 13px; color: #95a5a6; flex-grow: 1;">${e.flavorText || ''}</div>
+                                ${isOpened ?
+                                    '<div style="color: #2ecc71; font-weight: bold; margin-top: 10px;">▶ 進行中 (AP消費済み)</div>' :
+                                    `<div style="color: #f1c40f; font-weight: bold; margin-top: 10px;">⚡ 消費AP: ${e.apCost}</div>`
+                                }
                             </div>
                         `;
                     }).join('')}
                 </div>
+            </div>
+        `;
+    }
 
-                <div id="event-detail-panel" class="ui-panel" style="flex: 1; overflow-y: auto;">
-                    <div style="margin: auto; color: #7f8c8d; font-size: 14px;">上のイベントカードを選択してください</div>
+    openEventStep2(eventId) {
+        const ev = window.gameState.currentEvents.find(e => e.id === eventId);
+        if (!ev) return;
+
+        if (!ev.isOpened) {
+            if (window.gameState.ap < ev.apCost) {
+                this.showToast(`APが足りません（必要AP: ${ev.apCost}）`, 'error');
+                return;
+            }
+            window.gameState.ap -= ev.apCost;
+            ev.isOpened = true;
+            this.updateHeaderBar();
+        }
+
+        // Step 2: Course Selection View
+        let choicesHtml = ev.choices.map((choice, i) => `
+            <div class="event-choice-card" onclick="managementUI.executeEventChoice('${ev.id}', ${i})"
+                 style="background: #1a2b27; border: 1px solid #34495e; border-radius: 8px; padding: 15px; margin-bottom: 15px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-size: 16px; font-weight: bold; color: white;">${choice.text}</div>
+                    ${choice.cost > 0 ? `<div style="color: #e74c3c; font-size: 13px; margin-top: 5px;">💰 ¥${choice.cost.toLocaleString()}</div>` : ''}
+                </div>
+                <div style="color: #3498db; font-size: 20px;">➤</div>
+            </div>
+        `).join('');
+
+        this.uiContent.innerHTML = `
+            <div style="padding: 20px;">
+                <button onclick="managementUI.showEvents()" style="background: transparent; border: none; color: #95a5a6; cursor: pointer; font-size: 16px; margin-bottom: 20px;">◀ 戻る</button>
+                <h2 style="color: white; border-bottom: 2px solid #2ecc71; padding-bottom: 10px; margin-bottom: 20px;">${ev.title}</h2>
+                <div style="color: #bdc3c7; margin-bottom: 20px;">どの方針を選択しますか？</div>
+                <div style="max-width: 600px; margin: 0 auto;">
+                    ${choicesHtml}
                 </div>
             </div>
         `;
+    }
 
-        if (events.length > 0) {
-            this.selectEvent(events[0].id);
+    executeEventChoice(eventId, choiceIndex) {
+        const ev = window.gameState.currentEvents.find(e => e.id === eventId);
+        if (!ev) return;
+        const choice = ev.choices[choiceIndex];
+
+        if (choice.cost > window.gameState.funds) {
+            this.showToast('資金が足りません', 'error');
+            return;
+        }
+
+        // Check if step 3 is needed
+        if (choice.type === 'scout_draft') {
+            this.showEventStep3Draft(ev, choice);
+        } else if (choice.type === 'training_target' || choice.type === 'awaken_target') {
+            this.showEventStep3Target(ev, choice);
+        } else {
+            // Immediate execution
+            window.gameState.funds -= (choice.cost || 0);
+            if (choice.action) choice.action();
+            this.showToast(`${choice.text} を実行しました`, 'success');
+
+            // Remove event from list as it's completed
+            window.gameState.currentEvents = window.gameState.currentEvents.filter(e => e.id !== eventId);
+            this.updateHeaderBar();
+            this.showEvents();
         }
     }
 
-    selectEvent(eventId) {
-        const e = window.gameState.currentEvents.find(ev => ev.id === eventId);
-        if (!e) return;
-
-        document.querySelectorAll('.event-card').forEach(el => {
-            el.style.boxShadow = 'none';
-        });
-        const cardEl = document.getElementById(`card_${eventId}`);
-        if (cardEl) cardEl.style.boxShadow = '0 0 14px rgba(46, 204, 113, 0.5)';
-
-        const detailPanel = document.getElementById('event-detail-panel');
-        if (!detailPanel) return;
-
-        const team = window.gameState.playerTeam;
-        const posCounts = { GK: 0, DF: 0, MF: 0, FW: 0 };
-        (team.players || []).forEach(p => {
-            if (p.position === 'GK') posCounts.GK++;
-            else if (['CB', 'SB'].includes(p.position)) posCounts.DF++;
-            else if (['CDM', 'CM', 'CAM'].includes(p.position)) posCounts.MF++;
-            else posCounts.FW++;
-        });
-
-        let html = `
-            <div class="panel-header-title">
-                <span style="font-size: 16px;">${e.title} — ${e.flavorText || ''}</span>
-                <span style="color: #f1c40f; font-size: 12px;">
-                    現在編成: GK ${posCounts.GK} | DF ${posCounts.DF} | MF ${posCounts.MF} | FW ${posCounts.FW} (計${team.players.length}/18名)
-                </span>
-            </div>
-            <div style="display: flex; gap: 12px; flex: 1; align-items: stretch; overflow-y: auto;">
-        `;
-
-        e.choices.forEach((choice, idx) => {
-            const canAfford = window.gameState.funds >= choice.fundCost && window.gameState.ap >= 1;
-            const titleText = choice.text || choice.desc;
-
-            let innerContent = '';
-            if (choice.candidates) {
-                innerContent += `<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; width: 100%; margin-bottom: 8px;">`;
-                choice.candidates.forEach((cand, candIdx) => {
-                    const skillsStr = cand.skills.map(sid => window.MasterData.PlayerSkills.find(s => s.id === sid)?.name).filter(Boolean).join(', ') || 'なし';
-                    const subStr = cand.subPositions?.length ? `/${cand.subPositions.join(',')}` : '';
-                    innerContent += `
-                        <label style="background: #0b1814; border: 1px solid #285446; border-radius: 6px; padding: 8px; cursor: pointer; display: flex; flex-direction: column; gap: 4px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <span><input type="radio" name="draft_select_${eventId}_${idx}" value="${candIdx}" ${candIdx === 0 ? 'checked' : ''}> <strong>[${cand.position}${subStr}] ${cand.name}</strong></span>
-                                <span style="color: #f1c40f; font-weight: 900;">OVR ${cand.getOvr()}</span>
-                            </div>
-                            <div style="font-size: 10px; color: #a3e4d7;">${cand.rarity} | Lv.${cand.level} | 志向: ${cand.preference} | 役割: ${cand.role || 'なし'}</div>
-                            <div style="font-size: 10px; color: #bdc3c7;">SPD:${cand.stats.speed} PAS:${cand.stats.pass} SHT:${cand.stats.shoot} DEF:${cand.stats.defense} PHY:${cand.stats.physical}</div>
-                            <div style="font-size: 10px; color: #95a5a6;">スキル: ${skillsStr}</div>
-                        </label>
-                    `;
-                });
-                innerContent += `</div>`;
-            }
-
-            if (choice.tradeCount > 0) {
-                innerContent += `<div style="margin-bottom: 8px;">`;
-                for (let tc = 0; tc < choice.tradeCount; tc++) {
-                    let optIdx = 0;
-                    innerContent += `<div style="font-size: 11px; color: #ff7979; margin-bottom: 2px;">放出選手 ${tc + 1}:</div>`;
-                    innerContent += `<select id="trade_select_${eventId}_${idx}_${tc}" style="width: 100%; background: #0b1714; color: #fff; padding: 5px; border: 1px solid #e74c3c; border-radius: 4px; font-size: 11px; margin-bottom: 4px;">`;
-                    team.bench.forEach(p => {
-                        innerContent += `<option value="${p.id}" ${optIdx === tc ? 'selected' : ''}>[ベンチ] [${p.rarity}] [${p.position}] ${p.name} (Lv.${p.level} / OVR: ${p.getOvr()} / ${p.preference})</option>`;
-                        optIdx++;
-                    });
-                    team.starting11.forEach(p => {
-                        innerContent += `<option value="${p.id}" ${optIdx === tc ? 'selected' : ''}>[スタメン] [${p.rarity}] [${p.position}] ${p.name} (Lv.${p.level} / OVR: ${p.getOvr()} / ${p.preference})</option>`;
-                        optIdx++;
-                    });
-                    innerContent += `</select>`;
-                }
-                innerContent += `</div>`;
-            } else if (choice.action === 'awaken') {
-                innerContent += `
-                    <div style="margin-bottom: 8px;">
-                        <div style="font-size: 11px; color: #3498db; margin-bottom: 3px;">覚醒対象を選択:</div>
-                        <select id="awaken_select_${eventId}_${idx}" style="width: 100%; background: #0b1714; color: #fff; padding: 6px; border: 1px solid #3498db; border-radius: 4px;">
-                            ${team.starting11.map(p => `<option value="${p.id}">[スタメン] [${p.rarity}] [${p.position}] ${p.name} (Lv.${p.level} / OVR: ${p.getOvr()})</option>`).join('')}
-                            ${team.bench.map(p => `<option value="${p.id}">[ベンチ] [${p.rarity}] [${p.position}] ${p.name} (Lv.${p.level} / OVR: ${p.getOvr()})</option>`).join('')}
-                        </select>
-                    </div>
-                `;
-            } else if (choice.action === 'teach_skill') {
-                const validTargets = team.players.filter(p => p.skills.length < 3 && choice.skill.allowedPositions.includes(p.position) && !p.skills.includes(choice.skill.id));
-                innerContent += `
-                    <div style="margin-bottom: 8px;">
-                        <div style="font-size: 11px; color: #3498db; margin-bottom: 3px;">伝授する対象選手:</div>
-                        <select id="teach_select_${eventId}_${idx}" style="width: 100%; background: #0b1714; color: #fff; padding: 6px; border: 1px solid #3498db; border-radius: 4px;">
-                            ${validTargets.length === 0 ? `<option value="">対象選手がいません</option>` : validTargets.map(p => `<option value="${p.id}">[${p.rarity}] [${p.position}] ${p.name} (Lv.${p.level} / OVR: ${p.getOvr()})</option>`).join('')}
-                        </select>
-                    </div>
-                `;
-            } else if (choice.action === 'mad_science') {
-                innerContent += `
-                    <div style="margin-bottom: 8px;">
-                        <div style="font-size: 11px; color: #9b59b6; margin-bottom: 3px;">手術対象を選択:</div>
-                        <select id="mad_select_${eventId}_${idx}" style="width: 100%; background: #0b1714; color: #fff; padding: 6px; border: 1px solid #9b59b6; border-radius: 4px;">
-                            ${team.starting11.map(p => `<option value="${p.id}">[スタメン] [${p.rarity}] [${p.position}] ${p.name} (Lv.${p.level} / OVR: ${p.getOvr()})</option>`).join('')}
-                            ${team.bench.map(p => `<option value="${p.id}">[ベンチ] [${p.rarity}] [${p.position}] ${p.name} (Lv.${p.level} / OVR: ${p.getOvr()})</option>`).join('')}
-                        </select>
-                    </div>
-                `;
-            }
-
-            html += `
-                <div style="flex: 1; background: #122620; border: 1px solid #285446; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between;">
-                    <div>
-                        <div style="font-size: 14px; font-weight: 800; color: #fff; margin-bottom: 6px;">${titleText}</div>
-                        ${choice.detailHtml || ''}
-                        ${innerContent}
-                    </div>
-                    <button onclick="managementUI.executeEvent('${eventId}', ${idx})" ${!canAfford ? 'disabled' : ''}
-                        style="width: 100%; padding: 10px; background: ${canAfford ? '#27ae60' : '#333'}; margin-top: 8px;">
-                        実行する (資金: ¥${choice.fundCost.toLocaleString()} / AP: 1)
-                    </button>
+    showEventStep3Draft(ev, choice) {
+        let cardsHtml = choice.candidates.map((p, i) => `
+            <div style="background: #1a2b27; border: 2px solid #2ecc71; border-radius: 8px; padding: 15px; display: flex; flex-direction: column;">
+                <div style="text-align: center; margin-bottom: 15px;">
+                    <div style="font-size: 24px; font-weight: bold; color: white;">${p.name}</div>
+                    <div style="color: #f1c40f; margin-top: 5px;">${p.position} | OVR: ${p.getOvr()}</div>
                 </div>
-            `;
-        });
+                ${this.renderPlayerRadarChart(p, 150)}
+                <button onclick="managementUI.completeDraft('${ev.id}', ${i})" style="margin-top: auto; padding: 10px; background: #2ecc71; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">この選手を獲得</button>
+            </div>
+        `).join('');
 
-        html += `</div>`;
-        detailPanel.innerHTML = html;
+        this.uiContent.innerHTML = `
+            <div style="padding: 20px;">
+                <button onclick="managementUI.openEventStep2('${ev.id}')" style="background: transparent; border: none; color: #95a5a6; cursor: pointer; font-size: 16px; margin-bottom: 20px;">◀ コース選択へ戻る</button>
+                <h2 style="color: white; margin-bottom: 20px;">獲得する選手を選んでください</h2>
+                <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px;">
+                    ${cardsHtml}
+                </div>
+            </div>
+        `;
     }
+
+    completeDraft(eventId, candidateIndex) {
+        const ev = window.gameState.currentEvents.find(e => e.id === eventId);
+        if (!ev) return;
+        const choice = ev.choices.find(c => c.candidates);
+        if(!choice) return;
+        window.gameState.funds -= (choice.cost || 0);
+        if (choice.action) choice.action(choice.candidates[candidateIndex]);
+        this.showToast('選手を獲得しました', 'success');
+        window.gameState.currentEvents = window.gameState.currentEvents.filter(e => e.id !== eventId);
+        this.updateHeaderBar();
+        this.showEvents();
+    }
+
+    showEventStep3Target(ev, choice) {
+        let playersHtml = window.gameState.playerTeam.players.map(p => `
+            <div onclick="managementUI.completeTargetAction('${ev.id}', '${p.id}')"
+                 style="background: #1a2b27; border: 1px solid #34495e; border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">
+                <div style="color: white; font-weight: bold;">${p.name}</div>
+                <div style="color: #95a5a6; font-size: 12px;">${p.position} | OVR: ${p.getOvr()}</div>
+            </div>
+        `).join('');
+
+        this.uiContent.innerHTML = `
+            <div style="padding: 20px;">
+                <button onclick="managementUI.openEventStep2('${ev.id}')" style="background: transparent; border: none; color: #95a5a6; cursor: pointer; font-size: 16px; margin-bottom: 20px;">◀ コース選択へ戻る</button>
+                <h2 style="color: white; margin-bottom: 20px;">対象の選手を選んでください</h2>
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px;">
+                    ${playersHtml}
+                </div>
+            </div>
+        `;
+    }
+
+    completeTargetAction(eventId, playerId) {
+        const ev = window.gameState.currentEvents.find(e => e.id === eventId);
+        if (!ev) return;
+        const choice = ev.choices.find(c => c.type === 'training_target' || c.type === 'awaken_target');
+        if(!choice) return;
+        const player = window.gameState.playerTeam.players.find(p => p.id === playerId);
+        if(!player) return;
+        window.gameState.funds -= (choice.cost || 0);
+        if (choice.action) choice.action(player);
+        this.showToast('対象へ実行しました', 'success');
+        window.gameState.currentEvents = window.gameState.currentEvents.filter(e => e.id !== eventId);
+        this.updateHeaderBar();
+        this.showEvents();
+    }
+
+
 
     generateEvents() {
         window.gameState.currentEvents = [];
@@ -953,7 +989,11 @@ class ManagementUI {
         const guaranteedTypes = ['scout', 'training', 'relic', 'command', 'mystery'];
 
         guaranteedTypes.forEach((type, i) => {
-            const eventObj = { id: `evt_${Date.now()}_${i}`, type, choices: [] };
+            let apCost = 1;
+            if (type === 'command' || type === 'relic') apCost = 2;
+            if (type === 'mystery') apCost = Math.floor(Math.random() * 2) + 2; // 2 or 3
+
+            const eventObj = { id: `evt_${Date.now()}_${i}`, type, apCost, choices: [] };
 
             if (type === 'scout') {
                 eventObj.title = 'スカウトからの提案';
