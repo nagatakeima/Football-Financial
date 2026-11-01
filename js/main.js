@@ -567,18 +567,6 @@ createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
 
     triggerCommand(slotIndex) {
         if (!this.playerTeamData) return;
-        const cmdId = this.playerTeamData.microCommands[slotIndex];
-        const cmdData = window.MasterData.MicroCommands.find(c => c.id === cmdId);
-        if (cmdData && cmdData.conditions && cmdData.conditions.length > 0) {
-            cmdData.conditions.forEach(cond => {
-                if (cond.targets) {
-                    cond.targets.forEach(p => {
-                        this.showAuraEffect(p);
-                        this.showFloatingText(p.x, p.y, cmdData.name, 0xffd700);
-                    });
-                }
-            });
-        }
         const slot = this.commandSlots[slotIndex];
         if (!slot) return;
         if (slot.currentCd > 0 || slot.usesLeft <= 0) return;
