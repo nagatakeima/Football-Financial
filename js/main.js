@@ -525,7 +525,7 @@ createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
                 slotEl.innerHTML = `
                     <div class="command-slot-top">
                         <span class="command-name">${cmdData.name}</span>
-                        <button class="auto-toggle-btn" id="cmd-auto-${i}" style="background: #555;">AUTO: OFF</button>
+
                     </div>
                     <div class="command-expl">${expl}</div>
                     <div class="command-slot-bottom">
@@ -570,6 +570,16 @@ createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
         const slot = this.commandSlots[slotIndex];
         if (!slot) return;
         if (slot.currentCd > 0 || slot.usesLeft <= 0) return;
+
+        // Reset CD early for visual
+        slot.currentCd = slot.maxCd;
+        if (slot.usesLeft) slot.usesLeft--;
+
+        let target = this.ball.owner && this.ball.owner.isPlayerTeam !== false ? this.ball.owner : this.playerSprites[0];
+        if (target) {
+            this.createPopup(target.x, target.y - 25, "⚡ " + slot.data.name, "#f1c40f");
+            this.showAuraEffect(target);
+        }
 
         if (slot.data.condition) {
             const isBehind = this.score.player < this.score.opponent;
