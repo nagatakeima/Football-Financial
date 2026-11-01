@@ -582,7 +582,7 @@ class ManagementUI {
                     <table style="width: 100%; border-collapse: collapse; font-size: 12px; color: #fff;">
                         <tr><th style="background: rgba(0,0,0,0.5); padding: 5px;">${p1.name}</th><th style="background: rgba(0,0,0,0.5); padding: 5px;">STAT</th><th style="background: rgba(0,0,0,0.5); padding: 5px;">${p2.name}</th></tr>
                         ${this.generateCompareRow(p1.condition, p2.condition, '体力')}
-                        ${this.generateCompareRow(p1.stats.pass, p2.stats.pass, 'パス')}
+                        ${this.generateCompareRow(p1.stats.pass, p2.stats.pass, p1.position === 'GK' || p2.position === 'GK' ? 'KIC' : 'パス')}
                         ${this.generateCompareRow(p1.stats.shoot, p2.stats.shoot, 'シュート')}
                         ${this.generateCompareRow(p1.stats.defense, p2.stats.defense, '守備')}
                         ${this.generateCompareRow(p1.stats.speed, p2.stats.speed, 'スピード')}
