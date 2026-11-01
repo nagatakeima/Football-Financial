@@ -581,12 +581,6 @@ createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
             this.showAuraEffect(target);
         }
 
-        if (slot.data.condition) {
-            const isBehind = this.score.player < this.score.opponent;
-            const isLead = this.score.player > this.score.opponent;
-            if (slot.data.condition === "behind" && !isBehind) return;
-            if (slot.data.condition === "lead" && !isLead) return;
-        }
 
         slot.usesLeft -= 1;
         slot.currentCd = slot.data.cooldown;
@@ -834,6 +828,12 @@ createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
             }
         }
 
+        if (isPlayerTeam && this.realTimeTactic === 'Attack') {
+            tx += 110;
+        } else if (isPlayerTeam && this.realTimeTactic === 'Defend') {
+            tx -= 120;
+        }
+
         // Width compression when defending
         if (!isAttacking) {
             ty = ty + (this.ball.y - ty) * 0.22;
@@ -958,8 +958,23 @@ createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
             Dribble: 42 + speedStat * 0.35,
             RunIntoSpace: contextData.isAttacking ? 58 + speedStat * 0.25 : 20,
             Press: !contextData.isAttacking ? 60 : 15,
-            HoldPosition: 45
+            HoldPosition: 45,
+            Clear: (isPlayer ? p.x < 150 : p.x > 650) ? 80 : 5,
+            Tackle: 60 + this.getEffectiveStat(p, 'defense', conds) * 0.3,
+            Retreat: (isPlayer ? p.x > 400 : p.x < 400) ? 70 : 30
         };
+
+        if (isPlayer && this.realTimeTactic === 'Attack') {
+            scores.Shoot += 25;
+            scores.Pass += 25;
+            scores.Press += 25;
+        } else if (isPlayer && this.realTimeTactic === 'Defend') {
+            scores.Clear += 30;
+            scores.Tackle += 30;
+            scores.Retreat += 30;
+            scores.Shoot -= 25;
+            scores.Pass -= 25;
+        }
 
         if (contextData.tactic === 'Possession') scores.Pass += 18;
         if (contextData.tactic === 'Counter') {
@@ -1284,7 +1299,9 @@ createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
                 const step = Math.min(dist, moveSpeed);
                 p.x = Phaser.Math.Clamp(p.x + (dx / dist) * step, 28, 772);
                 p.y = Phaser.Math.Clamp(p.y + (dy / dist) * step, 48, 552);
-                p.playerData.currentStamina = Math.max(5, (p.playerData.currentStamina || 80) - 0.012 * (p.playerData.staminaConsumptionRate || 1));
+                let stCost = 0.012 * (p.playerData.staminaConsumptionRate || 1);
+                if (p.isPlayerTeam !== false && this.realTimeTactic === 'Attack') stCost *= 2.0;
+                p.playerData.currentStamina = Math.max(5, (p.playerData.currentStamina || 80) - stCost);
             }
         });
 
@@ -1341,6 +1358,33 @@ createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
         }
     }
 
+    drawPassTrajectory(x1, y1, x2, y2, type = 'pass') {
+        const graphics = this.add.graphics();
+        let color = 0xa3e4d7;
+        let width = 2;
+
+        if (type === 'through' || type === 'cross' || type === 'long') {
+            color = 0xf1c40f;
+            width = 3;
+        } else if (type === 'shoot') {
+            color = 0xff5252;
+            width = 4;
+        }
+
+        graphics.lineStyle(width, color, 0.8);
+        graphics.beginPath();
+        graphics.moveTo(x1, y1);
+        graphics.lineTo(x2, y2);
+        graphics.strokePath();
+
+        this.tweens.add({
+            targets: graphics,
+            alpha: 0,
+            duration: 450,
+            onComplete: () => graphics.destroy()
+        });
+    }
+
     executePass(passer, targetPos, speed = 9, loftZ = 0) {
         const conds = this.getActiveConditions(passer);
         const skillBonus = window.Player.getSkillEffectFor(passer.playerData, "SUCCESS_RATE_UP", "pass", conds);
@@ -1356,6 +1400,9 @@ createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
 
         this.ball.owner = null;
         this.ball.lastTouchTeam = passer.isPlayerTeam;
+        let passType = 'pass';
+        if (loftZ > 0) passType = 'long';
+        this.drawPassTrajectory(passer.x, passer.y, tx, ty, passType);
         this.ball.vx = Math.cos(angle) * speed;
         this.ball.vy = Math.sin(angle) * speed;
         this.ball.vz = loftZ > 0 ? loftZ * 0.35 : 0;
@@ -1387,6 +1434,7 @@ createPlayerToken(pData, isPlayerTeam, number, expectedPosStr) {
 
         this.ball.owner = null;
         this.ball.lastTouchTeam = isPlayer;
+        this.drawPassTrajectory(shooter.x, shooter.y, goalX, targetY, 'shoot');
         this.ball.vx = Math.cos(angle) * power;
         this.ball.vy = Math.sin(angle) * power;
         this.ball.vz = 3.5;
